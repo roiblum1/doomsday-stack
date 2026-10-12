@@ -1,0 +1,19 @@
+image:
+  repository: registry-internal/grafana/grafana
+  tag: "9.2.4"
+  pullPolicy: IfNotPresent
+
+initImage:
+  repository: registry-internal/s5cmd
+  tag: "v2.3.0"
+
+persistence:
+  size: 1Gi
+  storageClassName: lvms-vg1
+
+grafanaIni:
+  rootUrl: ""
+  # Override via parent values, e.g.:
+  # rootUrl: https://grafana-openshift-monitoring.apps.{{ .Values.clusterName }}.{{ .Values.baseDomain }}
+
+resources: {}

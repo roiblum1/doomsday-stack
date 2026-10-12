@@ -1,0 +1,272 @@
+apiVersion: v1
+items:
+- apiVersion: serving.kserve.io/v1alpha2
+  kind: LLMInferenceService
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen36-judge-deploy:serving.kserve.io/LLMInferenceService:llm-judge/qwen36-judge
+    creationTimestamp: "2026-10-07T16:13:42Z"
+    finalizers:
+    - serving.kserve.io/llmisvc-finalizer
+    generation: 2
+    labels:
+      app.kubernetes.io/instance: qwen36-judge
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen36-judge
+      helm.sh/chart: qwen36-judge-0.2.2
+    name: qwen36-judge
+    namespace: llm-judge
+    resourceVersion: "55038111"
+    uid: 3d24a4ee-260e-4bfe-8427-1839eb41b068
+  spec:
+    model:
+      name: judge
+      uri: s3://llms/Qwen/Qwen3.6-35B-A3B-FP8
+    parallelism:
+      tensor: 2
+    replicas: 1
+    router:
+      gateway:
+        refs:
+        - name: envoy-ai-gateway
+          namespace: envoy-ai-gateway-system
+      route: {}
+      scheduler:
+        template:
+          containers: []
+          serviceAccountName: s3sa
+    template:
+      containers:
+      - args:
+        - --max-model-len=16384
+        - --max-num-seqs=128
+        - --reasoning-parser=qwen3
+        - --enable-prefix-caching
+        - --enable-prompt-tokens-details
+        - --enable-force-include-usage
+        - '--default-chat-template-kwargs=''{"enable_thinking": false}'''
+        - --limit-mm-per-prompt='{"image":0,"video":0}'
+        - --trust-remote-code
+        env:
+        - name: HF_HUB_OFFLINE
+          value: "1"
+        - name: NCCL_IB_DISABLE
+          value: "1"
+        - name: TRANSFORMERS_OFFLINE
+          value: "1"
+        - name: VLLM_ENGINE_READY_TIMEOUT_S
+          value: "1800"
+        image: registry-internal/vllm/vllm-openai:v0.30.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: 10
+          timeoutSeconds: 10
+        name: main
+        readinessProbe:
+          failureThreshold: 60
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: "32"
+            memory: 128Gi
+            nvidia.com/gpu: "2"
+          requests:
+            cpu: "16"
+            memory: 64Gi
+            nvidia.com/gpu: "2"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+            - IPC_LOCK
+          runAsNonRoot: false
+        startupProbe:
+          failureThreshold: 360
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: 5
+          timeoutSeconds: 5
+      initContainers:
+      - image: registry-internal/kserve/kserve/storage-initializer:v0.21.0-rc1
+        imagePullPolicy: IfNotPresent
+        name: storage-initializer
+        resources:
+          limits:
+            cpu: "8"
+            memory: 8Gi
+          requests:
+            cpu: "2"
+            memory: 2Gi
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-L4
+      schedulerName: default-scheduler
+      serviceAccountName: s3sa
+      terminationGracePeriodSeconds: 300
+  status:
+    addresses:
+    - models:
+      - name: publishers/llm-judge/models/judge
+      name: gateway-external-model-routing
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: http://192.0.2.7/
+    - models:
+      - name: publishers/llm-judge/models/judge
+      - name: judge
+      name: gateway-external
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: http://192.0.2.7/llm-judge/qwen36-judge
+    - models:
+      - name: publishers/llm-judge/models/judge
+      - name: judge
+      name: gateway-external
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: http://192.0.2.7/publishers/llm-judge/models/judge
+    - models:
+      - name: publishers/llm-judge/models/judge
+      name: gateway-external-model-routing
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: https://192.0.2.7:8443/
+    - models:
+      - name: publishers/llm-judge/models/judge
+      - name: judge
+      name: gateway-external
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: https://192.0.2.7:8443/llm-judge/qwen36-judge
+    - models:
+      - name: publishers/llm-judge/models/judge
+      - name: judge
+      name: gateway-external
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: https://192.0.2.7:8443/publishers/llm-judge/models/judge
+    annotations:
+      serving.kserve.io/config-llm-decode-template: kserve-config-llm-decode-template
+      serving.kserve.io/config-llm-decode-worker-data-parallel: kserve-config-llm-decode-worker-data-parallel
+      serving.kserve.io/config-llm-prefill-template: kserve-config-llm-prefill-template
+      serving.kserve.io/config-llm-prefill-worker-data-parallel: kserve-config-llm-prefill-worker-data-parallel
+      serving.kserve.io/config-llm-router-route: kserve-config-llm-router-route
+      serving.kserve.io/config-llm-scheduler: kserve-config-llm-scheduler
+      serving.kserve.io/config-llm-scheduler-eppconfig-default: kserve-config-llm-scheduler-eppconfig-default
+      serving.kserve.io/config-llm-scheduler-eppconfig-default-pd: kserve-config-llm-scheduler-eppconfig-default-pd
+      serving.kserve.io/config-llm-scheduler-latency-predictor: kserve-config-llm-scheduler-latency-predictor
+      serving.kserve.io/config-llm-template: kserve-config-llm-template
+      serving.kserve.io/config-llm-tokenizer: kserve-config-llm-tokenizer
+      serving.kserve.io/config-llm-tracing: kserve-config-llm-tracing
+      serving.kserve.io/config-llm-worker-data-parallel: kserve-config-llm-worker-data-parallel
+    appliedConfigs:
+    - name: kserve-config-llm-scheduler
+      namespace: kserve
+      source: Preset
+    - name: kserve-config-llm-router-route
+      namespace: kserve
+      source: Preset
+    - name: kserve-config-llm-template
+      namespace: kserve
+      source: Preset
+    conditions:
+    - lastTransitionTime: "2026-10-12T13:46:25Z"
+      severity: Info
+      status: "True"
+      type: GatewaysReady
+    - lastTransitionTime: "2026-10-07T16:13:54Z"
+      severity: Info
+      status: "True"
+      type: HTTPRoutesReady
+    - lastTransitionTime: "2026-10-07T16:46:44Z"
+      severity: Info
+      status: "True"
+      type: InferencePoolReady
+    - lastTransitionTime: "2026-10-07T16:17:58Z"
+      severity: Info
+      status: "True"
+      type: MainWorkloadReady
+    - lastTransitionTime: "2026-10-07T16:13:53Z"
+      status: "True"
+      type: PresetsCombined
+    - lastTransitionTime: "2026-10-12T13:46:25Z"
+      status: "True"
+      type: Ready
+    - lastTransitionTime: "2026-10-12T13:46:25Z"
+      status: "True"
+      type: RouterReady
+    - lastTransitionTime: "2026-10-07T16:14:21Z"
+      severity: Info
+      status: "True"
+      type: SchedulerWorkloadReady
+    - lastTransitionTime: "2026-10-07T16:17:58Z"
+      status: "True"
+      type: WorkloadsReady
+    observedGeneration: 2
+    router:
+      gateways:
+      - group: gateway.networking.k8s.io
+        httpRoutes:
+        - group: gateway.networking.k8s.io
+          kind: HTTPRoute
+          name: qwen36-judge-kserve-route
+          namespace: llm-judge
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      scheduler:
+        inferencePool:
+          group: inference.networking.k8s.io
+          kind: InferencePool
+          name: qwen36-judge-inference-pool
+        service:
+          group: ""
+          kind: Service
+          name: qwen36-judge-epp-service
+    url: http://192.0.2.7/llm-judge/qwen36-judge
+    workloads:
+      primary:
+        apiGroup: apps
+        kind: Deployment
+        name: qwen36-judge-kserve
+        readyReplicas: 1
+      scheduler:
+        apiGroup: apps
+        kind: Deployment
+        name: qwen36-judge-kserve-router-scheduler
+        readyReplicas: 1
+      service:
+        kind: Service
+        name: qwen36-judge-kserve-workload-svc
+kind: List
+metadata:
+  resourceVersion: ""

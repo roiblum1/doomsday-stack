@@ -1,0 +1,52 @@
+apiVersion: v1
+items:
+- apiVersion: scheduling.k8s.io/v1
+  description: This priority class should be used for user facing OpenShift workload
+    pods only.
+  kind: PriorityClass
+  metadata:
+    annotations:
+      include.release.openshift.io/hypershift: "true"
+      include.release.openshift.io/ibm-cloud-managed: "true"
+      include.release.openshift.io/self-managed-high-availability: "true"
+      include.release.openshift.io/single-node-developer: "true"
+    creationTimestamp: "2026-09-24T16:35:07Z"
+    generation: 1
+    name: openshift-user-critical
+    ownerReferences:
+    - apiVersion: config.openshift.io/v1
+      controller: true
+      kind: ClusterVersion
+      name: version
+      uid: 3ab9a300-7882-4a00-9bbf-07e0c6590925
+    resourceVersion: "751"
+    uid: dc2cde45-2255-403e-aa0e-be6c46dada8b
+  preemptionPolicy: PreemptLowerPriority
+  value: 1000000000
+- apiVersion: scheduling.k8s.io/v1
+  description: Used for system critical pods that must run in the cluster, but can
+    be moved to another node if necessary.
+  kind: PriorityClass
+  metadata:
+    creationTimestamp: "2026-09-24T16:34:36Z"
+    generation: 1
+    name: system-cluster-critical
+    resourceVersion: "69"
+    uid: 8f0ed2f1-dae1-4012-a52f-b913f97ff4e3
+  preemptionPolicy: PreemptLowerPriority
+  value: 2000000000
+- apiVersion: scheduling.k8s.io/v1
+  description: Used for system critical pods that must not be moved from their current
+    node.
+  kind: PriorityClass
+  metadata:
+    creationTimestamp: "2026-09-24T16:34:36Z"
+    generation: 1
+    name: system-node-critical
+    resourceVersion: "68"
+    uid: 0e8d281f-524a-491c-9ecf-7299827f5416
+  preemptionPolicy: PreemptLowerPriority
+  value: 2000001000
+kind: List
+metadata:
+  resourceVersion: ""

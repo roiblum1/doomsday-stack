@@ -1,0 +1,13 @@
+{{- if .Values.clusterPolicy.enabled }}
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: {{ .Values.clusterPolicy.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    {{- include "gpu.labels" . | nindent 4 }}
+spec:
+  {{- toYaml .Values.clusterPolicy.spec | nindent 2 }}
+{{- end }}

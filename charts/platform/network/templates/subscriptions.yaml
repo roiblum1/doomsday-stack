@@ -1,0 +1,39 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: {{ .Values.subscription.name }}
+  namespace: {{ .Values.subscription.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  labels:
+    {{- include "network.labels" . | nindent 4 }}
+spec:
+  channel: {{ .Values.subscription.channel | quote }}
+  name: {{ .Values.subscription.name }}
+  source: {{ .Values.subscription.source }}
+  sourceNamespace: {{ .Values.subscription.sourceNamespace }}
+  {{- with .Values.subscription.startingCSV }}
+  startingCSV: {{ . }}
+  {{- end }}
+  installPlanApproval: {{ .Values.subscription.installPlanApproval | default "Automatic" }}
+{{- if .Values.maintenanceSubscription.enabled }}
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: {{ .Values.maintenanceSubscription.name }}
+  namespace: {{ .Values.maintenanceSubscription.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  labels:
+    {{- include "network.labels" . | nindent 4 }}
+spec:
+  channel: {{ .Values.maintenanceSubscription.channel | quote }}
+  name: {{ .Values.maintenanceSubscription.name }}
+  source: {{ .Values.maintenanceSubscription.source }}
+  sourceNamespace: {{ .Values.maintenanceSubscription.sourceNamespace }}
+  {{- with .Values.maintenanceSubscription.startingCSV }}
+  startingCSV: {{ . }}
+  {{- end }}
+  installPlanApproval: {{ .Values.maintenanceSubscription.installPlanApproval | default "Automatic" }}
+{{- end }}

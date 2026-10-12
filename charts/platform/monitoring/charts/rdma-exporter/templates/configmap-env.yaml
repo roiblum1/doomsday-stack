@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rdma-exporter-env
+  namespace: rdma-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    {{- include "rdma-exporter.labels" . | nindent 4 }}
+data:
+  CLUSTER_NAME: {{ .Values.env.clusterName | default .Values.global.clusterName | quote }}
+  RDMA_EXPORTER_ADDR: {{ .Values.env.rdmaExporterAddr | quote }}
+  RDMA_EXPORTER_PORT: {{ .Values.env.rdmaExporterPort | quote }}
+  LOG_LEVEL: {{ .Values.env.logLevel | quote }}
+  ENABLE_GPU: {{ .Values.env.enableGpu | quote }}
+  ENABLE_RDMA_RES: {{ .Values.env.enableRdmaRes | quote }}
+  ENABLE_ETHTOOL: {{ .Values.env.enableEthtool | quote }}
+  HOST_ROOT: {{ .Values.env.hostRoot | quote }}
+  NVIDIA_LD_LIBRARY_PATH: {{ .Values.env.nvidiaLdLibraryPath | quote }}
+  NVIDIA_SMI_PATH: {{ .Values.env.nvidiaSmiPath | quote }}
+  CACHE_TTL: {{ .Values.env.cacheTtl | quote }}
+  METRICS_CACHE_TTL: {{ .Values.env.metricsCacheTtl | quote }}
+  AGGREGATE_CACHE_TTL: {{ .Values.env.aggregateCacheTtl | quote }}
+  AGGREGATE_MAX_WORKERS: {{ .Values.env.aggregateMaxWorkers | quote }}
+  AGGREGATE_SCRAPE_TIMEOUT: {{ .Values.env.aggregateScrapeTimeout | quote }}
+  SCRAPE_TIMEOUT: {{ .Values.env.scrapeTimeout | quote }}
+  POD_LABEL_SELECTOR: {{ .Values.env.podLabelSelector | quote }}

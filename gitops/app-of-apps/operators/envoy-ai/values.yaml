@@ -1,0 +1,18 @@
+# Values for the envoy-ai chart. The disconnected overlay from
+# kserve-dissconnected (charts/envoy-ai-gateway-openshift/values-mirror.yaml),
+# pointing at the PATCHED v1.2.0 build (UPGRADE_ENVOY_AI_1.2.0-patches.md):
+# the controller and ext_proc images must come from one commit, or they
+# refuse each other's configuration. Both are mirrored under
+# registry-internal/kserve/personal-ns-2/. The rate limit
+# image is a full reference the overlay pattern does not cover.
+ai-gateway:
+  controller:
+    image:
+      repository: registry-internal/kserve/personal-ns-2/ai-gateway-controller
+      tag: v1.2.0-patched.1
+  extProc:
+    image:
+      repository: registry-internal/kserve/personal-ns-2/ai-gateway-extproc
+      tag: v1.2.0-patched.1
+rateLimit:
+  image: registry-internal/kserve/envoyproxy/ratelimit:0482748e

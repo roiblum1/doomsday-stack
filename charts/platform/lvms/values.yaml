@@ -1,0 +1,54 @@
+# LVM Storage (LVMS) operator + LVMCluster.
+#
+# The LVMCluster spec mirrors the LIVE 4.22 cluster (thin provisioning, vg1, xfs).
+# Cluster-specific bits (deviceSelector paths, nodeSelector) are overridable per cluster
+# via mces/<mce>/<cluster>/lvms/values.yaml — the defaults below are a generic starting point.
+namespace:
+  name: openshift-storage
+  create: true
+  labels: {}
+
+operatorGroup:
+  name: openshift-storage
+  targetNamespaces:
+    - openshift-storage
+
+subscription:
+  name: lvms-operator
+  namespace: openshift-storage
+  channel: stable-4.22
+  source: cs-operator-index-4-22
+  sourceNamespace: openshift-marketplace
+  startingCSV: lvms-operator.v4.22.0
+  installPlanApproval: Automatic
+
+# LVMCluster instance.
+lvmCluster:
+  enabled: true
+  name: lvmcluster
+  # Thin pool provisioning (matches live). Set thinPool.enabled=false for thick.
+  thinPool:
+    enabled: true
+    name: thin-pool-1
+    sizePercent: 90
+    overprovisionRatio: 10
+    chunkSizeCalculationPolicy: Static
+    metadataSizeCalculationPolicy: Host
+  storage:
+    deviceClasses:
+      - name: vg1
+        default: true
+        fstype: xfs
+        # forceWipe + paths are cluster-specific. Override per cluster.
+        deviceSelector:
+          forceWipeDevicesAndDestroyAllData: true
+          paths: []
+          # paths: ["/dev/md/lvmdata"]
+        # nodeSelector scopes LVMS to specific nodes (e.g. RoCE worker pool).
+        # Empty = all nodes. Override per cluster.
+        nodeSelector: {}
+        # nodeSelector:
+        #   nodeSelectorTerms:
+        #     - matchExpressions:
+        #         - key: node-role.kubernetes.io/roce
+        #           operator: Exists

@@ -1,0 +1,107 @@
+{{- if .Values.anthropicBackend.enabled }}
+# Native Anthropic backend for the shared Envoy AI Gateway (VIP .145).
+#
+# WHY: vLLM (>= v0.25) serves the Anthropic Messages API natively at
+# /v1/messages -- including "thinking" content blocks and
+# /v1/messages/count_tokens. Routing Claude Code (/anthropic/v1/messages)
+# to an Anthropic-schema AIServiceBackend is a protocol PASSTHROUGH: the
+# extproc does no translation, so reasoning/thinking blocks and
+# count_tokens reach the client intact. The previous setup routed
+# /anthropic traffic to the OpenAI-schema InferencePool backend, forcing
+# an Anthropic->OpenAI->Anthropic translation in the extproc which (ai-gateway
+# v1.1.0) drops vLLM v0.30's "reasoning" field and 500s on count_tokens.
+#
+# THE CHAIN: AIGatewayRoute rule (model glm-5.3) -> AIServiceBackend
+# (schema Anthropic) -> Backend (Envoy Gateway, 8 FQDN endpoints, one per
+# DP rank port) -> glm53-b200-ranks-svc -> vLLM rank API servers
+# 8000-8007 (--data-parallel-multi-port-external-lb).
+#
+# Why a second Service: the kserve-owned workload svc only carries port
+# 8000 (rank 0); kube-proxy has no ClusterIP:8001-8007 without the ports
+# declared. This Service is chart-owned and additive -- kserve ignores it.
+#
+# NOTE: this path bypasses the EPP (round-robin across the 16 rank-port
+# endpoints instead of EPP scheduling). That is fine for Anthropic
+# traffic: llm-d-router v0.10.0 cannot parse Anthropic bodies, so its
+# prefix-cache/queue scorers were blind on this traffic anyway. OpenAI-
+# protocol traffic keeps the EPP path via the "publishers/..." model name.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.anthropicBackend.ranksServiceName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ .Values.llmisvc.name }}
+    app.kubernetes.io/part-of: llminferenceservice
+    kserve.io/component: workload
+  ports:
+    - name: rank-0
+      port: 8000
+      targetPort: 8000
+      appProtocol: http
+    - name: rank-1
+      port: 8001
+      targetPort: 8001
+      appProtocol: http
+    - name: rank-2
+      port: 8002
+      targetPort: 8002
+      appProtocol: http
+    - name: rank-3
+      port: 8003
+      targetPort: 8003
+      appProtocol: http
+    - name: rank-4
+      port: 8004
+      targetPort: 8004
+      appProtocol: http
+    - name: rank-5
+      port: 8005
+      targetPort: 8005
+      appProtocol: http
+    - name: rank-6
+      port: 8006
+      targetPort: 8006
+      appProtocol: http
+    - name: rank-7
+      port: 8007
+      targetPort: 8007
+      appProtocol: http
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: {{ .Values.anthropicBackend.backendName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+spec:
+  endpoints:
+{{- range $port := until 8 }}
+    - fqdn:
+        hostname: {{ $.Values.anthropicBackend.ranksServiceName }}.{{ $.Values.namespace }}.svc.cluster.local
+        port: {{ add 8000 $port }}
+{{- end }}
+---
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: {{ .Values.anthropicBackend.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+spec:
+  # Anthropic schema => /anthropic/v1/messages requests pass through to the
+  # backend's /v1/messages unmodified (thinking + count_tokens preserved).
+  # vLLM serves /v1/messages at exactly this path, so no prefix is needed.
+  schema:
+    name: Anthropic
+  backendRef:
+    group: gateway.envoyproxy.io
+    kind: Backend
+    name: {{ .Values.anthropicBackend.backendName }}
+{{- end }}

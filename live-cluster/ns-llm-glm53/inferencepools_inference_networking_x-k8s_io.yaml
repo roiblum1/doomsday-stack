@@ -1,0 +1,49 @@
+apiVersion: v1
+items:
+- apiVersion: inference.networking.x-k8s.io/v1alpha2
+  kind: InferencePool
+  metadata:
+    creationTimestamp: "2026-09-29T16:48:05Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+    name: glm53-b200-inference-pool
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: glm53-b200
+      uid: 6acd4f43-424b-47ee-b53e-1ba129ceeadb
+    resourceVersion: "660633"
+    uid: e827afe3-0666-4ccb-a1ab-1631b3dad349
+  spec:
+    extensionRef:
+      failureMode: FailOpen
+      group: ""
+      kind: Service
+      name: glm53-b200-epp-service
+      portNumber: 9002
+    selector:
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+      kserve.io/component: workload
+    targetPortNumber: 8000
+  status:
+    parent:
+    - conditions:
+      - lastTransitionTime: "1970-01-01T00:00:00Z"
+        message: Waiting for controller
+        reason: Pending
+        status: Unknown
+        type: Accepted
+      parentRef:
+        group: gateway.networking.k8s.io
+        kind: Status
+        name: default
+kind: List
+metadata:
+  resourceVersion: ""

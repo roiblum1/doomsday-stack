@@ -1,0 +1,124 @@
+apiVersion: v1
+items:
+- apiVersion: lmcache.lmcache.ai/v1alpha1
+  kind: LMCacheEngine
+  metadata:
+    annotations:
+      argocd.argoproj.io/sync-wave: "-1"
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:lmcache.lmcache.ai/LMCacheEngine:llm-glm53/glm53-cache
+    creationTimestamp: "2026-10-06T21:24:47Z"
+    generation: 8
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-cache
+    namespace: llm-glm53
+    resourceVersion: "55035960"
+    uid: 6621d695-f3b3-464e-a597-739e5a3279fe
+  spec:
+    env:
+    - name: HOME
+      value: /tmp
+    - name: NUMBA_CACHE_DIR
+      value: /tmp/numba
+    eviction:
+      evictionRatio: 0.2
+      policy: LRU
+      triggerWatermark: 0.8
+    extraArgs:
+    - --separate-object-groups
+    gpuVendor: nvidia
+    hostIPC: false
+    hostNetwork: false
+    image:
+      pullPolicy: IfNotPresent
+      repository: registry-internal/lmcache/lmcache/vllm-openai
+      tag: v0.5.5
+    isolatedIPC: true
+    l1:
+      sizeGB: 1000
+    l2Backend:
+      prefetchMaxInFlight: 8
+      prefetchPolicy: default
+      raw:
+        config:
+          backend: POSIX
+          backend_params:
+            file_path: /mnt/lmcache-l2
+            max_capacity_gb: "2200"
+            shard_dirs: "true"
+            use_direct_io: "false"
+          eviction:
+            eviction_policy: LRU
+            eviction_ratio: 0.1
+            trigger_watermark: 0.9
+          persist_enabled: true
+        type: nixl_store_dynamic
+      storePolicy: default
+    logLevel: INFO
+    nodeSelector:
+      nvidia.com/gpu.product: NVIDIA-B200
+    priorityClassName: openshift-user-critical
+    privileged: false
+    prometheus:
+      enabled: true
+      port: 8080
+      serviceMonitor:
+        enabled: true
+        interval: 30s
+    server:
+      chunkSize: 256
+      hashAlgorithm: blake3
+      httpPort: 8080
+      maxWorkers: 8
+      port: 5555
+    serviceAccountName: glm53-cache
+    volumeMounts:
+    - mountPath: /mnt/lmcache-l2
+      name: l2
+    volumes:
+    - name: l2
+      persistentVolumeClaim:
+        claimName: glm53-cache-l2
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-06T21:24:47Z"
+      message: Spec validation passed
+      observedGeneration: 8
+      reason: Valid
+      status: "True"
+      type: ConfigValid
+    - lastTransitionTime: "2026-10-12T13:42:18Z"
+      message: 2/2 instances ready
+      observedGeneration: 8
+      reason: AtLeastOneReady
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-10-12T13:42:52Z"
+      message: 2/2 instances ready
+      observedGeneration: 8
+      reason: AllReady
+      status: "True"
+      type: AllInstancesReady
+    desiredInstances: 2
+    endpoints:
+    - hostIP: 192.0.2.85
+      metricsPort: 8080
+      nodeName: gpu-node-x
+      podName: glm53-cache-p5thj
+      port: 5555
+      ready: true
+    - hostIP: 192.0.2.86
+      metricsPort: 8080
+      nodeName: gpu-node-x
+      podName: glm53-cache-5dl2l
+      port: 5555
+      ready: true
+    observedGeneration: 8
+    phase: Running
+    readyInstances: 2
+kind: List
+metadata:
+  resourceVersion: ""

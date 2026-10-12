@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: openshift-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    app: grafana
+data:
+  grafana.ini: |
+    [server]
+    root_url = {{ .Values.grafanaIni.rootUrl | default (printf "https://grafana-openshift-monitoring.apps.%s.%s" .Values.global.clusterName .Values.global.baseDomain) | default "" }}
+    [auth]
+    disable_login_form = true
+    disable_signout_menu = true
+    [auth.anonymous]
+    enabled = true
+    org_name = Main Org.
+    org_role = Admin
+    [security]
+    admin_user = admin
+    allow_embedding = true

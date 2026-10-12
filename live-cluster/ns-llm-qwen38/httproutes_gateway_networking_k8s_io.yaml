@@ -1,0 +1,482 @@
+apiVersion: v1
+items:
+- apiVersion: gateway.networking.k8s.io/v1
+  kind: HTTPRoute
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:aigateway.envoyproxy.io/AIGatewayRoute:llm-qwen38/qwen38
+      gateway.envoyproxy.io/ai-gateway-generated: "true"
+      gateway.envoyproxy.io/aigw-ui-quota-revision: dc222c28b37e
+      gateway.envoyproxy.io/backend-ref-priority: 0:qwen38-anthropic:0,1:qwen38-l4-inference-pool:0,2:qwen38-anthropic:0
+    creationTimestamp: "2026-10-07T18:06:30Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38
+    namespace: llm-qwen38
+    ownerReferences:
+    - apiVersion: aigateway.envoyproxy.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: AIGatewayRoute
+      name: qwen38
+      uid: dce5be37-75c7-4532-a51e-04105e4ebe71
+    resourceVersion: "55027626"
+    uid: 30fc5e43-9d58-4fb1-8942-4169cc2f41f5
+  spec:
+    parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: envoy-ai-gateway
+      namespace: envoy-ai-gateway-system
+      sectionName: http
+    rules:
+    - backendRefs:
+      - group: gateway.envoyproxy.io
+        kind: Backend
+        name: qwen38-anthropic-workload
+        weight: 1
+      filters:
+      - extensionRef:
+          group: gateway.envoyproxy.io
+          kind: HTTPRouteFilter
+          name: ai-eg-host-rewrite-qwen38
+        type: ExtensionRef
+      matches:
+      - headers:
+        - name: x-ai-eg-model
+          type: Exact
+          value: Qwen3.8-27B-FP8
+        path:
+          type: PathPrefix
+          value: /
+      name: anthropic-native
+      timeouts:
+        request: 900s
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: qwen38-l4-inference-pool
+        namespace: llm-qwen38
+        weight: 1
+      filters:
+      - extensionRef:
+          group: gateway.envoyproxy.io
+          kind: HTTPRouteFilter
+          name: ai-eg-host-rewrite-qwen38
+        type: ExtensionRef
+      matches:
+      - headers:
+        - name: x-ai-eg-model
+          type: Exact
+          value: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+        path:
+          type: PathPrefix
+          value: /
+      name: openai-epp
+      timeouts:
+        request: 900s
+    - backendRefs:
+      - group: gateway.envoyproxy.io
+        kind: Backend
+        name: qwen38-anthropic-workload
+        weight: 1
+      filters:
+      - extensionRef:
+          group: gateway.envoyproxy.io
+          kind: HTTPRouteFilter
+          name: ai-eg-host-rewrite-qwen38
+        type: ExtensionRef
+      matches:
+      - headers:
+        - name: x-ai-eg-model
+          type: RegularExpression
+          value: ^claude-.*$
+        path:
+          type: PathPrefix
+          value: /
+      name: claude-alias
+      timeouts:
+        request: 900s
+    - filters:
+      - extensionRef:
+          group: gateway.envoyproxy.io
+          kind: HTTPRouteFilter
+          name: ai-eg-route-not-found-response-qwen38
+        type: ExtensionRef
+      matches:
+      - path:
+          type: PathPrefix
+          value: /
+      name: route-not-found
+  status:
+    parents:
+    - conditions:
+      - lastTransitionTime: "2026-10-12T10:30:13Z"
+        message: Route is accepted
+        observedGeneration: 2
+        reason: Accepted
+        status: "True"
+        type: Accepted
+      - lastTransitionTime: "2026-10-12T10:30:13Z"
+        message: Resolved all the Object references for the Route
+        observedGeneration: 2
+        reason: ResolvedRefs
+        status: "True"
+        type: ResolvedRefs
+      - lastTransitionTime: "2026-10-12T10:30:13Z"
+        message: 'Overlapping match conditions with route(s): HTTPRoute envoy-ai-gateway-system/fleet-glm-5-3,
+          HTTPRoute llm-glm53/glm53, HTTPRoute llm-glm53/glm53-anthropic-alias, HTTPRoute
+          llm-judge/qwen36-judge'
+        observedGeneration: 2
+        reason: RouteRulesOverlap
+        status: "True"
+        type: RouteRulesOverlap
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+      parentRef:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+        sectionName: http
+- apiVersion: gateway.networking.k8s.io/v1
+  kind: HTTPRoute
+  metadata:
+    annotations:
+      serving.kserve.io/inference-pool-migrated: v1
+    creationTimestamp: "2026-10-07T14:22:18Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router
+      app.kubernetes.io/name: qwen38-l4
+      app.kubernetes.io/part-of: llminferenceservice
+    name: qwen38-l4-kserve-route
+    namespace: llm-qwen38
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: qwen38-l4
+      uid: 4ad66e96-4bef-49a7-a56a-2f4df47b3806
+    resourceVersion: "54450492"
+    uid: 73b91695-5386-46fa-9b06-3122433746be
+  spec:
+    parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: envoy-ai-gateway
+      namespace: envoy-ai-gateway-system
+    rules:
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: qwen38-l4-inference-pool
+        port: 8000
+        weight: 1
+      filters:
+      - type: URLRewrite
+        urlRewrite:
+          path:
+            replacePrefixMatch: /v1/completions
+            type: ReplacePrefixMatch
+      matches:
+      - path:
+          type: PathPrefix
+          value: /llm-qwen38/qwen38-l4/v1/completions
+      name: v1-completions-path
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: qwen38-l4-inference-pool
+        port: 8000
+        weight: 1
+      filters:
+      - type: URLRewrite
+        urlRewrite:
+          path:
+            replacePrefixMatch: /v1/chat/completions
+            type: ReplacePrefixMatch
+      matches:
+      - path:
+          type: PathPrefix
+          value: /llm-qwen38/qwen38-l4/v1/chat/completions
+      name: v1-chat-completions-path
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: qwen38-l4-inference-pool
+        port: 8000
+        weight: 1
+      filters:
+      - type: URLRewrite
+        urlRewrite:
+          path:
+            replacePrefixMatch: /v1/responses
+            type: ReplacePrefixMatch
+      matches:
+      - path:
+          type: PathPrefix
+          value: /llm-qwen38/qwen38-l4/v1/responses
+      name: v1-responses-path
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: qwen38-l4-inference-pool
+        port: 8000
+        weight: 1
+      filters:
+      - type: URLRewrite
+        urlRewrite:
+          path:
+            replacePrefixMatch: /v1/messages
+            type: ReplacePrefixMatch
+      matches:
+      - path:
+          type: PathPrefix
+          value: /llm-qwen38/qwen38-l4/v1/messages
+      name: v1-messages-path
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: qwen38-l4-inference-pool
+        port: 8000
+        weight: 1
+      matches:
+      - headers:
+        - name: X-Gateway-Model-Name
+          type: Exact
+          value: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+        path:
+          type: Exact
+          value: /v1/completions
+      - headers:
+        - name: X-Gateway-Model-Name
+          type: Exact
+          value: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+        path:
+          type: Exact
+          value: /v1/completions/
+      - headers:
+        - name: X-Gateway-Model-Name
+          type: Exact
+          value: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+        path:
+          type: Exact
+          value: /v1/chat/completions
+      - headers:
+        - name: X-Gateway-Model-Name
+          type: Exact
+          value: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+        path:
+          type: Exact
+          value: /v1/chat/completions/
+      - headers:
+        - name: X-Gateway-Model-Name
+          type: Exact
+          value: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+        path:
+          type: Exact
+          value: /v1/responses
+      - headers:
+        - name: X-Gateway-Model-Name
+          type: Exact
+          value: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+        path:
+          type: Exact
+          value: /v1/responses/
+      - headers:
+        - name: X-Gateway-Model-Name
+          type: Exact
+          value: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+        path:
+          type: Exact
+          value: /v1/messages
+      - headers:
+        - name: X-Gateway-Model-Name
+          type: Exact
+          value: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+        path:
+          type: Exact
+          value: /v1/messages/
+      name: v1-model-routing
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: qwen38-l4-inference-pool
+        port: 8000
+        weight: 1
+      filters:
+      - type: URLRewrite
+        urlRewrite:
+          path:
+            replacePrefixMatch: /v1/completions
+            type: ReplacePrefixMatch
+      matches:
+      - path:
+          type: PathPrefix
+          value: /publishers/llm-qwen38/models/Qwen3.8-27B-FP8/v1/completions
+      name: v1-completions-publisher-path
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: qwen38-l4-inference-pool
+        port: 8000
+        weight: 1
+      filters:
+      - type: URLRewrite
+        urlRewrite:
+          path:
+            replacePrefixMatch: /v1/chat/completions
+            type: ReplacePrefixMatch
+      matches:
+      - path:
+          type: PathPrefix
+          value: /publishers/llm-qwen38/models/Qwen3.8-27B-FP8/v1/chat/completions
+      name: v1-chat-completions-publisher-path
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: qwen38-l4-inference-pool
+        port: 8000
+        weight: 1
+      filters:
+      - type: URLRewrite
+        urlRewrite:
+          path:
+            replacePrefixMatch: /v1/responses
+            type: ReplacePrefixMatch
+      matches:
+      - path:
+          type: PathPrefix
+          value: /publishers/llm-qwen38/models/Qwen3.8-27B-FP8/v1/responses
+      name: v1-responses-publisher-path
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: qwen38-l4-inference-pool
+        port: 8000
+        weight: 1
+      filters:
+      - type: URLRewrite
+        urlRewrite:
+          path:
+            replacePrefixMatch: /v1/messages
+            type: ReplacePrefixMatch
+      matches:
+      - path:
+          type: PathPrefix
+          value: /publishers/llm-qwen38/models/Qwen3.8-27B-FP8/v1/messages
+      name: v1-messages-publisher-path
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+    - backendRefs:
+      - group: ""
+        kind: Service
+        name: qwen38-l4-kserve-workload-svc
+        port: 8000
+        weight: 1
+      filters:
+      - type: URLRewrite
+        urlRewrite:
+          path:
+            replacePrefixMatch: /
+            type: ReplacePrefixMatch
+      matches:
+      - path:
+          type: PathPrefix
+          value: /publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+      name: v1-publisher-path-catch-all
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+    - backendRefs:
+      - group: ""
+        kind: Service
+        name: qwen38-l4-kserve-workload-svc
+        port: 8000
+        weight: 1
+      filters:
+      - type: URLRewrite
+        urlRewrite:
+          path:
+            replacePrefixMatch: /
+            type: ReplacePrefixMatch
+      matches:
+      - path:
+          type: PathPrefix
+          value: /llm-qwen38/qwen38-l4
+      name: v1-catch-all-path
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+    - backendRefs:
+      - group: ""
+        kind: Service
+        name: qwen38-l4-kserve-workload-svc
+        port: 8000
+        weight: 1
+      matches:
+      - headers:
+        - name: X-Gateway-Model-Name
+          type: Exact
+          value: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+        path:
+          type: PathPrefix
+          value: /
+      name: v1-catch-all-model-routing
+      timeouts:
+        backendRequest: 0s
+        request: 0s
+  status:
+    parents:
+    - conditions:
+      - lastTransitionTime: "2026-10-11T21:08:29Z"
+        message: Route is accepted
+        observedGeneration: 2
+        reason: Accepted
+        status: "True"
+        type: Accepted
+      - lastTransitionTime: "2026-10-11T21:08:29Z"
+        message: Resolved all the Object references for the Route
+        observedGeneration: 2
+        reason: ResolvedRefs
+        status: "True"
+        type: ResolvedRefs
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+      parentRef:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+kind: List
+metadata:
+  resourceVersion: ""

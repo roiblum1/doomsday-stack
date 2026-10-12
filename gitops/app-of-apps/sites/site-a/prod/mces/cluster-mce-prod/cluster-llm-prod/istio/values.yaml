@@ -1,0 +1,2 @@
+# Per-cluster overrides for istio on cluster-gpu-test.
+# No cluster-specific overrides needed; chart defaults (operators/istio/values.yaml) apply.

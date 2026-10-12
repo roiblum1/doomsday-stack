@@ -1,0 +1,9 @@
+name: catalog-sources
+projectNamespace: openshift-marketplace
+repourl: 'https://git.example.internal/popai/helm-charts/catalog-sources-chart.git'
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true

@@ -1,0 +1,16 @@
+{{- if .Values.istioCNI.enabled }}
+apiVersion: sailoperator.io/v1
+kind: IstioCNI
+metadata:
+  name: {{ .Values.istioCNI.name }}
+  annotations:
+    # Wave 4: AFTER the Subscription (wave 3) — the sailoperator.io/IstioCNI CRD only
+    # exists once OLM installs the sail operator CSV.
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    {{- include "istio.labels" . | nindent 4 }}
+spec:
+  namespace: {{ .Values.istioCNI.namespace }}
+  version: {{ .Values.istioCNI.version }}
+{{- end }}

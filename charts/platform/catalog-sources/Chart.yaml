@@ -1,0 +1,6 @@
+apiVersion: v2
+name: catalog-sources
+description: Shared OLM CatalogSources for the popai day-2 standalone charts (deployed at sync-wave 0, before any Subscription)
+type: application
+version: 0.1.0
+appVersion: "4.22"

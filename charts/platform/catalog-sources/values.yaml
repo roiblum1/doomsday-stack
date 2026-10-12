@@ -1,0 +1,31 @@
+# CatalogSources are deployed FIRST (sync-wave 0) so every other chart's Subscription
+# can resolve its package by catalog NAME. Other charts reference these by name only and
+# do NOT redefine CatalogSources.
+#
+# Namespace is openshift-marketplace (the OLM catalog namespace) for all sources.
+catalogSources:
+  # Red Hat OP-INDEX operator index pinned to OCP 4.22. Hosts the 4.22-pinned OLM operators:
+  # nfd, kubernetes-nmstate-operator, numaresources-operator, lvms-operator,
+  # servicemeshoperator3, leader-worker-set.
+  - name: cs-operator-index-4-22
+    namespace: openshift-marketplace
+    image: example.internal/operators/redhat/operator-index:4.22
+    sourceType: grpc
+    displayName: Operator Index 4.22
+
+  # NVIDIA operator index (26.3 / 4.22). Hosts:
+  # gpu-operator-certified (v26.3.3), nvidia-network-operator (v26.4.1),
+  # nvidia-maintenance-operator (v26.4.0).
+  - name: cs-nvidia-26.3-4.22
+    namespace: openshift-marketplace
+    image: example.internal/operators/redhat/nvidia-index:26.3-4.22
+    sourceType: grpc
+    displayName: NVIDIA Index 26.3 4.22
+
+  # Generic Red Hat operator index (4.20-full). Carries the long tail of certified/community
+  # packages not covered by the two indexes above. Kept as a catch-all catalog.
+  - name: generic-cs
+    namespace: openshift-marketplace
+    image: example.internal/operators/redhat/redhat-operator-index:v4.20-full
+    sourceType: grpc
+    displayName: Generic Red Hat Operators

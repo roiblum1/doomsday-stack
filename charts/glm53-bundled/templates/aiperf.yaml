@@ -1,0 +1,75 @@
+{{- if .Values.aiperf.enabled }}
+# aiperf (NVIDIA AIPerf) benchmark Job against the full serving path
+# (Envoy AI Gateway -> EPP ext_proc -> InferencePool -> vLLM pods), with
+# the same routing header external clients would send. Target the
+# in-cluster gateway service if the external VIP is not routable from
+# the admin host.
+#
+# aiperf is installed at runtime from the internal artifactory PyPI
+# mirror (air-gapped cluster). The tokenizer is taken from the model PVC
+# (mounted read-only).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.aiperf.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        {{- include "glm53.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      restartPolicy: Never
+      containers:
+        - name: aiperf
+          image: {{ .Values.images.vllm }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: HF_HUB_OFFLINE, value: "1"}
+            - {name: TRANSFORMERS_OFFLINE, value: "1"}
+            - {name: TOKENIZERS_PARALLELISM, value: "false"}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              pip install --quiet --no-warn-script-location --ignore-installed \
+                --index-url {{ .Values.aiperf.pypiIndex }} \
+                --trusted-host {{ .Values.aiperf.pypiHost }} \
+                aiperf=={{ .Values.aiperf.version }}
+              cd /artifacts
+              aiperf profile \
+                --model-names {{ .Values.model.name }} \
+                --url {{ .Values.aiperf.url }} \
+                --header '{{ .Values.aigatewayRoute.headerName }}: {{ .Values.model.name }}' \
+                --tokenizer /models/{{ .Values.model.subPath }} \
+                --tokenizer-trust-remote-code \
+                {{- if .Values.aiperf.streaming }}
+                --streaming \
+                {{- end }}
+                --concurrency {{ .Values.aiperf.concurrency }} \
+                --num-prompts {{ .Values.aiperf.numPrompts }} \
+                --synthetic-input-tokens-mean {{ .Values.aiperf.inputTokensMean }} \
+                --synthetic-input-tokens-stddev {{ .Values.aiperf.inputTokensStddev }} \
+                --output-tokens-mean {{ .Values.aiperf.outputTokensMean }} \
+                --artifact-dir /artifacts
+              echo '===== ARTIFACTS ====='
+              ls -la /artifacts/ /artifacts/logs/ 2>/dev/null
+              echo '===== SUMMARY ====='
+              cat /artifacts/profile_export_aiperf.json 2>/dev/null || true
+          resources:
+            {{- toYaml .Values.aiperf.resources | nindent 12 }}
+          volumeMounts:
+            - {name: models, mountPath: /models, readOnly: true}
+            - {name: artifacts, mountPath: /artifacts}
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: {{ .Values.storage.models.pvcName }}
+        - name: artifacts
+          emptyDir: {}
+{{- end }}

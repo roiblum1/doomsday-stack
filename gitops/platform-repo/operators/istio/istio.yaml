@@ -1,0 +1,9 @@
+name: istio
+projectNamespace: openshift-operators
+repourl: 'https://git.example.internal/popai/helm-charts/istio-chart.git'
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true

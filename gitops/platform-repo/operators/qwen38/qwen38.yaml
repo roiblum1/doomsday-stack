@@ -1,0 +1,33 @@
+name: qwen38
+projectNamespace: llm-qwen38
+repourl: 'https://git.example.internal/popai/helm-charts/qwen38-chart.git'
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true
+    - ServerSideApply=true
+  # The chart deploys an LMCacheEngine (CRD from the day2 `lmcache` app)
+  # and cluster-scoped SCC/PV objects, so a first sync attempt can
+  # legitimately fail while dependencies land; retry instead of stalling
+  # the Application.
+  retry:
+    limit: 10
+    backoff:
+      duration: 30s
+      factor: 2
+      maxDuration: 5m
+ignoreDifferences:
+  # OpenShift injects the rotating dockercfg secret into every SA's
+  # `secrets` AND `imagePullSecrets`. jsonPointers are CASE-SENSITIVE:
+  # `/imagepullsecrets` never matched, so the s3sa SA flapped OutOfSync and
+  # its auto-generated secret kept popping in the diff on every refresh.
+  - group: ""
+    kind: ServiceAccount
+    jsonPointers:
+      - /secrets
+      - /imagePullSecrets
+    jqPathExpressions:
+      - .secrets
+      - .imagePullSecrets

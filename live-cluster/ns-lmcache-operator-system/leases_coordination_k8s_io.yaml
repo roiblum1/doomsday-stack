@@ -1,0 +1,19 @@
+apiVersion: v1
+items:
+- apiVersion: coordination.k8s.io/v1
+  kind: Lease
+  metadata:
+    creationTimestamp: "2026-10-06T21:24:18Z"
+    name: f517be84.lmcache.ai
+    namespace: lmcache-operator-system
+    resourceVersion: "55045615"
+    uid: bd658060-3a90-4c8e-8094-67604b8a5446
+  spec:
+    acquireTime: "2026-10-06T21:24:18.629299Z"
+    holderIdentity: lmcache-operator-controller-manager-674bdd89f4-npvgl_aa078452-b1df-4faa-894c-c251d3d5d382
+    leaseDurationSeconds: 15
+    leaseTransitions: 0
+    renewTime: "2026-10-12T13:58:29.976425Z"
+kind: List
+metadata:
+  resourceVersion: ""

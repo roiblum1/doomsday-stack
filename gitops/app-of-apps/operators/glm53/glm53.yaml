@@ -1,0 +1,53 @@
+name: glm53
+projectNamespace: llm-glm53
+repourl: 'https://git.example.internal/popai/helm-charts/glm53-chart.git'
+# Pinned to the `bundled` branch of the old glm53-bundled chart: main now
+# carries the generic llm-model chart, which cannot express this deployment
+# (CR name glm53-b200 serving glm-5.3, runtimeClassName, the DP8-tuned EPP
+# profile, the 8-rank-port pool, LMCache, the node-prep storage layer,
+# maxSurge 0). Migrating to llm-model needs chart extensions first (9-knob
+# list in the 2026-10-11 deep-scan); until then this app renders the tuned
+# bundle from `bundled` (fdd21bd + the vLLM billing flags, 2026-10-12).
+targetRevision: bundled
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true
+    # The llmisvc was kubectl-applied once (server-side); without SSA the
+    # app's apply hits "metadata.resourceVersion: Invalid value: 0" forever.
+    - ServerSideApply=true
+  # The popai charts depend on CRDs other apps install (EnvoyProxy/
+  # InferencePool from envoy-gateway, cert-manager.io from cert-manager, and
+  # -- since the LMCache cutover -- lmcache.lmcache.ai/LMCacheEngine from
+  # the `lmcache` app), so a first sync attempt can legitimately fail; retry
+  # until the dependencies land instead of stalling the Application.
+  retry:
+    limit: 10
+    backoff:
+      duration: 30s
+      factor: 2
+      maxDuration: 5m
+ignoreDifferences:
+  # OpenShift injects the rotating dockercfg secret into every SA's
+  # `secrets` AND `imagePullSecrets`. jsonPointers are CASE-SENSITIVE:
+  # `/imagepullsecrets` never matched, so the s3sa SA flapped OutOfSync and
+  # its auto-generated secret kept popping in the diff on every refresh.
+  - group: ""
+    kind: ServiceAccount
+    jsonPointers:
+      - /secrets
+      - /imagePullSecrets
+    jqPathExpressions:
+      - .secrets
+      - .imagePullSecrets
+  # The ai-gateway controller rewrites AIGatewayRoute rules after apply: it
+  # defaults priority: 0 / weight: 1 on every backendRef and stamps
+  # modelsOwnedBy: "Envoy AI Gateway" on every rule -- a permanent
+  # render-vs-live diff otherwise.
+  - group: aigateway.envoyproxy.io
+    kind: AIGatewayRoute
+    jqPathExpressions:
+      - .spec.rules[].backendRefs[].priority
+      - .spec.rules[].backendRefs[].weight
+      - .spec.rules[].modelsOwnedBy

@@ -1,0 +1,136 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:/PersistentVolumeClaim:llm-glm53/glm53-cache
+      pv.kubernetes.io/bind-completed: "yes"
+    creationTimestamp: "2026-09-29T16:42:30Z"
+    finalizers:
+    - kubernetes.io/pvc-protection
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-cache
+    namespace: llm-glm53
+    resourceVersion: "49317578"
+    uid: 011a0f2c-0671-4cd4-8b82-15e4c37054b8
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 300Gi
+    storageClassName: local-static
+    volumeMode: Filesystem
+    volumeName: glm53-cache
+  status:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 300Gi
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:/PersistentVolumeClaim:llm-glm53/glm53-cache-l2
+      pv.kubernetes.io/bind-completed: "yes"
+    creationTimestamp: "2026-10-07T10:48:07Z"
+    finalizers:
+    - kubernetes.io/pvc-protection
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-cache-l2
+    namespace: llm-glm53
+    resourceVersion: "50733785"
+    uid: 26bf4362-662a-432d-af72-fde0dd5f8551
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 2500Gi
+    storageClassName: local-static
+    volumeMode: Filesystem
+    volumeName: glm53-cache-l2
+  status:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 2500Gi
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+      pv.kubernetes.io/bind-completed: "yes"
+      pv.kubernetes.io/bound-by-controller: "yes"
+      volume.beta.kubernetes.io/storage-provisioner: topolvm.io
+      volume.kubernetes.io/selected-node: gpu-node-x
+      volume.kubernetes.io/storage-provisioner: topolvm.io
+    creationTimestamp: "2026-09-29T15:17:09Z"
+    finalizers:
+    - kubernetes.io/pvc-protection
+    name: glm53-model
+    namespace: llm-glm53
+    resourceVersion: "602830"
+    uid: 7cbbc0cf-2320-4a7a-8139-d404e5aa24bc
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Ti
+    storageClassName: lvms-vg1
+    volumeMode: Filesystem
+    volumeName: pvc-7cbbc0cf-2320-4a7a-8139-d404e5aa24bc
+  status:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 1Ti
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:/PersistentVolumeClaim:llm-glm53/glm53-models
+      pv.kubernetes.io/bind-completed: "yes"
+    creationTimestamp: "2026-09-29T16:42:30Z"
+    finalizers:
+    - kubernetes.io/pvc-protection
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-models
+    namespace: llm-glm53
+    resourceVersion: "49317579"
+    uid: 8f85052c-4778-42e0-81d2-a07fe57bf010
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1200Gi
+    storageClassName: local-static
+    volumeMode: Filesystem
+    volumeName: glm53-models
+  status:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 1200Gi
+    phase: Bound
+kind: List
+metadata:
+  resourceVersion: ""

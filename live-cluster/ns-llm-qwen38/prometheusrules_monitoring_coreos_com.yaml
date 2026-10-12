@@ -1,0 +1,77 @@
+apiVersion: v1
+items:
+- apiVersion: monitoring.coreos.com/v1
+  kind: PrometheusRule
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:monitoring.coreos.com/PrometheusRule:llm-qwen38/qwen38-cache
+    creationTimestamp: "2026-10-07T14:22:12Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-cache
+    namespace: llm-qwen38
+    resourceVersion: "51078428"
+    uid: 69588e5d-085b-42a5-83bb-8d19b7e617af
+  spec:
+    groups:
+    - name: qwen38-lmcache.rules
+      rules:
+      - alert: LMCacheEngineTargetDown
+        annotations:
+          description: Prometheus has failed to scrape engine target {{ $labels.pod
+            }} for 5 minutes. vLLM on that node serves uncached (slower) until the
+            engine returns.
+          summary: LMCache engine down ({{ $labels.pod }})
+        expr: up{namespace="llm-qwen38", job="qwen38-cache-metrics"} == 0
+        for: 5m
+        labels:
+          severity: critical
+      - alert: LMCacheEngineNoTargets
+        annotations:
+          description: No up{job="qwen38-cache-metrics"} series exists. The scrape
+            path broke (ServiceMonitor / Service / discovery Role) or the engine DaemonSet
+            is gone. Check `oc -n llm-qwen38 get pods -l app.kubernetes.io/instance=qwen38-cache`.
+          summary: LMCache engine metrics gone entirely
+        expr: absent(up{namespace="llm-qwen38", job="qwen38-cache-metrics"})
+        for: 5m
+        labels:
+          severity: critical
+      - alert: LMCacheL2UsageHigh
+        annotations:
+          description: L2 disk-tier usage has been above 90% of the 900Gi cap for
+            30 minutes. Normal at steady state under heavy unique-prefix load (LRU
+            eviction cycles); investigate only if hit rates drop.
+          summary: LMCache L2 near capacity on {{ $labels.pod }}
+        expr: max by (pod) (lmcache_mp_l2_usage_bytes{namespace="llm-qwen38"}) > 900
+          * 1024 * 1024 * 1024 * 0.9
+        for: 30m
+        labels:
+          severity: warning
+      - alert: LMCacheL1EvictionPressure
+        annotations:
+          description: L1 host-RAM tier above 95% for 1h (trigger watermark is 0.8).
+            Eviction is not reclaiming fast enough for the write rate.
+          summary: LMCache L1 eviction falling behind on {{ $labels.pod }}
+        expr: max by (pod) (lmcache_mp_l1_usage_ratio{namespace="llm-qwen38"}) > 0.95
+        for: 1h
+        labels:
+          severity: info
+      - alert: LMCacheNoLookups
+        annotations:
+          description: 'Requests may still be flowing but no cache lookups have happened
+            in 4h. Most likely the vLLM pods hold sessions to dead engine pods after
+            a roll: recycle the vLLM pods one at a time (README ''Operations runbook'').
+            Also expected overnight on an idle cluster -- severity is info for a reason.'
+          summary: LMCache engines serving zero lookups for 4h
+        expr: sum(increase(lmcache_mp_lookups_requests_total{namespace="llm-qwen38"}[4h]))
+          == 0
+        for: 30m
+        labels:
+          severity: info
+kind: List
+metadata:
+  resourceVersion: ""

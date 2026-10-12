@@ -1,0 +1,9 @@
+name: lws
+projectNamespace: openshift-lws-operator
+repourl: 'https://git.example.internal/popai/helm-charts/lws-chart.git'
+targetRevision: opensource-chart
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true

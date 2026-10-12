@@ -1,0 +1,233 @@
+# NVIDIA GPU operator + clock-lock.
+#
+# The cluster is SPLIT by node label: nodes carrying node-role.kubernetes.io/roce: "" are
+# RoCE nodes and get a different driver CONFIG (not a different binary) than the defaults.
+# This is implemented via the NVIDIADriver CRD: ClusterPolicy.useNvidiaDriverCRD=true tells
+# the gpu-operator to manage the driver DaemonSet(s) from NVIDIADriver CRs (see nvidiaDrivers
+# below) instead of from ClusterPolicy.spec.driver. Two CRs are rendered:
+#   - nvidia-driver-roce     : pinned to node-role.kubernetes.io/roce: "" ; rdma enabled +
+#                              useHostMofed=true (host MOFED from the network-operator OFED)
+#   - nvidia-driver-default  : pinned to nodes WITHOUT the roce label (DoesNotExist) ;
+#                              rdma disabled
+# Both CRs share the SAME driver version/image (RDMA config is the only difference).
+namespace:
+  name: nvidia-gpu-operator
+  create: true
+  labels: {}
+
+operatorGroup:
+  name: nvidia-gpu-operator
+  targetNamespaces:
+    - nvidia-gpu-operator
+
+subscription:
+  name: gpu-operator-certified
+  namespace: nvidia-gpu-operator
+  channel: v26.3
+  source: generic-cs-certified
+  sourceNamespace: openshift-marketplace
+  startingCSV: gpu-operator-certified.v26.3.3
+  installPlanApproval: Automatic
+
+clusterPolicy:
+  enabled: true
+  name: gpu-cluster-policy
+  spec:
+    ccManager:
+      enabled: true
+    cdi:
+      default: false
+      enabled: true
+      nriPluginEnabled: false
+    daemonsets:
+      rollingUpdate:
+        maxUnavailable: "1"
+      updateStrategy: RollingUpdate
+    dcgm:
+      enabled: true
+    dcgmExporter:
+      config:
+        name: ""
+      enabled: true
+      serviceMonitor:
+        enabled: true
+    devicePlugin:
+      config:
+        default: ""
+        name: ""
+      enabled: true
+      mps:
+        root: /run/nvidia/mps
+    driver:
+      certConfig:
+        name: ""
+      enabled: true
+      kernelModuleConfig:
+        name: kernel-module-params
+      kernelModuleType: auto
+      licensingConfig:
+        nlsEnabled: true
+        secretName: ""
+      # NOTE: rdma + version/image/repository are NOT set here. With useNvidiaDriverCRD=true
+      # the driver DaemonSet(s) are driven by the NVIDIADriver CRs in nvidiaDrivers below,
+      # which carry per-node-group rdma config. ClusterPolicy.spec.driver.* (below) is kept
+      # for the shared upgrade/repo/licensing defaults the CRs also reference.
+      repoConfig:
+        configMapName: ""
+      upgradePolicy:
+        autoUpgrade: true
+        drain:
+          deleteEmptyDir: false
+          enable: false
+          force: false
+          timeoutSeconds: 300
+        maxParallelUpgrades: 1
+        maxUnavailable: 25%
+        podDeletion:
+          deleteEmptyDir: true
+          force: false
+          timeoutSeconds: 300
+        waitForCompletion:
+          timeoutSeconds: 0
+      useNvidiaDriverCRD: true           # <-- driver managed by NVIDIADriver CRs (see below)
+      virtualTopology:
+        config: ""
+    gdrcopy:
+      enabled: true
+    gds:
+      enabled: false
+    gfd:
+      enabled: true
+    kataSandboxDevicePlugin:
+      enabled: false
+    mig:
+      strategy: none
+    migManager:
+      enabled: false
+    nodeStatusExporter:
+      enabled: true
+    operator:
+      runtimeClass: nvidia
+      use_ocp_driver_toolkit: true
+    sandboxDevicePlugin:
+      enabled: false
+    sandboxWorkloads:
+      defaultWorkload: container
+      enabled: false
+      mode: kubevirt
+    toolkit:
+      enabled: true
+      installDir: /usr/local/nvidia
+    validator:
+      plugin:
+        env: []
+    vfioManager:
+      enabled: false
+    vgpuDeviceManager:
+      enabled: false
+    vgpuManager:
+      enabled: false
+
+# ---------------------------------------------------------------------------
+# NVIDIADriver CRs — one per node group. Active because ClusterPolicy.useNvidiaDriverCRD=true.
+# `defaults` is the shared driver spec (version/image/repo/licensing/upgrade/kernelModule)
+# applied to EVERY CR; each entry in `drivers` overrides only the per-group fields
+# (nodeSelector / nodeAffinity / rdma). RDMA config is the ONLY difference between groups.
+#
+# IMPORTANT: NVIDIADriver does NOT inherit repository/image/version from ClusterPolicy or
+# from the operator's DRIVER_IMAGE env var. The full image path must be explicit in each
+# CR. Always override repository, image and version per-cluster.
+# ---------------------------------------------------------------------------
+nvidiaDrivers:
+  enabled: true
+  defaults:
+    repository: ""            # REQUIRED: override per-cluster (e.g. internal mirror)
+    image: driver
+    version: ""               # REQUIRED: override per-cluster (driver tag or digest)
+    imagePullPolicy: IfNotPresent
+    kernelModuleType: auto
+    usePrecompiled: true      # Set to false if version is a digest (digests + precompiled are unsupported)
+    certConfig:
+      name: artifactory-ca    # Global CA ConfigMap for registry TLS (matches network chart)
+    # NVIDIADriver CRD field names differ from ClusterPolicy.spec.driver:
+    #   - repoConfig takes `name` (configMapName is ClusterPolicy-only) — invalid keys are
+    #     silently dropped by the structural schema and cause a permanent Argo diff.
+    #   - `manager` is an init-container IMAGE spec only (env/image/repository/version) and
+    #     has NO upgradePolicy. Driver upgrade policy lives in
+    #     clusterPolicy.spec.driver.upgradePolicy above — do not render it here.
+    #   - driverType is required by the CRD (API-defaults to gpu); rendered explicitly so
+    #     live matches the desired manifest exactly.
+    repoConfig:
+      name: ""
+    driverType: gpu
+    licensingConfig:
+      nlsEnabled: true
+      secretName: ""
+    kernelModuleConfig:
+      name: kernel-module-params
+    rdma:                     # default (overridden by the roce driver below)
+      enabled: false
+      useHostMofed: false
+  drivers:
+    # RoCE nodes — GPUDirect RDMA via HOST MOFED (MOFED loaded on host by the
+    # network-operator chart's NicClusterPolicy OFED driver).
+    - name: nvidia-driver-roce
+      spec:
+        nodeSelector:
+          node-role.kubernetes.io/roce: ""
+        rdma:
+          enabled: true
+          useHostMofed: true
+    # Default (non-RoCE) nodes — selected by ABSENCE of the roce label.
+    # NOTE: This works only when the NVIDIADriver CRD supports spec.default (GPU Operator
+    # 26.x+). On older CRDs the controller rejects a selector-less/negatively-selected
+    # default CR because it overlaps with the RoCE instance; use positive node labels
+    # instead (see agent.md).
+    - name: nvidia-driver-default
+      spec:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/roce
+                    operator: DoesNotExist
+        rdma:
+          enabled: false
+          useHostMofed: false
+
+# ---------------------------------------------------------------------------
+# clock-lock (chronos) — GPU clock-locking DaemonSet. Lives in this chart because it is
+# logically GPU-adjacent, but deploys at sync-wave 5 (after the gpu-operator wave 3 has
+# installed the driver). Carried from the basepod-day2 clock-lock subchart.
+# ---------------------------------------------------------------------------
+clockLock:
+  enabled: true
+  namespace:
+    name: clock-lock
+    create: true
+  serviceAccount:
+    create: true
+    name: clock-lock
+  rbac:
+    create: true
+  scc:
+    create: true
+    name: clock-lock-privileged
+  configMap:
+    enabled: true
+    name: clock-lock-config
+  image:
+    repository: registry-internal/chronos
+    tag: "0.0.3"
+    pullPolicy: IfNotPresent
+  chronos:
+    checkInterval: "10"
+  daemonset:
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+    tolerations: []
+    updateStrategy:
+      type: RollingUpdate
+    resources: {}
+  podAnnotations: {}
+  podLabels: {}

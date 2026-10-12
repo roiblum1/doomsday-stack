@@ -1,0 +1,63 @@
+image:
+  repository: registry-internal/hpc-observability-exporter
+  tag: "0.1.7"
+  pullPolicy: IfNotPresent
+
+# Cluster identifier stamped on metrics (HPC_CLUSTER_ID env, cluster_id
+# relabel, route annotation). Defaults to global.clusterName.
+clusterId: ""
+
+logLevel: info
+
+daemonset:
+  nodeSelector:
+    node-role.kubernetes.io/roce: ""
+  tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/roce
+      operator: Exists
+
+# Fabric exporter: RDMA counters, ethtool, GPU (nvidia-smi), PCIe links.
+fabric:
+  port: 9500
+  env:
+    pollInterval: "1"
+    enableRdma: "1"
+    enableEthtool: "1"
+    enableGpu: "1"
+    enablePcie: "1"
+    hostRoot: /host
+    nvidiaSmiPath: ""
+    nvidiaLdLibraryPath: /run/nvidia/driver/usr/lib64
+  resources:
+    limits:
+      cpu: "2"
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+# Node exporter: CPU, NUMA topology, NVMe, RAID, PCIe AER.
+node:
+  port: 9501
+  env:
+    pollInterval: "5"
+    enableCpu: "1"
+    enableNuma: "1"
+    enableNvme: "1"
+    enableRaid: "1"
+    enablePcieAer: "1"
+  resources:
+    limits:
+      cpu: "1"
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+serviceMonitor:
+  interval: 1s
+  scrapeTimeout: 900ms
+
+route:
+  enabled: true

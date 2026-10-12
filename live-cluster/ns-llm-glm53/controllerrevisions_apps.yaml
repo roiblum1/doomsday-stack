@@ -1,0 +1,2710 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app.kubernetes.io/component: cache-engine
+            app.kubernetes.io/instance: glm53-cache
+            app.kubernetes.io/managed-by: lmcache-operator
+            app.kubernetes.io/name: lmcache
+        spec:
+          containers:
+          - args:
+            - --host
+            - 0.0.0.0
+            - --port
+            - "5555"
+            - --http-port
+            - "8080"
+            - --l1-size-gb
+            - "200.0"
+            - --chunk-size
+            - "256"
+            - --max-workers
+            - "8"
+            - --hash-algorithm
+            - blake3
+            - --isolated-ipc
+            - --eviction-policy
+            - LRU
+            - --eviction-trigger-watermark
+            - "0.80"
+            - --eviction-ratio
+            - "0.20"
+            - --prometheus-port
+            - "8080"
+            - --l2-adapter
+            - '{"backend":"POSIX","backend_params":{"file_path":"/mnt/lmcache-l2","max_capacity_gb":"900","shard_dirs":"true","use_direct_io":"false"},"eviction":{"eviction_policy":"LRU","eviction_ratio":0.1,"trigger_watermark":0.9},"persist_enabled":true,"type":"nixl_store_dynamic"}'
+            - --l2-store-policy
+            - default
+            - --l2-prefetch-policy
+            - default
+            - --l2-prefetch-max-in-flight
+            - "8"
+            - --separate-object-groups
+            command:
+            - /opt/venv/bin/lmcache
+            - server
+            env:
+            - name: LMCACHE_LOG_LEVEL
+              value: INFO
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: all
+            - name: HOME
+              value: /tmp
+            - name: NUMBA_CACHE_DIR
+              value: /tmp/numba
+            image: registry-internal/lmcache/lmcache/vllm-openai:v0.5.5
+            imagePullPolicy: IfNotPresent
+            livenessProbe:
+              failureThreshold: 3
+              periodSeconds: 10
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            name: lmcache
+            ports:
+            - containerPort: 5555
+              name: server
+              protocol: TCP
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+            readinessProbe:
+              failureThreshold: 3
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            resources:
+              limits:
+                memory: 308Gi
+              requests:
+                cpu: "4"
+                memory: 205Gi
+            securityContext:
+              privileged: false
+            startupProbe:
+              failureThreshold: 40
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /mnt/lmcache-l2
+              name: l2
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          priorityClassName: openshift-user-critical
+          restartPolicy: Always
+          runtimeClassName: nvidia
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-cache
+          serviceAccountName: glm53-cache
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - ephemeral:
+              volumeClaimTemplate:
+                metadata: {}
+                spec:
+                  accessModes:
+                  - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: 1000Gi
+                  storageClassName: lvms-vg1
+                  volumeMode: Filesystem
+            name: l2
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      deprecated.daemonset.template.generation: "2"
+    creationTimestamp: "2026-10-06T22:48:31Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      controller-revision-hash: 5454f5c4fb
+    name: glm53-cache-5454f5c4fb
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-cache
+      uid: df7c3a7b-acda-4bf9-80ea-07555e1935b2
+    resourceVersion: "50312708"
+    uid: 74469145-2ba5-4dda-89d0-8f260b4587f1
+  revision: 2
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app.kubernetes.io/component: cache-engine
+            app.kubernetes.io/instance: glm53-cache
+            app.kubernetes.io/managed-by: lmcache-operator
+            app.kubernetes.io/name: lmcache
+        spec:
+          containers:
+          - args:
+            - --host
+            - 0.0.0.0
+            - --port
+            - "5555"
+            - --http-port
+            - "8080"
+            - --l1-size-gb
+            - "1000.0"
+            - --chunk-size
+            - "256"
+            - --max-workers
+            - "8"
+            - --hash-algorithm
+            - blake3
+            - --isolated-ipc
+            - --eviction-policy
+            - LRU
+            - --eviction-trigger-watermark
+            - "0.80"
+            - --eviction-ratio
+            - "0.20"
+            - --prometheus-port
+            - "8080"
+            - --l2-adapter
+            - '{"backend":"POSIX","backend_params":{"file_path":"/mnt/lmcache-l2","max_capacity_gb":"2200","shard_dirs":"true","use_direct_io":"false"},"eviction":{"eviction_policy":"LRU","eviction_ratio":0.1,"trigger_watermark":0.9},"persist_enabled":true,"type":"nixl_store_dynamic"}'
+            - --l2-store-policy
+            - default
+            - --l2-prefetch-policy
+            - default
+            - --l2-prefetch-max-in-flight
+            - "8"
+            - --separate-object-groups
+            command:
+            - /opt/venv/bin/lmcache
+            - server
+            env:
+            - name: LMCACHE_LOG_LEVEL
+              value: INFO
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: all
+            - name: HOME
+              value: /tmp
+            - name: NUMBA_CACHE_DIR
+              value: /tmp/numba
+            image: registry-internal/lmcache/lmcache/vllm-openai:v0.5.5
+            imagePullPolicy: IfNotPresent
+            livenessProbe:
+              failureThreshold: 3
+              periodSeconds: 10
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            name: lmcache
+            ports:
+            - containerPort: 5555
+              name: server
+              protocol: TCP
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+            readinessProbe:
+              failureThreshold: 3
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            resources:
+              limits:
+                memory: 1508Gi
+              requests:
+                cpu: "4"
+                memory: 1005Gi
+            securityContext:
+              privileged: false
+            startupProbe:
+              failureThreshold: 200
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /mnt/lmcache-l2
+              name: l2
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          priorityClassName: openshift-user-critical
+          restartPolicy: Always
+          runtimeClassName: nvidia
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-cache
+          serviceAccountName: glm53-cache
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - ephemeral:
+              volumeClaimTemplate:
+                metadata: {}
+                spec:
+                  accessModes:
+                  - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: 2500Gi
+                  storageClassName: lvms-vg1
+                  volumeMode: Filesystem
+            name: l2
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      deprecated.daemonset.template.generation: "3"
+    creationTimestamp: "2026-10-07T07:21:42Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      controller-revision-hash: 58cdfddfcc
+    name: glm53-cache-58cdfddfcc
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-cache
+      uid: df7c3a7b-acda-4bf9-80ea-07555e1935b2
+    resourceVersion: "50613364"
+    uid: 8f7f36ec-3e32-4a97-a235-58329abbf643
+  revision: 3
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app.kubernetes.io/component: cache-engine
+            app.kubernetes.io/instance: glm53-cache
+            app.kubernetes.io/managed-by: lmcache-operator
+            app.kubernetes.io/name: lmcache
+        spec:
+          containers:
+          - args:
+            - --host
+            - 0.0.0.0
+            - --port
+            - "5555"
+            - --http-port
+            - "8080"
+            - --l1-size-gb
+            - "1000.0"
+            - --chunk-size
+            - "256"
+            - --max-workers
+            - "8"
+            - --hash-algorithm
+            - blake3
+            - --isolated-ipc
+            - --eviction-policy
+            - LRU
+            - --eviction-trigger-watermark
+            - "0.80"
+            - --eviction-ratio
+            - "0.20"
+            - --prometheus-port
+            - "8080"
+            - --l2-adapter
+            - '{"backend":"POSIX","backend_params":{"file_path":"/mnt/lmcache-l2","max_capacity_gb":"2200","shard_dirs":"true","use_direct_io":"false"},"eviction":{"eviction_policy":"LRU","eviction_ratio":0.1,"trigger_watermark":0.9},"persist_enabled":true,"type":"nixl_store_dynamic"}'
+            - --l2-store-policy
+            - default
+            - --l2-prefetch-policy
+            - default
+            - --l2-prefetch-max-in-flight
+            - "8"
+            - --separate-object-groups
+            command:
+            - /opt/venv/bin/lmcache
+            - server
+            env:
+            - name: LMCACHE_LOG_LEVEL
+              value: INFO
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: all
+            - name: HOME
+              value: /tmp
+            - name: NUMBA_CACHE_DIR
+              value: /tmp/numba
+            image: registry-internal/lmcache/lmcache/vllm-openai:v0.5.5
+            imagePullPolicy: IfNotPresent
+            livenessProbe:
+              failureThreshold: 3
+              periodSeconds: 10
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            name: lmcache
+            ports:
+            - containerPort: 5555
+              name: server
+              protocol: TCP
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+            readinessProbe:
+              failureThreshold: 3
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            resources:
+              limits:
+                memory: 1508Gi
+              requests:
+                cpu: "4"
+                memory: 1005Gi
+            securityContext:
+              privileged: false
+            startupProbe:
+              failureThreshold: 200
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /mnt/lmcache-l2
+              name: l2
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          priorityClassName: openshift-user-critical
+          restartPolicy: Always
+          runtimeClassName: nvidia
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-cache
+          serviceAccountName: glm53-cache
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - name: l2
+            persistentVolumeClaim:
+              claimName: glm53-cache-l2
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      deprecated.daemonset.template.generation: "4"
+    creationTimestamp: "2026-10-07T10:48:04Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      controller-revision-hash: 647bdf7595
+    name: glm53-cache-647bdf7595
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-cache
+      uid: df7c3a7b-acda-4bf9-80ea-07555e1935b2
+    resourceVersion: "54961516"
+    uid: 7f0331f9-ec78-4ab5-8c6e-53e5ed608b47
+  revision: 12
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app.kubernetes.io/component: cache-engine
+            app.kubernetes.io/instance: glm53-cache
+            app.kubernetes.io/managed-by: lmcache-operator
+            app.kubernetes.io/name: lmcache
+        spec:
+          containers:
+          - args:
+            - --host
+            - 0.0.0.0
+            - --port
+            - "5555"
+            - --http-port
+            - "8080"
+            - --l1-size-gb
+            - "200.0"
+            - --chunk-size
+            - "256"
+            - --max-workers
+            - "8"
+            - --hash-algorithm
+            - blake3
+            - --isolated-ipc
+            - --eviction-policy
+            - LRU
+            - --eviction-trigger-watermark
+            - "0.80"
+            - --eviction-ratio
+            - "0.20"
+            - --prometheus-port
+            - "9090"
+            - --l2-adapter
+            - '{"backend":"POSIX","backend_params":{"file_path":"/mnt/lmcache-l2","max_capacity_gb":"900","shard_dirs":"true","use_direct_io":"false"},"eviction":{"eviction_policy":"LRU","eviction_ratio":0.1,"trigger_watermark":0.9},"persist_enabled":true,"type":"nixl_store_dynamic"}'
+            - --l2-store-policy
+            - default
+            - --l2-prefetch-policy
+            - default
+            - --l2-prefetch-max-in-flight
+            - "8"
+            - --separate-object-groups
+            command:
+            - /opt/venv/bin/lmcache
+            - server
+            env:
+            - name: LMCACHE_LOG_LEVEL
+              value: INFO
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: all
+            - name: HOME
+              value: /tmp
+            - name: NUMBA_CACHE_DIR
+              value: /tmp/numba
+            image: registry-internal/lmcache/lmcache/vllm-openai:v0.5.5
+            imagePullPolicy: IfNotPresent
+            livenessProbe:
+              failureThreshold: 3
+              periodSeconds: 10
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            name: lmcache
+            ports:
+            - containerPort: 5555
+              name: server
+              protocol: TCP
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+            - containerPort: 9090
+              name: metrics
+              protocol: TCP
+            readinessProbe:
+              failureThreshold: 3
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            resources:
+              limits:
+                memory: 308Gi
+              requests:
+                cpu: "4"
+                memory: 205Gi
+            securityContext:
+              privileged: false
+            startupProbe:
+              failureThreshold: 40
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /mnt/lmcache-l2
+              name: l2
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          priorityClassName: openshift-user-critical
+          restartPolicy: Always
+          runtimeClassName: nvidia
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-cache
+          serviceAccountName: glm53-cache
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - ephemeral:
+              volumeClaimTemplate:
+                metadata: {}
+                spec:
+                  accessModes:
+                  - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: 1000Gi
+                  storageClassName: lvms-vg1
+                  volumeMode: Filesystem
+            name: l2
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      deprecated.daemonset.template.generation: "1"
+    creationTimestamp: "2026-10-06T21:24:47Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      controller-revision-hash: 6c77869d44
+    name: glm53-cache-6c77869d44
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-cache
+      uid: df7c3a7b-acda-4bf9-80ea-07555e1935b2
+    resourceVersion: "50264085"
+    uid: af15c885-140d-4721-bbdf-6208e38a4e3c
+  revision: 1
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app.kubernetes.io/component: cache-engine
+            app.kubernetes.io/instance: glm53-cache
+            app.kubernetes.io/managed-by: lmcache-operator
+            app.kubernetes.io/name: lmcache
+        spec:
+          containers:
+          - args:
+            - --host
+            - 0.0.0.0
+            - --port
+            - "5555"
+            - --http-port
+            - "8080"
+            - --l1-size-gb
+            - "40.0"
+            - --chunk-size
+            - "256"
+            - --max-workers
+            - "8"
+            - --hash-algorithm
+            - blake3
+            - --isolated-ipc
+            - --eviction-policy
+            - LRU
+            - --eviction-trigger-watermark
+            - "0.80"
+            - --eviction-ratio
+            - "0.20"
+            - --prometheus-port
+            - "8080"
+            - --l2-adapter
+            - '{"backend":"POSIX","backend_params":{"file_path":"/mnt/lmcache-l2","max_capacity_gb":"2200","shard_dirs":"true","use_direct_io":"false"},"eviction":{"eviction_policy":"LRU","eviction_ratio":0.1,"trigger_watermark":0.9},"persist_enabled":true,"type":"nixl_store_dynamic"}'
+            - --l2-store-policy
+            - default
+            - --l2-prefetch-policy
+            - default
+            - --l2-prefetch-max-in-flight
+            - "8"
+            - --separate-object-groups
+            command:
+            - /opt/venv/bin/lmcache
+            - server
+            env:
+            - name: LMCACHE_LOG_LEVEL
+              value: INFO
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: all
+            - name: HOME
+              value: /tmp
+            - name: NUMBA_CACHE_DIR
+              value: /tmp/numba
+            image: registry-internal/lmcache/lmcache/vllm-openai:v0.5.5
+            imagePullPolicy: IfNotPresent
+            livenessProbe:
+              failureThreshold: 3
+              periodSeconds: 10
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            name: lmcache
+            ports:
+            - containerPort: 5555
+              name: server
+              protocol: TCP
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+            readinessProbe:
+              failureThreshold: 3
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            resources:
+              limits:
+                memory: 68Gi
+              requests:
+                cpu: "4"
+                memory: 45Gi
+            securityContext:
+              privileged: false
+            startupProbe:
+              failureThreshold: 30
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /mnt/lmcache-l2
+              name: l2
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          priorityClassName: openshift-user-critical
+          restartPolicy: Always
+          runtimeClassName: nvidia
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-cache
+          serviceAccountName: glm53-cache
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - name: l2
+            persistentVolumeClaim:
+              claimName: glm53-cache-l2
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      deprecated.daemonset.template.generation: "9"
+    creationTimestamp: "2026-10-12T10:46:59Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      controller-revision-hash: 78f45d5c44
+    name: glm53-cache-78f45d5c44
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-cache
+      uid: df7c3a7b-acda-4bf9-80ea-07555e1935b2
+    resourceVersion: "54949634"
+    uid: 838dcc04-cddf-40c5-9896-f0809c1700bd
+  revision: 11
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app.kubernetes.io/component: cache-engine
+            app.kubernetes.io/instance: glm53-cache
+            app.kubernetes.io/managed-by: lmcache-operator
+            app.kubernetes.io/name: lmcache
+        spec:
+          containers:
+          - args:
+            - --host
+            - 0.0.0.0
+            - --port
+            - "5555"
+            - --http-port
+            - "8080"
+            - --l1-size-gb
+            - "40.0"
+            - --chunk-size
+            - "256"
+            - --max-workers
+            - "8"
+            - --hash-algorithm
+            - blake3
+            - --isolated-ipc
+            - --eviction-policy
+            - LRU
+            - --eviction-trigger-watermark
+            - "0.80"
+            - --eviction-ratio
+            - "0.20"
+            - --prometheus-port
+            - "8080"
+            - --l2-adapter
+            - '{"backend":"POSIX","backend_params":{"file_path":"/mnt/lmcache-l2","max_capacity_gb":"2200","shard_dirs":"true","use_direct_io":"false"},"eviction":{"eviction_policy":"LRU","eviction_ratio":0.1,"trigger_watermark":0.9},"persist_enabled":true,"type":"nixl_store_dynamic"}'
+            - --l2-store-policy
+            - default
+            - --l2-prefetch-policy
+            - default
+            - --l2-prefetch-max-in-flight
+            - "8"
+            - --separate-object-groups
+            command:
+            - /opt/venv/bin/lmcache
+            - server
+            env:
+            - name: LMCACHE_LOG_LEVEL
+              value: INFO
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: all
+            - name: HOME
+              value: /tmp
+            - name: NUMBA_CACHE_DIR
+              value: /tmp/numba
+            image: registry-internal/lmcache/lmcache/vllm-openai:v0.5.5
+            imagePullPolicy: IfNotPresent
+            livenessProbe:
+              failureThreshold: 3
+              periodSeconds: 10
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            name: lmcache
+            ports:
+            - containerPort: 5555
+              name: server
+              protocol: TCP
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+            readinessProbe:
+              failureThreshold: 3
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            resources:
+              limits:
+                memory: 1508Gi
+              requests:
+                cpu: "4"
+                memory: 1005Gi
+            securityContext:
+              privileged: false
+            startupProbe:
+              failureThreshold: 200
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              successThreshold: 1
+              tcpSocket:
+                port: 5555
+              timeoutSeconds: 1
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+            - mountPath: /mnt/lmcache-l2
+              name: l2
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          priorityClassName: openshift-user-critical
+          restartPolicy: Always
+          runtimeClassName: nvidia
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-cache
+          serviceAccountName: glm53-cache
+          terminationGracePeriodSeconds: 30
+          volumes:
+          - name: l2
+            persistentVolumeClaim:
+              claimName: glm53-cache-l2
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      deprecated.daemonset.template.generation: "5"
+    creationTimestamp: "2026-10-12T10:46:32Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      controller-revision-hash: f88589948
+    name: glm53-cache-f88589948
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-cache
+      uid: df7c3a7b-acda-4bf9-80ea-07555e1935b2
+    resourceVersion: "54929775"
+    uid: b372f0af-76a3-4d73-a55c-c6156bf470f5
+  revision: 7
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app: glm53-node-prep
+            app.kubernetes.io/instance: glm53
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: glm53
+            helm.sh/chart: glm53-bundled-0.1.0
+        spec:
+          containers:
+          - args:
+            - |
+              set -euo pipefail
+              # nsenter keeps the container's env; host LVM tools live in /usr/sbin.
+              export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              VG=vg1
+              BASE=/var/mnt/llm
+              LOOP=60
+
+              ensure_lv() {
+                local name=$1 size=$2 subdir=$3
+                local dev="/dev/${VG}/${name}" mp="${BASE}/${subdir}"
+                if ! lvs "${VG}/${name}" >/dev/null 2>&1; then
+                  echo "[node-prep] creating LV ${VG}/${name} (${size})"
+                  lvcreate -y -L "${size}" -n "${name}" "${VG}"
+                fi
+                lvchange -ay "${VG}/${name}" 2>/dev/null || true
+                mkdir -p "${mp}"
+                if ! mountpoint -q "${mp}"; then
+                  if ! blkid "${dev}" >/dev/null 2>&1; then
+                    echo "[node-prep] mkfs.xfs ${dev}"
+                    mkfs.xfs "${dev}"
+                  fi
+                  mount "${dev}" "${mp}"
+                  # Full relabel once, right after first mount (empty fs).
+                  chcon -R -t container_file_t ${BASE}
+                fi
+                chmod 1777 "${mp}"
+                chcon -t container_file_t "${mp}" >/dev/null 2>&1 || true
+              }
+
+              # (flashinfer cubin seeding needs the image's dist-packages,
+              # which are NOT visible in this HOST mount namespace; the
+              # cubin-src container below exposes them via /proc/<pid>/root.)
+
+
+              # Seed flashinfer's trtllm-gen cubins from the cubin-src
+              # container's rootfs (same image, v0.30.0: flashinfer
+              # 0.6.18.post1 bundles the cubins) into the cache LV. The
+              # lmcache vllm-openai:v0.5.5 image ships plain flashinfer
+              # 0.6.18 with NO bundled cubins and fetches fmha/trtllm-gen
+              # cubins from edge.urm.nvidia.com at boot -- unreachable
+              # air-gapped (vLLM pod crash-looped on "Failed to get
+              # checksums.txt"). flashinfer checks FLASHINFER_CUBIN_DIR (=
+              # FLASHINFER_WORKSPACE_BASE + .cache/flashinfer/cubins inside
+              # the vLLM pods, i.e. this LV) BEFORE any download and
+              # sha256-verifies each file, so a plain copy satisfies it.
+              # Runs AFTER ensure_lv mounted the LV (we see it through the
+              # host mount table, so no bind-mount staleness). Idempotent.
+              seed_flashinfer_cubins() {
+                local dst_root="${BASE}/cache/flashinfer/.cache/flashinfer/cubins"
+                local pid
+                # Anchored: this script's own cmdline contains the marker
+                # text (function body), and pgrep -f scans full cmdlines --
+                # an unanchored pattern matched ourselves (host root, no
+                # dist-packages). ^ pins it to the sidecar's argv0.
+                pid=$(pgrep -f '^lmcache-cubin-src' | head -1 || true)
+                if [ -z "${pid}" ]; then
+                  echo "[node-prep] cubin-src container not up yet, will retry"
+                  return 0
+                fi
+                local src="/proc/${pid}/root/usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins"
+                if [ ! -d "${src}" ]; then
+                  echo "[node-prep] cubin-src image has no flashinfer_cubin package"
+                  return 0
+                fi
+                for hashdir in "${src}"/*; do
+                  [ -d "${hashdir}" ] || continue
+                  local hash=$(basename "${hashdir}")
+                  if [ -e "${dst_root}/${hash}/fmha/trtllm-gen/checksums.txt" ]; then
+                    continue
+                  fi
+                  echo "[node-prep] seeding flashinfer cubins ${hash} ($(du -sh ${hashdir} | cut -f1))"
+                  mkdir -p "${dst_root}/${hash}"
+                  cp -a "${hashdir}/." "${dst_root}/${hash}/"
+                  chmod -R a+rX "${dst_root}/${hash}"
+                  echo "[node-prep] seeded ${hash}"
+                done
+              }
+
+              while true; do
+                ensure_lv llm-models 1200G models
+                ensure_lv llm-cache 300G cache
+                seed_flashinfer_cubins
+                echo "[node-prep] $(date -Is) OK: $(mount | grep ${BASE} | awk '{print $1"->"$3}' | tr '\n' ' ')"
+                sleep ${LOOP}
+              done
+            command:
+            - nsenter
+            - -t
+            - "1"
+            - -m
+            - -u
+            - -i
+            - -n
+            - --
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: node-prep
+            resources:
+              limits:
+                cpu: "2"
+                memory: 1Gi
+              requests:
+                cpu: "1"
+                memory: 512Mi
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          - args:
+            - exec -a lmcache-cubin-src sleep infinity
+            command:
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: cubin-src
+            resources:
+              limits:
+                cpu: 100m
+                memory: 256Mi
+              requests:
+                cpu: 10m
+                memory: 64Mi
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          hostPID: true
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-node-prep
+          serviceAccountName: glm53-node-prep
+          terminationGracePeriodSeconds: 5
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:apps/DaemonSet:llm-glm53/glm53-node-prep
+      deprecated.daemonset.template.generation: "7"
+    creationTimestamp: "2026-10-06T21:45:12Z"
+    labels:
+      app: glm53-node-prep
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      controller-revision-hash: 5c9cd54c67
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-node-prep-5c9cd54c67
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-node-prep
+      uid: 8eeea19f-b01f-44cb-98ae-31a03c75337a
+    resourceVersion: "50276052"
+    uid: be64f9c2-dcd0-49b8-930a-f6ec368c170e
+  revision: 7
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app: glm53-node-prep
+            app.kubernetes.io/instance: glm53
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: glm53
+            helm.sh/chart: glm53-bundled-0.1.0
+        spec:
+          containers:
+          - args:
+            - |
+              set -euo pipefail
+              # nsenter keeps the container's env; host LVM tools live in /usr/sbin.
+              export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              VG=vg1
+              BASE=/var/mnt/llm
+              LOOP=60
+
+              ensure_lv() {
+                local name=$1 size=$2 subdir=$3
+                local dev="/dev/${VG}/${name}" mp="${BASE}/${subdir}"
+                if ! lvs "${VG}/${name}" >/dev/null 2>&1; then
+                  echo "[node-prep] creating LV ${VG}/${name} (${size})"
+                  lvcreate -y -L "${size}" -n "${name}" "${VG}"
+                fi
+                lvchange -ay "${VG}/${name}" 2>/dev/null || true
+                mkdir -p "${mp}"
+                if ! mountpoint -q "${mp}"; then
+                  if ! blkid "${dev}" >/dev/null 2>&1; then
+                    echo "[node-prep] mkfs.xfs ${dev}"
+                    mkfs.xfs "${dev}"
+                  fi
+                  mount "${dev}" "${mp}"
+                  # Full relabel once, right after first mount (empty fs).
+                  chcon -R -t container_file_t ${BASE}
+                fi
+                chmod 1777 "${mp}"
+                chcon -t container_file_t "${mp}" >/dev/null 2>&1 || true
+              }
+
+              # (flashinfer cubin seeding needs the image's dist-packages,
+              # which are NOT visible in this HOST mount namespace; the
+              # cubin-src container below exposes them via /proc/<pid>/root.)
+
+
+              # Seed flashinfer's trtllm-gen cubins from the cubin-src
+              # container's rootfs (same image, v0.30.0: flashinfer
+              # 0.6.18.post1 bundles the cubins) into the cache LV. The
+              # lmcache vllm-openai:v0.5.5 image ships plain flashinfer
+              # 0.6.18 with NO bundled cubins and fetches fmha/trtllm-gen
+              # cubins from edge.urm.nvidia.com at boot -- unreachable
+              # air-gapped (vLLM pod crash-looped on "Failed to get
+              # checksums.txt"). flashinfer checks FLASHINFER_CUBIN_DIR (=
+              # FLASHINFER_WORKSPACE_BASE + .cache/flashinfer/cubins inside
+              # the vLLM pods, i.e. this LV) BEFORE any download and
+              # sha256-verifies each file, so a plain copy satisfies it.
+              # Runs AFTER ensure_lv mounted the LV (we see it through the
+              # host mount table, so no bind-mount staleness). Idempotent.
+              seed_flashinfer_cubins() {
+                local dst_root="${BASE}/cache/flashinfer/.cache/flashinfer/cubins"
+                local pid
+                pid=$(pgrep -f lmcache-cubin-src | head -1 || true)
+                if [ -z "${pid}" ]; then
+                  echo "[node-prep] cubin-src container not up yet, will retry"
+                  return 0
+                fi
+                local src="/proc/${pid}/root/usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins"
+                if [ ! -d "${src}" ]; then
+                  echo "[node-prep] cubin-src image has no flashinfer_cubin package"
+                  return 0
+                fi
+                for hashdir in "${src}"/*; do
+                  [ -d "${hashdir}" ] || continue
+                  local hash=$(basename "${hashdir}")
+                  if [ -e "${dst_root}/${hash}/fmha/trtllm-gen/checksums.txt" ]; then
+                    continue
+                  fi
+                  echo "[node-prep] seeding flashinfer cubins ${hash} ($(du -sh ${hashdir} | cut -f1))"
+                  mkdir -p "${dst_root}/${hash}"
+                  cp -a "${hashdir}/." "${dst_root}/${hash}/"
+                  chmod -R a+rX "${dst_root}/${hash}"
+                  echo "[node-prep] seeded ${hash}"
+                done
+              }
+
+              while true; do
+                ensure_lv llm-models 1200G models
+                ensure_lv llm-cache 300G cache
+                seed_flashinfer_cubins
+                echo "[node-prep] $(date -Is) OK: $(mount | grep ${BASE} | awk '{print $1"->"$3}' | tr '\n' ' ')"
+                sleep ${LOOP}
+              done
+            command:
+            - nsenter
+            - -t
+            - "1"
+            - -m
+            - -u
+            - -i
+            - -n
+            - --
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: node-prep
+            resources:
+              limits:
+                cpu: "2"
+                memory: 1Gi
+              requests:
+                cpu: "1"
+                memory: 512Mi
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          - args:
+            - exec -a lmcache-cubin-src sleep infinity
+            command:
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: cubin-src
+            resources:
+              limits:
+                cpu: 100m
+                memory: 256Mi
+              requests:
+                cpu: 10m
+                memory: 64Mi
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          hostPID: true
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-node-prep
+          serviceAccountName: glm53-node-prep
+          terminationGracePeriodSeconds: 5
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:apps/DaemonSet:llm-glm53/glm53-node-prep
+      deprecated.daemonset.template.generation: "6"
+    creationTimestamp: "2026-10-06T21:43:33Z"
+    labels:
+      app: glm53-node-prep
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      controller-revision-hash: 665697bb4d
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-node-prep-665697bb4d
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-node-prep
+      uid: 8eeea19f-b01f-44cb-98ae-31a03c75337a
+    resourceVersion: "50275061"
+    uid: 85b65a6f-a94f-4582-9bdf-947a9732851e
+  revision: 6
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app: glm53-node-prep
+            app.kubernetes.io/instance: glm53
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: glm53
+            helm.sh/chart: glm53-bundled-0.1.0
+        spec:
+          containers:
+          - args:
+            - |
+              set -euo pipefail
+              # nsenter keeps the container's env; host LVM tools live in /usr/sbin.
+              export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              VG=vg1
+              BASE=/var/mnt/llm
+              LOOP=60
+
+              ensure_lv() {
+                local name=$1 size=$2 subdir=$3
+                local dev="/dev/${VG}/${name}" mp="${BASE}/${subdir}"
+                if ! lvs "${VG}/${name}" >/dev/null 2>&1; then
+                  echo "[node-prep] creating LV ${VG}/${name} (${size})"
+                  lvcreate -y -L "${size}" -n "${name}" "${VG}"
+                fi
+                lvchange -ay "${VG}/${name}" 2>/dev/null || true
+                mkdir -p "${mp}"
+                if ! mountpoint -q "${mp}"; then
+                  if ! blkid "${dev}" >/dev/null 2>&1; then
+                    echo "[node-prep] mkfs.xfs ${dev}"
+                    mkfs.xfs "${dev}"
+                  fi
+                  mount "${dev}" "${mp}"
+                  # Full relabel once, right after first mount (empty fs).
+                  chcon -R -t container_file_t ${BASE}
+                fi
+                chmod 1777 "${mp}"
+                chcon -t container_file_t "${mp}" >/dev/null 2>&1 || true
+              }
+
+              while true; do
+                ensure_lv llm-models 1200G models
+                ensure_lv llm-cache 300G cache
+                echo "[node-prep] $(date -Is) OK: $(mount | grep ${BASE} | awk '{print $1"->"$3}' | tr '\n' ' ')"
+                sleep ${LOOP}
+              done
+            command:
+            - nsenter
+            - -t
+            - "1"
+            - -m
+            - -u
+            - -i
+            - -n
+            - --
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: node-prep
+            resources:
+              limits:
+                cpu: "2"
+                memory: 1Gi
+              requests:
+                cpu: "1"
+                memory: 512Mi
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          hostPID: true
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-node-prep
+          serviceAccountName: glm53-node-prep
+          terminationGracePeriodSeconds: 5
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:apps/DaemonSet:llm-glm53/glm53-node-prep
+      deprecated.daemonset.template.generation: "4"
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-04T07:17:28Z"
+    labels:
+      app: glm53-node-prep
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      controller-revision-hash: 6859bbc9bc
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-node-prep-6859bbc9bc
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-node-prep
+      uid: 8eeea19f-b01f-44cb-98ae-31a03c75337a
+    resourceVersion: "38474203"
+    uid: 4b6f178c-42af-43e6-803d-fbb919c130eb
+  revision: 4
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app: glm53-node-prep
+        spec:
+          containers:
+          - args:
+            - |
+              set -euo pipefail
+              # nsenter keeps the container's env; host LVM tools live in /usr/sbin.
+              export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              VG=vg1
+
+              ensure_lv() {
+                local name=$1 size=$2 subdir=$3
+                local dev="/dev/${VG}/${name}" mp="/var/mnt/llm/${subdir}"
+                if ! lvs "${VG}/${name}" >/dev/null 2>&1; then
+                  echo "[node-prep] creating LV ${VG}/${name} (${size})"
+                  lvcreate -y -L "${size}" -n "${name}" "${VG}"
+                fi
+                lvchange -ay "${VG}/${name}" 2>/dev/null || true
+                mkdir -p "${mp}"
+                if ! mountpoint -q "${mp}"; then
+                  if ! blkid "${dev}" >/dev/null 2>&1; then
+                    echo "[node-prep] mkfs.xfs ${dev}"
+                    mkfs.xfs "${dev}"
+                  fi
+                  mount "${dev}" "${mp}"
+                  # Full relabel once, right after first mount (empty fs).
+                  chcon -R -t container_file_t /var/mnt/llm
+                fi
+                chmod 1777 "${mp}"
+                chcon -t container_file_t "${mp}" >/dev/null 2>&1 || true
+              }
+
+              while true; do
+                ensure_lv llm-models 1200G models
+                ensure_lv llm-cache 300G cache
+                echo "[node-prep] $(date -Is) OK: $(mount | grep /var/mnt/llm | awk '{print $1"->"$3}' | tr '\n' ' ')"
+                sleep 60
+              done
+            command:
+            - nsenter
+            - -t
+            - "1"
+            - -m
+            - -u
+            - -i
+            - -n
+            - --
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: node-prep
+            resources:
+              limits:
+                cpu: "2"
+                memory: 1Gi
+              requests:
+                cpu: "1"
+                memory: 512Mi
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          hostPID: true
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-node-prep
+          serviceAccountName: glm53-node-prep
+          terminationGracePeriodSeconds: 5
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      deprecated.daemonset.template.generation: "3"
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T16:41:24Z"
+    labels:
+      app: glm53-node-prep
+      controller-revision-hash: 6f46c8fdfc
+    name: glm53-node-prep-6f46c8fdfc
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-node-prep
+      uid: 8eeea19f-b01f-44cb-98ae-31a03c75337a
+    resourceVersion: "650154"
+    uid: 52bd459f-8d62-42e4-bcce-ef8a5a7b256b
+  revision: 3
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app: glm53-node-prep
+            app.kubernetes.io/instance: glm53
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: glm53
+            helm.sh/chart: glm53-bundled-0.1.0
+        spec:
+          containers:
+          - args:
+            - |
+              set -euo pipefail
+              # nsenter keeps the container's env; host LVM tools live in /usr/sbin.
+              export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              VG=vg1
+              BASE=/var/mnt/llm
+              LOOP=60
+
+              ensure_lv() {
+                local name=$1 size=$2 subdir=$3
+                local dev="/dev/${VG}/${name}" mp="${BASE}/${subdir}"
+                if ! lvs "${VG}/${name}" >/dev/null 2>&1; then
+                  echo "[node-prep] creating LV ${VG}/${name} (${size})"
+                  # Non-fatal on failure (e.g. vg1 briefly out of space while
+                  # an old volume is being recycled): the loop below retries
+                  # every ${LOOP}s instead of crash-looping the pod.
+                  if ! lvcreate -y -L "${size}" -n "${name}" "${VG}"; then
+                    echo "[node-prep] lvcreate ${name} deferred (will retry): $(vgs --noheadings -o vg_free --units g ${VG} 2>/dev/null || echo '?') free"
+                    return 0
+                  fi
+                fi
+                lvchange -ay "${VG}/${name}" 2>/dev/null || true
+                mkdir -p "${mp}"
+                if ! mountpoint -q "${mp}"; then
+                  if ! blkid "${dev}" >/dev/null 2>&1; then
+                    echo "[node-prep] mkfs.xfs ${dev}"
+                    mkfs.xfs "${dev}"
+                  fi
+                  mount "${dev}" "${mp}"
+                  # Full relabel once, right after first mount (empty fs).
+                  chcon -R -t container_file_t ${BASE}
+                fi
+                chmod 1777 "${mp}"
+                chcon -t container_file_t "${mp}" >/dev/null 2>&1 || true
+              }
+
+              # (flashinfer cubin seeding needs the image's dist-packages,
+              # which are NOT visible in this HOST mount namespace; the
+              # cubin-src container below exposes them via /proc/<pid>/root.)
+
+
+              # Seed flashinfer's trtllm-gen cubins from the cubin-src
+              # container's rootfs (same image, v0.30.0: flashinfer
+              # 0.6.18.post1 bundles the cubins) into the cache LV. The
+              # lmcache vllm-openai:v0.5.5 image ships plain flashinfer
+              # 0.6.18 with NO bundled cubins and fetches fmha/trtllm-gen
+              # cubins from edge.urm.nvidia.com at boot -- unreachable
+              # air-gapped (vLLM pod crash-looped on "Failed to get
+              # checksums.txt"). flashinfer checks FLASHINFER_CUBIN_DIR (=
+              # FLASHINFER_WORKSPACE_BASE + .cache/flashinfer/cubins inside
+              # the vLLM pods, i.e. this LV) BEFORE any download and
+              # sha256-verifies each file, so a plain copy satisfies it.
+              # Runs AFTER ensure_lv mounted the LV (we see it through the
+              # host mount table, so no bind-mount staleness). Idempotent.
+              seed_flashinfer_cubins() {
+                local dst_root="${BASE}/cache/flashinfer/.cache/flashinfer/cubins"
+                local pid
+                # Anchored: this script's own cmdline contains the marker
+                # text (function body), and pgrep -f scans full cmdlines --
+                # an unanchored pattern matched ourselves (host root, no
+                # dist-packages). ^ pins it to the sidecar's argv0.
+                pid=$(pgrep -f '^lmcache-cubin-src' | head -1 || true)
+                if [ -z "${pid}" ]; then
+                  echo "[node-prep] cubin-src container not up yet, will retry"
+                  return 0
+                fi
+                local src="/proc/${pid}/root/usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins"
+                if [ ! -d "${src}" ]; then
+                  echo "[node-prep] cubin-src image has no flashinfer_cubin package"
+                  return 0
+                fi
+                for hashdir in "${src}"/*; do
+                  [ -d "${hashdir}" ] || continue
+                  local hash=$(basename "${hashdir}")
+                  if [ -e "${dst_root}/${hash}/fmha/trtllm-gen/checksums.txt" ]; then
+                    continue
+                  fi
+                  echo "[node-prep] seeding flashinfer cubins ${hash} ($(du -sh ${hashdir} | cut -f1))"
+                  mkdir -p "${dst_root}/${hash}"
+                  cp -a "${hashdir}/." "${dst_root}/${hash}/"
+                  chmod -R a+rX "${dst_root}/${hash}"
+                  echo "[node-prep] seeded ${hash}"
+                done
+              }
+
+              while true; do
+                ensure_lv llm-models 1200G models
+                ensure_lv llm-cache 300G cache
+                ensure_lv llm-l2 2500G lmcache-l2
+                seed_flashinfer_cubins
+                echo "[node-prep] $(date -Is) OK: $(mount | grep ${BASE} | awk '{print $1"->"$3}' | tr '\n' ' ')"
+                sleep ${LOOP}
+              done
+            command:
+            - nsenter
+            - -t
+            - "1"
+            - -m
+            - -u
+            - -i
+            - -n
+            - --
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: node-prep
+            resources:
+              limits:
+                cpu: "2"
+                memory: 1Gi
+              requests:
+                cpu: "1"
+                memory: 512Mi
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          - args:
+            - exec -a lmcache-cubin-src sleep infinity
+            command:
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: cubin-src
+            resources:
+              limits:
+                cpu: 100m
+                memory: 256Mi
+              requests:
+                cpu: 10m
+                memory: 64Mi
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          hostPID: true
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-node-prep
+          serviceAccountName: glm53-node-prep
+          terminationGracePeriodSeconds: 5
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:apps/DaemonSet:llm-glm53/glm53-node-prep
+      deprecated.daemonset.template.generation: "8"
+    creationTimestamp: "2026-10-07T10:48:07Z"
+    labels:
+      app: glm53-node-prep
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      controller-revision-hash: 7985546fd6
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-node-prep-7985546fd6
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-node-prep
+      uid: 8eeea19f-b01f-44cb-98ae-31a03c75337a
+    resourceVersion: "50733788"
+    uid: 662ae2d8-de27-4252-aeee-3721521ec8fa
+  revision: 8
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app: glm53-node-prep
+            app.kubernetes.io/instance: glm53
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: glm53
+            helm.sh/chart: glm53-bundled-0.1.0
+        spec:
+          containers:
+          - args:
+            - |
+              set -euo pipefail
+              # nsenter keeps the container's env; host LVM tools live in /usr/sbin.
+              export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              VG=vg1
+              BASE=/var/mnt/llm
+              LOOP=60
+
+              # Ensure an LV exists, is mounted, and -- critically -- is
+              # mounted at BOTH path resolutions the container runtime may
+              # use for local PVs. On RHCOS /var is a bind of
+              # <rootfs>/ostree/deploy/rhcos/var, so the same directory is
+              # reachable via /var/mnt/... AND via the ostree path. Bind
+              # mounts are snapshots: if the runtime binds through the
+              # ostree path while the LV is only mounted at the /var path
+              # (or vice versa), the pod gets the underlying boot-disk
+              # directory and silently writes cache data to the root fs.
+              # Mounting the LV at both paths makes every resolution land
+              # on the LV. fstab entries make systemd mount both at boot,
+              # before the kubelet starts pods (same protection across
+              # node reboots).
+              ensure_fstab() {
+                local dev=$1 mp=$2
+                if ! grep -qE "^${dev}[[:space:]]+${mp}[[:space:]]" /etc/fstab; then
+                  echo "${dev}  ${mp}  xfs  defaults,nofail,x-systemd.device-timeout=10s  0 0" >> /etc/fstab
+                  echo "[node-prep] fstab entry added: ${dev} -> ${mp}"
+                fi
+              }
+              ensure_lv() {
+                local name=$1 size=$2 subdir=$3
+                local dev="/dev/${VG}/${name}" mp="${BASE}/${subdir}"
+                if ! lvs "${VG}/${name}" >/dev/null 2>&1; then
+                  echo "[node-prep] creating LV ${VG}/${name} (${size})"
+                  # Non-fatal on failure (e.g. vg1 briefly out of space while
+                  # an old volume is being recycled): the loop below retries
+                  # every ${LOOP}s instead of crash-looping the pod.
+                  if ! lvcreate -y -L "${size}" -n "${name}" "${VG}"; then
+                    echo "[node-prep] lvcreate ${name} deferred (will retry): $(vgs --noheadings -o vg_free --units g ${VG} 2>/dev/null || echo '?') free"
+                    return 0
+                  fi
+                fi
+                lvchange -ay "${VG}/${name}" 2>/dev/null || true
+                mkdir -p "${mp}"
+                if ! mountpoint -q "${mp}"; then
+                  if ! blkid "${dev}" >/dev/null 2>&1; then
+                    echo "[node-prep] mkfs.xfs ${dev}"
+                    mkfs.xfs "${dev}"
+                  fi
+                  mount "${dev}" "${mp}"
+                  # Full relabel once, right after first mount (empty fs).
+                  chcon -R -t container_file_t ${BASE}
+                fi
+                ensure_fstab "${dev}" "${mp}"
+                # Second mount at the canonical (root-mount) path: same
+                # directory content, independent mount instance. Harmless
+                # when /var is not a bind (canon == mp, skipped).
+                local var_root canon=""
+                var_root="$(findmnt -n -o FSROOT /var 2>/dev/null || true)"
+                case "${BASE}" in
+                  /var/*) [ -n "${var_root}" ] && [ "${var_root}" != "/" ] && canon="${var_root}${BASE#/var}/${subdir}" ;;
+                esac
+                if [ -n "${canon}" ] && [ "${canon}" != "${mp}" ]; then
+                  mkdir -p "${canon}" 2>/dev/null || true
+                  if ! mountpoint -q "${canon}"; then
+                    if mount "${dev}" "${canon}" 2>/dev/null; then
+                      echo "[node-prep] dual mount OK: ${name} also at ${canon}"
+                    else
+                      echo "[node-prep] WARN: dual mount failed: ${name} -> ${canon} (will retry)"
+                    fi
+                  fi
+                  ensure_fstab "${dev}" "${canon}"
+                fi
+                chmod 1777 "${mp}"
+                chcon -t container_file_t "${mp}" >/dev/null 2>&1 || true
+              }
+
+              # (flashinfer cubin seeding needs the image's dist-packages,
+              # which are NOT visible in this HOST mount namespace; the
+              # cubin-src container below exposes them via /proc/<pid>/root.)
+
+
+              # Seed flashinfer's trtllm-gen cubins from the cubin-src
+              # container's rootfs (same image, v0.30.0: flashinfer
+              # 0.6.18.post1 bundles the cubins) into the cache LV. The
+              # lmcache vllm-openai:v0.5.5 image ships plain flashinfer
+              # 0.6.18 with NO bundled cubins and fetches fmha/trtllm-gen
+              # cubins from edge.urm.nvidia.com at boot -- unreachable
+              # air-gapped (vLLM pod crash-looped on "Failed to get
+              # checksums.txt"). flashinfer checks FLASHINFER_CUBIN_DIR (=
+              # FLASHINFER_WORKSPACE_BASE + .cache/flashinfer/cubins inside
+              # the vLLM pods, i.e. this LV) BEFORE any download and
+              # sha256-verifies each file, so a plain copy satisfies it.
+              # Runs AFTER ensure_lv mounted the LV (we see it through the
+              # host mount table, so no bind-mount staleness). Idempotent.
+              seed_flashinfer_cubins() {
+                # ONLY seed onto the mounted cache LV: without this check
+                # a deferred lvcreate would silently write ~6G of cubins to
+                # the boot disk (later shadowed by the LV mount, invisible
+                # and undeletable through normal paths). Latent-bug guard
+                # added with the qwen38 chart (2026-10-07); never fired
+                # here because the B200 vg1 exists from day 1.
+                if ! mountpoint -q "${BASE}/cache"; then
+                  echo "[node-prep] cache LV not mounted yet, cubin seeding deferred"
+                  return 0
+                fi
+                local dst_root="${BASE}/cache/flashinfer/.cache/flashinfer/cubins"
+                local pid
+                # Anchored: this script's own cmdline contains the marker
+                # text (function body), and pgrep -f scans full cmdlines --
+                # an unanchored pattern matched ourselves (host root, no
+                # dist-packages). ^ pins it to the sidecar's argv0.
+                pid=$(pgrep -f '^lmcache-cubin-src' | head -1 || true)
+                if [ -z "${pid}" ]; then
+                  echo "[node-prep] cubin-src container not up yet, will retry"
+                  return 0
+                fi
+                local src="/proc/${pid}/root/usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins"
+                if [ ! -d "${src}" ]; then
+                  echo "[node-prep] cubin-src image has no flashinfer_cubin package"
+                  return 0
+                fi
+                for hashdir in "${src}"/*; do
+                  [ -d "${hashdir}" ] || continue
+                  local hash=$(basename "${hashdir}")
+                  if [ -e "${dst_root}/${hash}/fmha/trtllm-gen/checksums.txt" ]; then
+                    continue
+                  fi
+                  echo "[node-prep] seeding flashinfer cubins ${hash} ($(du -sh ${hashdir} | cut -f1))"
+                  mkdir -p "${dst_root}/${hash}"
+                  cp -a "${hashdir}/." "${dst_root}/${hash}/"
+                  chmod -R a+rX "${dst_root}/${hash}"
+                  echo "[node-prep] seeded ${hash}"
+                done
+              }
+
+              while true; do
+                ensure_lv llm-models 1200G models
+                ensure_lv llm-cache 300G cache
+                ensure_lv llm-l2 2500G lmcache-l2
+                seed_flashinfer_cubins
+                echo "[node-prep] $(date -Is) OK: $(mount | grep ${BASE} | awk '{print $1"->"$3}' | tr '\n' ' ')"
+                sleep ${LOOP}
+              done
+            command:
+            - nsenter
+            - -t
+            - "1"
+            - -m
+            - -u
+            - -i
+            - -n
+            - --
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: node-prep
+            resources:
+              limits:
+                cpu: "2"
+                memory: 1Gi
+              requests:
+                cpu: "1"
+                memory: 512Mi
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          - args:
+            - exec -a lmcache-cubin-src sleep infinity
+            command:
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: cubin-src
+            resources:
+              limits:
+                cpu: 100m
+                memory: 256Mi
+              requests:
+                cpu: 10m
+                memory: 64Mi
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          hostPID: true
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-node-prep
+          serviceAccountName: glm53-node-prep
+          terminationGracePeriodSeconds: 5
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:apps/DaemonSet:llm-glm53/glm53-node-prep
+      deprecated.daemonset.template.generation: "11"
+    creationTimestamp: "2026-10-07T18:09:13Z"
+    labels:
+      app: glm53-node-prep
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      controller-revision-hash: 7b44857f6d
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-node-prep-7b44857f6d
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-node-prep
+      uid: 8eeea19f-b01f-44cb-98ae-31a03c75337a
+    resourceVersion: "50994075"
+    uid: 3f1b106c-95de-420c-a9ef-aba4efe07212
+  revision: 11
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app: glm53-node-prep
+            app.kubernetes.io/instance: glm53
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: glm53
+            helm.sh/chart: glm53-bundled-0.1.0
+        spec:
+          containers:
+          - args:
+            - |
+              set -euo pipefail
+              # nsenter keeps the container's env; host LVM tools live in /usr/sbin.
+              export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              VG=vg1
+              BASE=/var/mnt/llm
+              LOOP=60
+
+              # Ensure an LV exists, is mounted, and -- critically -- is
+              # mounted at BOTH path resolutions the container runtime may
+              # use for local PVs. On RHCOS /var is a bind of
+              # <rootfs>/ostree/deploy/rhcos/var, so the same directory is
+              # reachable via /var/mnt/... AND via the ostree path. Bind
+              # mounts are snapshots: if the runtime binds through the
+              # ostree path while the LV is only mounted at the /var path
+              # (or vice versa), the pod gets the underlying boot-disk
+              # directory and silently writes cache data to the root fs.
+              # Mounting the LV at both paths makes every resolution land
+              # on the LV. fstab entries make systemd mount both at boot,
+              # before the kubelet starts pods (same protection across
+              # node reboots).
+              ensure_fstab() {
+                local dev=$1 mp=$2
+                if ! grep -qE "^${dev}[[:space:]]+${mp}[[:space:]]" /etc/fstab; then
+                  echo "${dev}  ${mp}  xfs  defaults,nofail,x-systemd.device-timeout=10s  0 0" >> /etc/fstab
+                  echo "[node-prep] fstab entry added: ${dev} -> ${mp}"
+                fi
+              }
+              ensure_lv() {
+                local name=$1 size=$2 subdir=$3
+                local dev="/dev/${VG}/${name}" mp="${BASE}/${subdir}"
+                if ! lvs "${VG}/${name}" >/dev/null 2>&1; then
+                  echo "[node-prep] creating LV ${VG}/${name} (${size})"
+                  # Non-fatal on failure (e.g. vg1 briefly out of space while
+                  # an old volume is being recycled): the loop below retries
+                  # every ${LOOP}s instead of crash-looping the pod.
+                  if ! lvcreate -y -L "${size}" -n "${name}" "${VG}"; then
+                    echo "[node-prep] lvcreate ${name} deferred (will retry): $(vgs --noheadings -o vg_free --units g ${VG} 2>/dev/null || echo '?') free"
+                    return 0
+                  fi
+                fi
+                lvchange -ay "${VG}/${name}" 2>/dev/null || true
+                mkdir -p "${mp}"
+                if ! mountpoint -q "${mp}"; then
+                  if ! blkid "${dev}" >/dev/null 2>&1; then
+                    echo "[node-prep] mkfs.xfs ${dev}"
+                    mkfs.xfs "${dev}"
+                  fi
+                  mount "${dev}" "${mp}"
+                  # Full relabel once, right after first mount (empty fs).
+                  chcon -R -t container_file_t ${BASE}
+                fi
+                ensure_fstab "${dev}" "${mp}"
+                # Second mount at the canonical (root-mount) path: same
+                # directory content, independent mount instance. Harmless
+                # when /var is not a bind (canon == mp, skipped).
+                local var_root canon=""
+                var_root="$(findmnt -n -o FSROOT /var 2>/dev/null || true)"
+                case "${BASE}" in
+                  /var/*) [ -n "${var_root}" ] && [ "${var_root}" != "/" ] && canon="${var_root}${BASE#/var}/${subdir}" ;;
+                esac
+                if [ -n "${canon}" ] && [ "${canon}" != "${mp}" ]; then
+                  mkdir -p "${canon}" 2>/dev/null || true
+                  if ! mountpoint -q "${canon}"; then
+                    if mount "${dev}" "${canon}" 2>/dev/null; then
+                      echo "[node-prep] dual mount OK: ${name} also at ${canon}"
+                    else
+                      echo "[node-prep] WARN: dual mount failed: ${name} -> ${canon} (will retry)"
+                    fi
+                  fi
+                  ensure_fstab "${dev}" "${canon}"
+                fi
+                chmod 1777 "${mp}"
+                chcon -t container_file_t "${mp}" >/dev/null 2>&1 || true
+              }
+
+              # (flashinfer cubin seeding needs the image's dist-packages,
+              # which are NOT visible in this HOST mount namespace; the
+              # cubin-src container below exposes them via /proc/<pid>/root.)
+
+
+              # Seed flashinfer's trtllm-gen cubins from the cubin-src
+              # container's rootfs (same image, v0.30.0: flashinfer
+              # 0.6.18.post1 bundles the cubins) into the cache LV. The
+              # lmcache vllm-openai:v0.5.5 image ships plain flashinfer
+              # 0.6.18 with NO bundled cubins and fetches fmha/trtllm-gen
+              # cubins from edge.urm.nvidia.com at boot -- unreachable
+              # air-gapped (vLLM pod crash-looped on "Failed to get
+              # checksums.txt"). flashinfer checks FLASHINFER_CUBIN_DIR (=
+              # FLASHINFER_WORKSPACE_BASE + .cache/flashinfer/cubins inside
+              # the vLLM pods, i.e. this LV) BEFORE any download and
+              # sha256-verifies each file, so a plain copy satisfies it.
+              # Runs AFTER ensure_lv mounted the LV (we see it through the
+              # host mount table, so no bind-mount staleness). Idempotent.
+              seed_flashinfer_cubins() {
+                local dst_root="${BASE}/cache/flashinfer/.cache/flashinfer/cubins"
+                local pid
+                # Anchored: this script's own cmdline contains the marker
+                # text (function body), and pgrep -f scans full cmdlines --
+                # an unanchored pattern matched ourselves (host root, no
+                # dist-packages). ^ pins it to the sidecar's argv0.
+                pid=$(pgrep -f '^lmcache-cubin-src' | head -1 || true)
+                if [ -z "${pid}" ]; then
+                  echo "[node-prep] cubin-src container not up yet, will retry"
+                  return 0
+                fi
+                local src="/proc/${pid}/root/usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins"
+                if [ ! -d "${src}" ]; then
+                  echo "[node-prep] cubin-src image has no flashinfer_cubin package"
+                  return 0
+                fi
+                for hashdir in "${src}"/*; do
+                  [ -d "${hashdir}" ] || continue
+                  local hash=$(basename "${hashdir}")
+                  if [ -e "${dst_root}/${hash}/fmha/trtllm-gen/checksums.txt" ]; then
+                    continue
+                  fi
+                  echo "[node-prep] seeding flashinfer cubins ${hash} ($(du -sh ${hashdir} | cut -f1))"
+                  mkdir -p "${dst_root}/${hash}"
+                  cp -a "${hashdir}/." "${dst_root}/${hash}/"
+                  chmod -R a+rX "${dst_root}/${hash}"
+                  echo "[node-prep] seeded ${hash}"
+                done
+              }
+
+              while true; do
+                ensure_lv llm-models 1200G models
+                ensure_lv llm-cache 300G cache
+                ensure_lv llm-l2 2500G lmcache-l2
+                seed_flashinfer_cubins
+                echo "[node-prep] $(date -Is) OK: $(mount | grep ${BASE} | awk '{print $1"->"$3}' | tr '\n' ' ')"
+                sleep ${LOOP}
+              done
+            command:
+            - nsenter
+            - -t
+            - "1"
+            - -m
+            - -u
+            - -i
+            - -n
+            - --
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: node-prep
+            resources:
+              limits:
+                cpu: "2"
+                memory: 1Gi
+              requests:
+                cpu: "1"
+                memory: 512Mi
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          - args:
+            - exec -a lmcache-cubin-src sleep infinity
+            command:
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: cubin-src
+            resources:
+              limits:
+                cpu: 100m
+                memory: 256Mi
+              requests:
+                cpu: 10m
+                memory: 64Mi
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          hostPID: true
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-node-prep
+          serviceAccountName: glm53-node-prep
+          terminationGracePeriodSeconds: 5
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:apps/DaemonSet:llm-glm53/glm53-node-prep
+      deprecated.daemonset.template.generation: "10"
+    creationTimestamp: "2026-10-07T11:39:39Z"
+    labels:
+      app: glm53-node-prep
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      controller-revision-hash: 7c5cc44985
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-node-prep-7c5cc44985
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-node-prep
+      uid: 8eeea19f-b01f-44cb-98ae-31a03c75337a
+    resourceVersion: "50764420"
+    uid: e7c53d14-5d26-4831-8376-d7c8e0482192
+  revision: 10
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app: glm53-node-prep
+        spec:
+          containers:
+          - args:
+            - |
+              set -euo pipefail
+              VG=vg1
+
+              ensure_lv() {
+                local name=$1 size=$2 subdir=$3
+                local dev="/dev/${VG}/${name}" mp="/var/mnt/llm/${subdir}"
+                if ! lvs "${VG}/${name}" >/dev/null 2>&1; then
+                  echo "[node-prep] creating LV ${VG}/${name} (${size})"
+                  lvcreate -y -L "${size}" -n "${name}" "${VG}"
+                fi
+                lvchange -ay "${VG}/${name}" 2>/dev/null || true
+                mkdir -p "${mp}"
+                if ! mountpoint -q "${mp}"; then
+                  if ! blkid "${dev}" >/dev/null 2>&1; then
+                    echo "[node-prep] mkfs.xfs ${dev}"
+                    mkfs.xfs "${dev}"
+                  fi
+                  mount "${dev}" "${mp}"
+                  # Full relabel once, right after first mount (empty fs).
+                  chcon -R -t container_file_t /var/mnt/llm
+                fi
+                chmod 1777 "${mp}"
+                chcon -t container_file_t "${mp}" >/dev/null 2>&1 || true
+              }
+
+              while true; do
+                ensure_lv llm-models 1200G models
+                ensure_lv llm-cache 300G cache
+                echo "[node-prep] $(date -Is) OK: $(mount | grep /var/mnt/llm | awk '{print $1"->"$3}' | tr '\n' ' ')"
+                sleep 60
+              done
+            command:
+            - nsenter
+            - -t
+            - "1"
+            - -m
+            - -u
+            - -i
+            - -n
+            - --
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: node-prep
+            resources:
+              limits:
+                cpu: "2"
+                memory: 1Gi
+              requests:
+                cpu: "1"
+                memory: 512Mi
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-node-prep
+          serviceAccountName: glm53-node-prep
+          terminationGracePeriodSeconds: 5
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      deprecated.daemonset.template.generation: "1"
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T16:39:46Z"
+    labels:
+      app: glm53-node-prep
+      controller-revision-hash: 7c6df6cd66
+    name: glm53-node-prep-7c6df6cd66
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-node-prep
+      uid: 8eeea19f-b01f-44cb-98ae-31a03c75337a
+    resourceVersion: "649141"
+    uid: ffc56006-937c-4214-a177-8dc8ae5f9827
+  revision: 1
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app: glm53-node-prep
+            app.kubernetes.io/instance: glm53
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: glm53
+            helm.sh/chart: glm53-bundled-0.1.0
+        spec:
+          containers:
+          - args:
+            - |
+              set -euo pipefail
+              # nsenter keeps the container's env; host LVM tools live in /usr/sbin.
+              export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              VG=vg1
+              BASE=/var/mnt/llm
+              LOOP=60
+
+              # Ensure an LV exists, is mounted, and -- critically -- is
+              # mounted at BOTH path resolutions the container runtime may
+              # use for local PVs. On RHCOS /var is a bind of
+              # <rootfs>/ostree/deploy/rhcos/var, so the same directory is
+              # reachable via /var/mnt/... AND via the ostree path. Bind
+              # mounts are snapshots: if the runtime binds through the
+              # ostree path while the LV is only mounted at the /var path
+              # (or vice versa), the pod gets the underlying boot-disk
+              # directory and silently writes cache data to the root fs.
+              # Mounting the LV at both paths makes every resolution land
+              # on the LV. fstab entries make systemd mount both at boot,
+              # before the kubelet starts pods (same protection across
+              # node reboots).
+              ensure_fstab() {
+                local dev=$1 mp=$2
+                if ! grep -qE "^${dev}[[:space:]]+${mp}[[:space:]]" /etc/fstab; then
+                  echo "${dev}  ${mp}  xfs  defaults,nofail,x-systemd.device-timeout=10s  0 0" >> /etc/fstab
+                  echo "[node-prep] fstab entry added: ${dev} -> ${mp}"
+                fi
+              }
+              ensure_lv() {
+                local name=$1 size=$2 subdir=$3
+                local dev="/dev/${VG}/${name}" mp="${BASE}/${subdir}"
+                if ! lvs "${VG}/${name}" >/dev/null 2>&1; then
+                  echo "[node-prep] creating LV ${VG}/${name} (${size})"
+                  # Non-fatal on failure (e.g. vg1 briefly out of space while
+                  # an old volume is being recycled): the loop below retries
+                  # every ${LOOP}s instead of crash-looping the pod.
+                  if ! lvcreate -y -L "${size}" -n "${name}" "${VG}"; then
+                    echo "[node-prep] lvcreate ${name} deferred (will retry): $(vgs --noheadings -o vg_free --units g ${VG} 2>/dev/null || echo '?') free"
+                    return 0
+                  fi
+                fi
+                lvchange -ay "${VG}/${name}" 2>/dev/null || true
+                mkdir -p "${mp}"
+                if ! mountpoint -q "${mp}"; then
+                  if ! blkid "${dev}" >/dev/null 2>&1; then
+                    echo "[node-prep] mkfs.xfs ${dev}"
+                    mkfs.xfs "${dev}"
+                  fi
+                  mount "${dev}" "${mp}"
+                  # Full relabel once, right after first mount (empty fs).
+                  chcon -R -t container_file_t ${BASE}
+                fi
+                ensure_fstab "${dev}" "${mp}"
+                # Second mount at the canonical (root-mount) path: same
+                # directory content, independent mount instance. Harmless
+                # when /var is not a bind (canon == mp, skipped).
+                local var_root canon=""
+                var_root="$(findmnt -n -o ROOT /var 2>/dev/null || true)"
+                case "${BASE}" in
+                  /var/*) [ -n "${var_root}" ] && [ "${var_root}" != "/" ] && canon="${var_root}${BASE#/var}/${subdir}" ;;
+                esac
+                if [ -n "${canon}" ] && [ "${canon}" != "${mp}" ]; then
+                  mkdir -p "${canon}" 2>/dev/null || true
+                  if ! mountpoint -q "${canon}"; then
+                    if mount "${dev}" "${canon}" 2>/dev/null; then
+                      echo "[node-prep] dual mount OK: ${name} also at ${canon}"
+                    else
+                      echo "[node-prep] WARN: dual mount failed: ${name} -> ${canon} (will retry)"
+                    fi
+                  fi
+                  ensure_fstab "${dev}" "${canon}"
+                fi
+                chmod 1777 "${mp}"
+                chcon -t container_file_t "${mp}" >/dev/null 2>&1 || true
+              }
+
+              # (flashinfer cubin seeding needs the image's dist-packages,
+              # which are NOT visible in this HOST mount namespace; the
+              # cubin-src container below exposes them via /proc/<pid>/root.)
+
+
+              # Seed flashinfer's trtllm-gen cubins from the cubin-src
+              # container's rootfs (same image, v0.30.0: flashinfer
+              # 0.6.18.post1 bundles the cubins) into the cache LV. The
+              # lmcache vllm-openai:v0.5.5 image ships plain flashinfer
+              # 0.6.18 with NO bundled cubins and fetches fmha/trtllm-gen
+              # cubins from edge.urm.nvidia.com at boot -- unreachable
+              # air-gapped (vLLM pod crash-looped on "Failed to get
+              # checksums.txt"). flashinfer checks FLASHINFER_CUBIN_DIR (=
+              # FLASHINFER_WORKSPACE_BASE + .cache/flashinfer/cubins inside
+              # the vLLM pods, i.e. this LV) BEFORE any download and
+              # sha256-verifies each file, so a plain copy satisfies it.
+              # Runs AFTER ensure_lv mounted the LV (we see it through the
+              # host mount table, so no bind-mount staleness). Idempotent.
+              seed_flashinfer_cubins() {
+                local dst_root="${BASE}/cache/flashinfer/.cache/flashinfer/cubins"
+                local pid
+                # Anchored: this script's own cmdline contains the marker
+                # text (function body), and pgrep -f scans full cmdlines --
+                # an unanchored pattern matched ourselves (host root, no
+                # dist-packages). ^ pins it to the sidecar's argv0.
+                pid=$(pgrep -f '^lmcache-cubin-src' | head -1 || true)
+                if [ -z "${pid}" ]; then
+                  echo "[node-prep] cubin-src container not up yet, will retry"
+                  return 0
+                fi
+                local src="/proc/${pid}/root/usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins"
+                if [ ! -d "${src}" ]; then
+                  echo "[node-prep] cubin-src image has no flashinfer_cubin package"
+                  return 0
+                fi
+                for hashdir in "${src}"/*; do
+                  [ -d "${hashdir}" ] || continue
+                  local hash=$(basename "${hashdir}")
+                  if [ -e "${dst_root}/${hash}/fmha/trtllm-gen/checksums.txt" ]; then
+                    continue
+                  fi
+                  echo "[node-prep] seeding flashinfer cubins ${hash} ($(du -sh ${hashdir} | cut -f1))"
+                  mkdir -p "${dst_root}/${hash}"
+                  cp -a "${hashdir}/." "${dst_root}/${hash}/"
+                  chmod -R a+rX "${dst_root}/${hash}"
+                  echo "[node-prep] seeded ${hash}"
+                done
+              }
+
+              while true; do
+                ensure_lv llm-models 1200G models
+                ensure_lv llm-cache 300G cache
+                ensure_lv llm-l2 2500G lmcache-l2
+                seed_flashinfer_cubins
+                echo "[node-prep] $(date -Is) OK: $(mount | grep ${BASE} | awk '{print $1"->"$3}' | tr '\n' ' ')"
+                sleep ${LOOP}
+              done
+            command:
+            - nsenter
+            - -t
+            - "1"
+            - -m
+            - -u
+            - -i
+            - -n
+            - --
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: node-prep
+            resources:
+              limits:
+                cpu: "2"
+                memory: 1Gi
+              requests:
+                cpu: "1"
+                memory: 512Mi
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          - args:
+            - exec -a lmcache-cubin-src sleep infinity
+            command:
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: cubin-src
+            resources:
+              limits:
+                cpu: 100m
+                memory: 256Mi
+              requests:
+                cpu: 10m
+                memory: 64Mi
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          hostPID: true
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-node-prep
+          serviceAccountName: glm53-node-prep
+          terminationGracePeriodSeconds: 5
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:apps/DaemonSet:llm-glm53/glm53-node-prep
+      deprecated.daemonset.template.generation: "9"
+    creationTimestamp: "2026-10-07T11:38:08Z"
+    labels:
+      app: glm53-node-prep
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      controller-revision-hash: 7cdb9fff7b
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-node-prep-7cdb9fff7b
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-node-prep
+      uid: 8eeea19f-b01f-44cb-98ae-31a03c75337a
+    resourceVersion: "50763454"
+    uid: 4a62327a-169d-4988-af09-ff7f0db35480
+  revision: 9
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app: glm53-node-prep
+        spec:
+          containers:
+          - args:
+            - |
+              set -euo pipefail
+              # nsenter keeps the container's env; host LVM tools live in /usr/sbin.
+              export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              VG=vg1
+
+              ensure_lv() {
+                local name=$1 size=$2 subdir=$3
+                local dev="/dev/${VG}/${name}" mp="/var/mnt/llm/${subdir}"
+                if ! lvs "${VG}/${name}" >/dev/null 2>&1; then
+                  echo "[node-prep] creating LV ${VG}/${name} (${size})"
+                  lvcreate -y -L "${size}" -n "${name}" "${VG}"
+                fi
+                lvchange -ay "${VG}/${name}" 2>/dev/null || true
+                mkdir -p "${mp}"
+                if ! mountpoint -q "${mp}"; then
+                  if ! blkid "${dev}" >/dev/null 2>&1; then
+                    echo "[node-prep] mkfs.xfs ${dev}"
+                    mkfs.xfs "${dev}"
+                  fi
+                  mount "${dev}" "${mp}"
+                  # Full relabel once, right after first mount (empty fs).
+                  chcon -R -t container_file_t /var/mnt/llm
+                fi
+                chmod 1777 "${mp}"
+                chcon -t container_file_t "${mp}" >/dev/null 2>&1 || true
+              }
+
+              while true; do
+                ensure_lv llm-models 1200G models
+                ensure_lv llm-cache 300G cache
+                echo "[node-prep] $(date -Is) OK: $(mount | grep /var/mnt/llm | awk '{print $1"->"$3}' | tr '\n' ' ')"
+                sleep 60
+              done
+            command:
+            - nsenter
+            - -t
+            - "1"
+            - -m
+            - -u
+            - -i
+            - -n
+            - --
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: node-prep
+            resources:
+              limits:
+                cpu: "2"
+                memory: 1Gi
+              requests:
+                cpu: "1"
+                memory: 512Mi
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-node-prep
+          serviceAccountName: glm53-node-prep
+          terminationGracePeriodSeconds: 5
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      deprecated.daemonset.template.generation: "2"
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T16:40:29Z"
+    labels:
+      app: glm53-node-prep
+      controller-revision-hash: 844cb68668
+    name: glm53-node-prep-844cb68668
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-node-prep
+      uid: 8eeea19f-b01f-44cb-98ae-31a03c75337a
+    resourceVersion: "649577"
+    uid: 16ed2a30-92fa-4439-a23c-f54b80c22487
+  revision: 2
+- apiVersion: apps/v1
+  data:
+    spec:
+      template:
+        $patch: replace
+        metadata:
+          labels:
+            app: glm53-node-prep
+            app.kubernetes.io/instance: glm53
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: glm53
+            helm.sh/chart: glm53-bundled-0.1.0
+        spec:
+          containers:
+          - args:
+            - |
+              set -euo pipefail
+              # nsenter keeps the container's env; host LVM tools live in /usr/sbin.
+              export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              VG=vg1
+              BASE=/var/mnt/llm
+              LOOP=60
+
+              ensure_lv() {
+                local name=$1 size=$2 subdir=$3
+                local dev="/dev/${VG}/${name}" mp="${BASE}/${subdir}"
+                if ! lvs "${VG}/${name}" >/dev/null 2>&1; then
+                  echo "[node-prep] creating LV ${VG}/${name} (${size})"
+                  lvcreate -y -L "${size}" -n "${name}" "${VG}"
+                fi
+                lvchange -ay "${VG}/${name}" 2>/dev/null || true
+                mkdir -p "${mp}"
+                if ! mountpoint -q "${mp}"; then
+                  if ! blkid "${dev}" >/dev/null 2>&1; then
+                    echo "[node-prep] mkfs.xfs ${dev}"
+                    mkfs.xfs "${dev}"
+                  fi
+                  mount "${dev}" "${mp}"
+                  # Full relabel once, right after first mount (empty fs).
+                  chcon -R -t container_file_t ${BASE}
+                fi
+                chmod 1777 "${mp}"
+                chcon -t container_file_t "${mp}" >/dev/null 2>&1 || true
+              }
+
+              # Seed flashinfer's trtllm-gen cubins from THIS image into the
+              # cache LV. vLLM 0.29.0 (the lmcache v0.5.5 image) ships plain
+              # flashinfer 0.6.18 with NO bundled cubins and fetches them at
+              # runtime from edge.urm.nvidia.com -- unreachable air-gapped
+              # (pod crash-looped: "Failed to get checksums.txt ..."). This
+              # node-prep image is vllm-openai v0.30.0, whose flashinfer
+              # 0.6.18.post1 bundles the SAME cubin set (same version hash
+              # 2d6a5a02...) as a flashinfer_cubin dist-package. flashinfer
+              # checks FLASHINFER_CUBIN_DIR (= FLASHINFER_WORKSPACE_BASE +
+              # .cache/flashinfer/cubins on the vLLM pods) BEFORE attempting
+              # any download and sha256-verifies each file, so a plain copy
+              # works. Idempotent: skip when checksums.txt is already there.
+              seed_flashinfer_cubins() {
+                local src="/usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins"
+                local dst_root="${BASE}/cache/flashinfer/.cache/flashinfer/cubins"
+                if [ ! -d "${src}" ]; then
+                  echo "[node-prep] no flashinfer_cubin package in image, skipping seed"
+                  return 0
+                fi
+                for hashdir in "${src}"/*; do
+                  [ -d "${hashdir}" ] || continue
+                  local hash=$(basename "${hashdir}")
+                  local dst="${dst_root}/${hash}"
+                  if [ -e "${dst}/fmha/trtllm-gen/checksums.txt" ]; then
+                    continue
+                  fi
+                  echo "[node-prep] seeding flashinfer cubins ${hash} into cache LV"
+                  mkdir -p "${dst}"
+                  cp -a "${hashdir}/." "${dst}/"
+                  chmod -R a+rX "${dst}"
+                  chcon -R -t container_file_t "${dst}" 2>/dev/null || true
+                done
+              }
+
+
+              while true; do
+                ensure_lv llm-models 1200G models
+                ensure_lv llm-cache 300G cache
+                seed_flashinfer_cubins
+                echo "[node-prep] $(date -Is) OK: $(mount | grep ${BASE} | awk '{print $1"->"$3}' | tr '\n' ' ')"
+                sleep ${LOOP}
+              done
+            command:
+            - nsenter
+            - -t
+            - "1"
+            - -m
+            - -u
+            - -i
+            - -n
+            - --
+            - /bin/bash
+            - -c
+            image: registry-internal/vllm/vllm-openai:v0.30.0
+            imagePullPolicy: IfNotPresent
+            name: node-prep
+            resources:
+              limits:
+                cpu: "2"
+                memory: 1Gi
+              requests:
+                cpu: "1"
+                memory: 512Mi
+            securityContext:
+              privileged: true
+              runAsNonRoot: false
+              runAsUser: 0
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: ClusterFirst
+          hostPID: true
+          nodeSelector:
+            nvidia.com/gpu.product: NVIDIA-B200
+          restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          serviceAccount: glm53-node-prep
+          serviceAccountName: glm53-node-prep
+          terminationGracePeriodSeconds: 5
+  kind: ControllerRevision
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:apps/DaemonSet:llm-glm53/glm53-node-prep
+      deprecated.daemonset.template.generation: "5"
+    creationTimestamp: "2026-10-06T21:40:43Z"
+    labels:
+      app: glm53-node-prep
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      controller-revision-hash: dbd7b8568
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-node-prep-dbd7b8568
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: DaemonSet
+      name: glm53-node-prep
+      uid: 8eeea19f-b01f-44cb-98ae-31a03c75337a
+    resourceVersion: "50273405"
+    uid: 7972d3dd-99ba-4d09-bb74-2f99b149a131
+  revision: 5
+kind: List
+metadata:
+  resourceVersion: ""

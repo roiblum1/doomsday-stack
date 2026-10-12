@@ -1,0 +1,193 @@
+apiVersion: v1
+items:
+- apiVersion: cert-manager.io/v1
+  kind: CertificateRequest
+  metadata:
+    annotations:
+      cert-manager.io/certificate-name: llm-peer-client
+      cert-manager.io/certificate-revision: "1"
+      cert-manager.io/private-key-secret-name: llm-peer-client-6k6fn
+    creationTimestamp: "2026-10-11T22:19:23Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: envoy-ai-gateway-openshift
+      app.kubernetes.io/part-of: envoy-ai-gateway
+      helm.sh/chart: envoy-ai-gateway-openshift-0.1.0
+    name: llm-peer-client-1
+    namespace: envoy-ai-gateway-system
+    ownerReferences:
+    - apiVersion: cert-manager.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Certificate
+      name: llm-peer-client
+      uid: 7c4b99aa-e09d-4c0a-82d4-de317cf869e7
+    resourceVersion: "54492530"
+    uid: cc45f242-ad1f-4101-ad70-c875f8766483
+  spec:
+    duration: 2160h0m0s
+    extra:
+      authentication.kubernetes.io/credential-id:
+      - JTI=79eb5a7e-5d93-481e-b5b2-6b9ebbeb2d40
+      authentication.kubernetes.io/node-name:
+      - gpu-node-x
+      authentication.kubernetes.io/node-uid:
+      - 3b1e5686-2954-4841-89c9-02a404699ce0
+      authentication.kubernetes.io/pod-name:
+      - cert-manager-6b54cd75d9-qw9rm
+      authentication.kubernetes.io/pod-uid:
+      - 685558be-bf3d-47d5-b2f7-5cb880de2c98
+    groups:
+    - system:serviceaccounts
+    - system:serviceaccounts:cert-manager
+    - system:authenticated
+    issuerRef:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: llm-peer-issuer
+    request: REDACTED-B64
+    uid: 04b7811e-0107-461a-a8d7-e148646b7b91
+    usages:
+    - client auth
+    username: system:serviceaccount:cert-manager:cert-manager
+  status:
+    ca: REDACTED-B64
+    certificate: REDACTED-B64
+    conditions:
+    - lastTransitionTime: "2026-10-11T22:19:23Z"
+      message: Certificate request has been approved by cert-manager.io
+      reason: cert-manager.io
+      status: "True"
+      type: Approved
+    - lastTransitionTime: "2026-10-11T22:19:23Z"
+      message: Certificate fetched from issuer successfully
+      reason: Issued
+      status: "True"
+      type: Ready
+- apiVersion: cert-manager.io/v1
+  kind: CertificateRequest
+  metadata:
+    annotations:
+      cert-manager.io/certificate-name: llm-peer-server
+      cert-manager.io/certificate-revision: "1"
+      cert-manager.io/private-key-secret-name: llm-peer-server-gndgp
+    creationTimestamp: "2026-10-11T22:19:23Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: envoy-ai-gateway-openshift
+      app.kubernetes.io/part-of: envoy-ai-gateway
+      helm.sh/chart: envoy-ai-gateway-openshift-0.1.0
+    name: llm-peer-server-1
+    namespace: envoy-ai-gateway-system
+    ownerReferences:
+    - apiVersion: cert-manager.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Certificate
+      name: llm-peer-server
+      uid: 8d0926df-1749-4811-a071-c24f99096048
+    resourceVersion: "54492531"
+    uid: 738df165-91bc-4008-81e2-a1d60f5448b6
+  spec:
+    duration: 2160h0m0s
+    extra:
+      authentication.kubernetes.io/credential-id:
+      - JTI=79eb5a7e-5d93-481e-b5b2-6b9ebbeb2d40
+      authentication.kubernetes.io/node-name:
+      - gpu-node-x
+      authentication.kubernetes.io/node-uid:
+      - 3b1e5686-2954-4841-89c9-02a404699ce0
+      authentication.kubernetes.io/pod-name:
+      - cert-manager-6b54cd75d9-qw9rm
+      authentication.kubernetes.io/pod-uid:
+      - 685558be-bf3d-47d5-b2f7-5cb880de2c98
+    groups:
+    - system:serviceaccounts
+    - system:serviceaccounts:cert-manager
+    - system:authenticated
+    issuerRef:
+      group: cert-manager.io
+      kind: ClusterIssuer
+      name: llm-peer-issuer
+    request: REDACTED-B64
+    uid: 04b7811e-0107-461a-a8d7-e148646b7b91
+    usages:
+    - server auth
+    username: system:serviceaccount:cert-manager:cert-manager
+  status:
+    ca: REDACTED-B64
+    certificate: REDACTED-B64
+    conditions:
+    - lastTransitionTime: "2026-10-11T22:19:23Z"
+      message: Certificate request has been approved by cert-manager.io
+      reason: cert-manager.io
+      status: "True"
+      type: Approved
+    - lastTransitionTime: "2026-10-11T22:19:23Z"
+      message: Certificate fetched from issuer successfully
+      reason: Issued
+      status: "True"
+      type: Ready
+- apiVersion: cert-manager.io/v1
+  kind: CertificateRequest
+  metadata:
+    annotations:
+      cert-manager.io/certificate-name: self-signed-cert-for-mutating-webhook
+      cert-manager.io/certificate-revision: "1"
+      cert-manager.io/private-key-secret-name: self-signed-cert-for-mutating-webhook-bsqpd
+    creationTimestamp: "2026-09-29T13:12:43Z"
+    generation: 1
+    name: self-signed-cert-for-mutating-webhook-1
+    namespace: envoy-ai-gateway-system
+    ownerReferences:
+    - apiVersion: cert-manager.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Certificate
+      name: self-signed-cert-for-mutating-webhook
+      uid: e9faebf9-342c-4cf6-8e8d-f9b42ec9cad6
+    resourceVersion: "530701"
+    uid: 6a1af71d-a4eb-47b5-8a86-4398fa056ca7
+  spec:
+    extra:
+      authentication.kubernetes.io/credential-id:
+      - JTI=667f75a4-d8e0-4b91-a123-e8fde4dd116f
+      authentication.kubernetes.io/node-name:
+      - gpu-node-x
+      authentication.kubernetes.io/node-uid:
+      - 9ce44361-1d07-4aa7-979b-d45bea57c2a3
+      authentication.kubernetes.io/pod-name:
+      - cert-manager-6b54cd75d9-l4c72
+      authentication.kubernetes.io/pod-uid:
+      - d7eab6b5-3e8c-453e-b6b6-653410db4b0f
+    groups:
+    - system:serviceaccounts
+    - system:serviceaccounts:cert-manager
+    - system:authenticated
+    issuerRef:
+      kind: Issuer
+      name: self-signed-issuer-for-mutating-webhook
+    request: REDACTED-B64
+    uid: 04b7811e-0107-461a-a8d7-e148646b7b91
+    username: system:serviceaccount:cert-manager:cert-manager
+  status:
+    ca: REDACTED-B64
+    certificate: REDACTED-B64
+    conditions:
+    - lastTransitionTime: "2026-09-29T13:12:43Z"
+      message: Certificate request has been approved by cert-manager.io
+      reason: cert-manager.io
+      status: "True"
+      type: Approved
+    - lastTransitionTime: "2026-09-29T13:12:43Z"
+      message: Certificate fetched from issuer successfully
+      reason: Issued
+      status: "True"
+      type: Ready
+kind: List
+metadata:
+  resourceVersion: ""

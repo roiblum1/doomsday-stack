@@ -1,0 +1,98 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: "2026-10-07T16:13:47Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen36-judge
+      app.kubernetes.io/part-of: llminferenceservice
+    name: qwen36-judge-epp-service
+    namespace: llm-judge
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: qwen36-judge
+      uid: 3d24a4ee-260e-4bfe-8427-1839eb41b068
+    resourceVersion: "50925596"
+    uid: 1f19506b-4510-4a6e-af7f-cca4108da08a
+  spec:
+    clusterIP: 192.0.2.93
+    clusterIPs:
+    - 192.0.2.93
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: grpc
+      port: 9002
+      protocol: TCP
+      targetPort: grpc
+    - name: grpc-health
+      port: 9003
+      protocol: TCP
+      targetPort: grpc-health
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: metrics
+    - name: zmq
+      port: 5557
+      protocol: TCP
+      targetPort: zmq
+    selector:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen36-judge
+      app.kubernetes.io/part-of: llminferenceservice
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: "2026-10-07T16:13:47Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-workload
+      app.kubernetes.io/name: qwen36-judge
+      app.kubernetes.io/part-of: llminferenceservice
+    name: qwen36-judge-kserve-workload-svc
+    namespace: llm-judge
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: qwen36-judge
+      uid: 3d24a4ee-260e-4bfe-8427-1839eb41b068
+    resourceVersion: "50925570"
+    uid: 54943491-16d4-4f33-93e0-bca630060f1e
+  spec:
+    clusterIP: 192.0.2.94
+    clusterIPs:
+    - 192.0.2.94
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - appProtocol: http
+      name: http
+      port: 8000
+      protocol: TCP
+      targetPort: 8000
+    selector:
+      app.kubernetes.io/name: qwen36-judge
+      app.kubernetes.io/part-of: llminferenceservice
+      kserve.io/component: workload
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+kind: List
+metadata:
+  resourceVersion: ""

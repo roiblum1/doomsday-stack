@@ -1,0 +1,14 @@
+{{- if .Values.nfdInstance.enabled }}
+apiVersion: nfd.openshift.io/v1
+kind: NodeFeatureDiscovery
+metadata:
+  name: {{ .Values.nfdInstance.name }}
+  namespace: {{ include "nfd.namespace" . }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    {{- include "nfd.labels" . | nindent 4 }}
+spec:
+  {{- toYaml .Values.nfdInstance.spec | nindent 2 }}
+{{- end }}

@@ -1,0 +1,30 @@
+name: lmcache
+projectNamespace: lmcache-operator-system
+repourl: 'https://git.example.internal/popai/helm-charts/lmcache-chart.git'
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    # The three lmcache.lmcache.ai CRDs are 220-335KB: client-side apply's
+    # last-applied-configuration annotation would exceed the API's 256KiB
+    # limit (the classic big-CRD failure). ServerSideApply is required.
+    - ServerSideApply=true
+  retry:
+    limit: 10
+    backoff:
+      duration: 30s
+      factor: 2
+      maxDuration: 5m
+ignoreDifferences:
+  # OpenShift injects the rotating dockercfg secret into every SA's
+  # `secrets` AND `imagePullSecrets` (same reason as glm53's s3sa entry:
+  # without this the controller-manager SA flaps OutOfSync on every refresh).
+  - group: ""
+    kind: ServiceAccount
+    jsonPointers:
+      - /secrets
+      - /imagePullSecrets
+    jqPathExpressions:
+      - .secrets
+      - .imagePullSecrets

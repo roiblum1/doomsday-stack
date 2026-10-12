@@ -1,0 +1,79 @@
+apiVersion: v1
+items:
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: BackendTrafficPolicy
+  metadata:
+    creationTimestamp: "2026-10-11T22:41:58Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: aigw-ui
+    name: fleet-glm-5-3
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54506095"
+    uid: 6c7e4bd5-9bf0-4ee1-adbe-b2b4cc520ece
+  spec:
+    circuitBreaker:
+      maxConnections: 100000
+      maxParallelRequests: 100000
+      maxParallelRetries: 1024
+      maxPendingRequests: 100000
+    healthCheck:
+      active:
+        healthyThreshold: 2
+        http:
+          expectedStatuses:
+          - 200
+          hostname: host.example.internal
+          path: /healthz/glm-5.3
+        interval: 5s
+        timeout: 5s
+        type: HTTP
+        unhealthyThreshold: 3
+      panicThreshold: 0
+    loadBalancer:
+      consistentHash:
+        headers:
+        - name: x-claude-code-session-id
+        - name: x-openwebui-chat-id
+        tableSize: 65537
+        type: Headers
+      type: ConsistentHash
+    retry:
+      numRetries: 0
+      perRetry:
+        backOff:
+          baseInterval: 100ms
+          maxInterval: 1s
+      retryOn:
+        httpStatusCodes:
+        - 503
+        triggers:
+        - connect-failure
+        - reset
+        - retriable-status-codes
+    targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: fleet-glm-5-3
+    timeout:
+      http:
+        requestTimeout: 3600s
+  status:
+    ancestors:
+    - ancestorRef:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+        sectionName: http
+      conditions:
+      - lastTransitionTime: "2026-10-11T22:41:58Z"
+        message: Policy has been accepted.
+        observedGeneration: 1
+        reason: Accepted
+        status: "True"
+        type: Accepted
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+kind: List
+metadata:
+  resourceVersion: ""

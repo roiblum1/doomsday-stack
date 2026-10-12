@@ -1,0 +1,182 @@
+apiVersion: v1
+items:
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-gateway-deploy:rbac.authorization.k8s.io/Role:envoy-gateway-system/envoy-gateway-certgen
+      helm.sh/hook: pre-install, pre-upgrade
+      helm.sh/hook-weight: "-1"
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-11T17:14:50Z"
+    labels:
+      app.kubernetes.io/instance: envoy-gateway
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: gateway-helm
+      app.kubernetes.io/version: v1.9.2
+      helm.sh/chart: envoy-gateway-v1.9.2
+    name: envoy-gateway-certgen
+    namespace: envoy-gateway-system
+    resourceVersion: "54313243"
+    uid: 75c3e1ba-7c34-4ca9-9fdf-b3e35a4a7924
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - secrets
+    verbs:
+    - get
+    - create
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-gateway-deploy:rbac.authorization.k8s.io/Role:envoy-gateway-system/envoy-gateway-infra-manager
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T13:28:40Z"
+    labels:
+      app.kubernetes.io/instance: envoy-gateway
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: gateway-helm
+      app.kubernetes.io/version: v1.9.2
+      helm.sh/chart: envoy-gateway-v1.9.2
+    name: envoy-gateway-infra-manager
+    namespace: envoy-gateway-system
+    resourceVersion: "54288177"
+    uid: b5b820f3-0345-4a7f-9e52-35611363323f
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - serviceaccounts
+    - services
+    - configmaps
+    verbs:
+    - create
+    - get
+    - list
+    - delete
+    - deletecollection
+    - patch
+    - watch
+  - apiGroups:
+    - apps
+    resources:
+    - deployments
+    - daemonsets
+    verbs:
+    - create
+    - get
+    - list
+    - delete
+    - deletecollection
+    - patch
+    - watch
+  - apiGroups:
+    - autoscaling
+    resources:
+    - horizontalpodautoscalers
+    verbs:
+    - create
+    - get
+    - list
+    - delete
+    - deletecollection
+    - patch
+    - watch
+  - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
+    verbs:
+    - create
+    - get
+    - list
+    - delete
+    - deletecollection
+    - patch
+    - watch
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - clustertrustbundles
+    verbs:
+    - list
+    - get
+    - watch
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-gateway-deploy:rbac.authorization.k8s.io/Role:envoy-gateway-system/envoy-gateway-leader-election-role
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T13:28:40Z"
+    labels:
+      app.kubernetes.io/instance: envoy-gateway
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: gateway-helm
+      app.kubernetes.io/version: v1.9.2
+      helm.sh/chart: envoy-gateway-v1.9.2
+    name: envoy-gateway-leader-election-role
+    namespace: envoy-gateway-system
+    resourceVersion: "54288176"
+    uid: e2c63296-1ba6-4332-99c7-60e9f2064d4a
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-11T20:46:15Z"
+    labels:
+      app.kubernetes.io/managed-by: envoy-ai-gateway-observability
+    name: prometheus-k8s
+    namespace: envoy-gateway-system
+    resourceVersion: "54437002"
+    uid: 24f56d5c-e106-4bc6-a5b3-11b222e870a8
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - services
+    - endpoints
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+kind: List
+metadata:
+  resourceVersion: ""

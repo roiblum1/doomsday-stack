@@ -1,0 +1,19 @@
+name: envoy-gateway
+projectNamespace: envoy-gateway-system
+repourl: 'https://git.example.internal/popai/helm-charts/envoy-chart.git'
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true
+  # The three popai charts depend on CRDs each other installs
+  # (EnvoyProxy/InferencePool from envoy-gateway, cert-manager.io from
+  # cert-manager), so a first sync attempt can legitimately fail; retry
+  # until the dependencies land instead of stalling the Application.
+  retry:
+    limit: 10
+    backoff:
+      duration: 30s
+      factor: 2
+      maxDuration: 5m

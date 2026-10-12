@@ -1,0 +1,27 @@
+apiVersion: v1
+items:
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: manager
+    usage:
+      cpu: 511052n
+      memory: 70480Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:58:46Z"
+    labels:
+      app.kubernetes.io/instance: lmcache
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: operator
+      app.kubernetes.io/part-of: lmcache
+      app.kubernetes.io/version: v0.5.5
+      control-plane: controller-manager
+      helm.sh/chart: lmcache-operator-openshift-0.1.0
+      pod-template-hash: 674bdd89f4
+    name: lmcache-operator-controller-manager-674bdd89f4-npvgl
+    namespace: lmcache-operator-system
+  timestamp: "2026-10-12T13:58:33Z"
+  window: 12.531s
+kind: List
+metadata:
+  resourceVersion: ""

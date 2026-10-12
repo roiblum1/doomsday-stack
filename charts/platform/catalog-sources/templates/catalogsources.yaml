@@ -1,0 +1,18 @@
+{{- range .Values.catalogSources }}
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: {{ .name }}
+  namespace: {{ .namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  displayName: {{ .displayName }}
+  image: {{ .image }}
+  sourceType: {{ .sourceType }}
+  {{- with .updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

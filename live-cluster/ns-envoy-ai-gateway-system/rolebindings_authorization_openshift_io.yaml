@@ -1,0 +1,113 @@
+apiVersion: v1
+items:
+- apiVersion: authorization.openshift.io/v1
+  groupNames:
+  - system:serviceaccounts:envoy-ai-gateway-system
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/sync-wave: "-5"
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-ai-deploy:rbac.authorization.k8s.io/RoleBinding:envoy-ai-gateway-system/envoy-ai-envoy-ai-gateway-openshift-scc-nonroot-v2
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T13:12:37Z"
+    labels:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: envoy-ai-gateway-openshift
+      app.kubernetes.io/part-of: envoy-ai-gateway
+      helm.sh/chart: envoy-ai-gateway-openshift-0.1.0
+    name: envoy-ai-envoy-ai-gateway-openshift-scc-nonroot-v2
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54289757"
+    uid: f1126dd0-7fd1-42f4-a35d-dda26867f5b5
+  roleRef:
+    name: system:openshift:scc:nonroot-v2
+  subjects:
+  - kind: SystemGroup
+    name: system:serviceaccounts:envoy-ai-gateway-system
+  userNames: null
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-11T20:46:16Z"
+    labels:
+      app.kubernetes.io/managed-by: envoy-ai-gateway-observability
+    name: prometheus-k8s
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54437009"
+    uid: 8898cd56-52e2-4b1e-b2db-ae2f0e355d11
+  roleRef:
+    name: prometheus-k8s
+    namespace: envoy-ai-gateway-system
+  subjects:
+  - kind: ServiceAccount
+    name: prometheus-k8s
+    namespace: openshift-monitoring
+  userNames:
+  - system:serviceaccount:openshift-monitoring:prometheus-k8s
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows deploymentconfigs in this namespace to rollout
+        pods in this namespace.  It is auto-managed by a controller; remove subjects
+        to disable.
+    creationTimestamp: "2026-09-29T13:11:55Z"
+    name: system:deployers
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "530362"
+    uid: 6c34ccb1-4d14-4e8a-8b1c-7e0b967cfc2b
+  roleRef:
+    name: system:deployer
+  subjects:
+  - kind: ServiceAccount
+    name: deployer
+    namespace: envoy-ai-gateway-system
+  userNames:
+  - system:serviceaccount:envoy-ai-gateway-system:deployer
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows builds in this namespace to push images to
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-09-29T13:11:55Z"
+    name: system:image-builders
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "530363"
+    uid: 845ad381-6628-408b-a28f-e2eb30635ef4
+  roleRef:
+    name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    name: builder
+    namespace: envoy-ai-gateway-system
+  userNames:
+  - system:serviceaccount:envoy-ai-gateway-system:builder
+- apiVersion: authorization.openshift.io/v1
+  groupNames:
+  - system:serviceaccounts:envoy-ai-gateway-system
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows all pods in this namespace to pull images from
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-09-29T13:11:55Z"
+    name: system:image-pullers
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "530361"
+    uid: 7eebc912-9f29-4ab4-909f-baac87ea8f17
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:serviceaccounts:envoy-ai-gateway-system
+  userNames: null
+kind: List
+metadata:
+  resourceVersion: ""

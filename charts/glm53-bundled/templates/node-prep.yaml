@@ -1,0 +1,146 @@
+{{- if .Values.nodePrep.enabled }}
+# Node prep for GPU-node local storage.
+#
+# Why a DaemonSet: this cluster has no manageable MCO/MachineConfig
+# (HyperShift hosted), so a systemd mount unit is not an option. Instead a
+# privileged DaemonSet runs `nsenter -t 1` to prepare and KEEP MOUNTED the
+# manual LVs carved from the VG's free space (LVMS/topolvm uses thick LVs
+# and only manages its own, so a manually created LV is left alone; VG
+# free just shrinks).
+#
+# The same path exists on EVERY node in nodes.hostnames, each holding its
+# own copy of the data. A static `local` PV (local-storage.yaml) with
+# nodeAffinity for all nodes then exposes them through ONE pre-created PVC
+# name so the single Deployment the LLMInferenceService controller creates
+# can mount it from any node.
+#
+# The DaemonSet is idempotent and re-runs on node reboot: mounts land in
+# the HOST mount namespace via nsenter (they survive container exit), and
+# the loop re-checks periodically. SELinux: dirs are labeled
+# container_file_t so restricted pods (the model pull Jobs) can write into
+# them; files created by containers inherit the label.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "glm53.fullname" . }}-node-prep
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: use-privileged-scc
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - security.openshift.io
+    resources:
+      - securitycontextconstraints
+    resourceNames:
+      - privileged
+    verbs:
+      - use
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "glm53.fullname" . }}-node-prep-use-privileged-scc
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: use-privileged-scc
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "glm53.fullname" . }}-node-prep
+    namespace: {{ .Values.namespace }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "glm53.fullname" . }}-node-prep
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+    app: {{ include "glm53.fullname" . }}-node-prep
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "glm53.fullname" . }}-node-prep
+  template:
+    metadata:
+      labels:
+        {{- include "glm53.labels" . | nindent 8 }}
+        app: {{ include "glm53.fullname" . }}-node-prep
+    spec:
+      serviceAccountName: {{ include "glm53.fullname" . }}-node-prep
+      hostPID: true
+      nodeSelector:
+        nvidia.com/gpu.product: {{ .Values.nodes.gpuProduct }}
+      terminationGracePeriodSeconds: 5
+      containers:
+        - name: node-prep
+          image: {{ .Values.nodePrep.image }}
+          imagePullPolicy: IfNotPresent
+          # nsenter into PID 1's mount namespace so lvcreate/mkfs/mount/chcon
+          # act on the HOST and persist beyond this container's lifetime.
+          command:
+            - nsenter
+            - -t
+            - "1"
+            - -m
+            - -u
+            - -i
+            - -n
+            - --
+            - /bin/bash
+            - -c
+          args:
+            - |
+              set -euo pipefail
+              # nsenter keeps the container's env; host LVM tools live in /usr/sbin.
+              export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+              VG={{ .Values.nodePrep.vg }}
+              BASE={{ .Values.nodePrep.hostPathBase }}
+              LOOP={{ .Values.nodePrep.loopIntervalSeconds }}
+
+              ensure_lv() {
+                local name=$1 size=$2 subdir=$3
+                local dev="/dev/${VG}/${name}" mp="${BASE}/${subdir}"
+                if ! lvs "${VG}/${name}" >/dev/null 2>&1; then
+                  echo "[node-prep] creating LV ${VG}/${name} (${size})"
+                  lvcreate -y -L "${size}" -n "${name}" "${VG}"
+                fi
+                lvchange -ay "${VG}/${name}" 2>/dev/null || true
+                mkdir -p "${mp}"
+                if ! mountpoint -q "${mp}"; then
+                  if ! blkid "${dev}" >/dev/null 2>&1; then
+                    echo "[node-prep] mkfs.xfs ${dev}"
+                    mkfs.xfs "${dev}"
+                  fi
+                  mount "${dev}" "${mp}"
+                  # Full relabel once, right after first mount (empty fs).
+                  chcon -R -t container_file_t ${BASE}
+                fi
+                chmod 1777 "${mp}"
+                chcon -t container_file_t "${mp}" >/dev/null 2>&1 || true
+              }
+
+              while true; do
+                ensure_lv {{ .Values.storage.models.lvName }} {{ .Values.storage.models.lvSize }} {{ .Values.storage.models.subdir }}
+                ensure_lv {{ .Values.storage.cache.lvName }} {{ .Values.storage.cache.lvSize }} {{ .Values.storage.cache.subdir }}
+                echo "[node-prep] $(date -Is) OK: $(mount | grep ${BASE} | awk '{print $1"->"$3}' | tr '\n' ' ')"
+                sleep ${LOOP}
+              done
+          resources:
+            {{- toYaml .Values.nodePrep.resources | nindent 12 }}
+          securityContext:
+            privileged: true
+            runAsNonRoot: false
+            runAsUser: 0
+{{- end }}

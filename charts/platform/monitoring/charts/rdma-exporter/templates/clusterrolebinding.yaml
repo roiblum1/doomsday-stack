@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rdma-exporter
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    {{- include "rdma-exporter.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: rdma-exporter
+subjects:
+  - kind: ServiceAccount
+    name: rdma-exporter
+    namespace: rdma-monitoring

@@ -1,0 +1,173 @@
+apiVersion: v1
+items:
+- apiVersion: authorization.openshift.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:rbac.authorization.k8s.io/Role:llm-qwen38/prometheus-k8s
+    creationTimestamp: "2026-10-07T14:22:11Z"
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: prometheus-k8s
+    namespace: llm-qwen38
+    resourceVersion: "51078393"
+    uid: e7b170dc-14b7-4bc8-9e6a-c78c6c1a21e4
+  rules:
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - endpoints
+    - pods
+    - services
+    verbs:
+    - get
+    - list
+    - watch
+- apiVersion: authorization.openshift.io/v1
+  kind: Role
+  metadata:
+    creationTimestamp: "2026-10-07T14:22:18Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen38-l4
+      app.kubernetes.io/part-of: llminferenceservice
+    name: qwen38-l4-epp-role
+    namespace: llm-qwen38
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: qwen38-l4
+      uid: 4ad66e96-4bef-49a7-a56a-2f4df47b3806
+    resourceVersion: "50859609"
+    uid: a0cb68cc-7952-4eb2-8bdb-e281dd200938
+  rules:
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - inference.networking.k8s.io
+    - inference.networking.x-k8s.io
+    attributeRestrictions: null
+    resources:
+    - inferencemodels
+    - inferenceobjectives
+    - inferencepools
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - inference.networking.x-k8s.io
+    attributeRestrictions: null
+    resources:
+    - inferencemodelrewrites
+    - inferencepoolimports
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - llm-d.ai
+    attributeRestrictions: null
+    resources:
+    - inferencemodelrewrites
+    - inferenceobjectives
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - discovery.k8s.io
+    attributeRestrictions: null
+    resources:
+    - endpointslices
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - coordination.k8s.io
+    attributeRestrictions: null
+    resources:
+    - leases
+    verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+- apiVersion: authorization.openshift.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:rbac.authorization.k8s.io/Role:llm-qwen38/use-privileged-scc
+    creationTimestamp: "2026-10-07T14:22:11Z"
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: use-privileged-scc
+    namespace: llm-qwen38
+    resourceVersion: "51078394"
+    uid: e6d67f18-b87b-43b6-8dd5-a14af654719c
+  rules:
+  - apiGroups:
+    - security.openshift.io
+    attributeRestrictions: null
+    resourceNames:
+    - privileged
+    resources:
+    - securitycontextconstraints
+    verbs:
+    - use
+- apiVersion: authorization.openshift.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:rbac.authorization.k8s.io/Role:llm-qwen38/use-qwen38-model-serving-scc
+    creationTimestamp: "2026-10-07T14:22:11Z"
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: use-qwen38-model-serving-scc
+    namespace: llm-qwen38
+    resourceVersion: "51078395"
+    uid: 169bb894-267c-4ac6-8d81-6970ac86d503
+  rules:
+  - apiGroups:
+    - security.openshift.io
+    attributeRestrictions: null
+    resourceNames:
+    - qwen38-model-serving
+    resources:
+    - securitycontextconstraints
+    verbs:
+    - use
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,20 @@
+# RDMA monitoring stack — parent values.
+#
+# This chart vendors three proven subcharts (no OLM operator, plain workloads):
+#   - rdma-exporter   : DaemonSet scraping RDMA/GPU metrics (port 9402, /metrics + /aggregate)
+#   - prometheus-mcp  : MCP server exposing Prometheus queries (namespace prometheus-mcp)
+#   - grafana         : dashboards (namespace openshift-monitoring, PVC on lvms-vg1)
+#
+# Subcharts carry their own deployable defaults; override per-cluster via
+# mces/<mce>/<cluster>/monitoring/values.yaml. The globals below propagate to all subcharts.
+global:
+  clusterName: cluster-gpu-test   # override per-cluster
+  baseDomain: example.internal             # override per-cluster
+
+# Component enable flags (map to dependency conditions).
+rdma-exporter:
+  enabled: true
+prometheus-mcp:
+  enabled: true
+grafana:
+  enabled: true

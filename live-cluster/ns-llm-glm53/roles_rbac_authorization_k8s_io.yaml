@@ -1,0 +1,163 @@
+apiVersion: v1
+items:
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    creationTimestamp: "2026-09-29T16:48:05Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+    name: glm53-b200-epp-role
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: glm53-b200
+      uid: 6acd4f43-424b-47ee-b53e-1ba129ceeadb
+    resourceVersion: "660575"
+    uid: ad62b54b-f34d-4a72-a583-59756e7fd430
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - inference.networking.k8s.io
+    - inference.networking.x-k8s.io
+    resources:
+    - inferencepools
+    - inferenceobjectives
+    - inferencemodels
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - inference.networking.x-k8s.io
+    resources:
+    - inferencemodelrewrites
+    - inferencepoolimports
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - llm-d.ai
+    resources:
+    - inferenceobjectives
+    - inferencemodelrewrites
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - discovery.k8s.io
+    resources:
+    - endpointslices
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:rbac.authorization.k8s.io/Role:llm-glm53/prometheus-k8s
+    creationTimestamp: "2026-10-06T23:04:14Z"
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: prometheus-k8s
+    namespace: llm-glm53
+    resourceVersion: "50321788"
+    uid: 555f760a-a38f-432e-8d1d-76435f1c5f08
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - services
+    - endpoints
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:rbac.authorization.k8s.io/Role:llm-glm53/use-glm53-model-serving-scc
+    creationTimestamp: "2026-09-29T15:28:33Z"
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: use-glm53-model-serving-scc
+    namespace: llm-glm53
+    resourceVersion: "49317586"
+    uid: 313a3bba-177d-416f-9f6d-b5124ec3f498
+  rules:
+  - apiGroups:
+    - security.openshift.io
+    resourceNames:
+    - glm53-model-serving
+    resources:
+    - securitycontextconstraints
+    verbs:
+    - use
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:rbac.authorization.k8s.io/Role:llm-glm53/use-privileged-scc
+    creationTimestamp: "2026-09-29T16:39:46Z"
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: use-privileged-scc
+    namespace: llm-glm53
+    resourceVersion: "49317588"
+    uid: db06535b-e71c-4b42-91db-f7aa19242a32
+  rules:
+  - apiGroups:
+    - security.openshift.io
+    resourceNames:
+    - privileged
+    resources:
+    - securitycontextconstraints
+    verbs:
+    - use
+kind: List
+metadata:
+  resourceVersion: ""

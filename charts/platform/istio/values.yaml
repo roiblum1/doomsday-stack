@@ -1,0 +1,42 @@
+# OpenShift Service Mesh 3 (Sail operator). The operator installs into the global
+# openshift-operators namespace (which already has a global OperatorGroup — no OG rendered).
+# The Sail CRs (Istio, IstioCNI) deploy the control plane into istio-system / istio-cni.
+# Versions aligned to the LIVE cluster: operator v3.4.1, control plane v1.30.3.
+subscription:
+  name: servicemeshoperator3
+  namespace: openshift-operators
+  channel: stable
+  source: cs-operator-index-4-22
+  sourceNamespace: openshift-marketplace
+  startingCSV: servicemeshoperator3.v3.4.1
+  installPlanApproval: Automatic
+
+# Control-plane namespaces (created explicitly; Sail operator also tolerates pre-existing).
+namespaces:
+  istioSystem:
+    name: istio-system
+    create: true
+  istioCNI:
+    name: istio-cni
+    create: true
+
+# IstioCNI Sail CR.
+istioCNI:
+  enabled: true
+  name: default
+  namespace: istio-cni
+  version: v1.30.3
+
+# Istio control-plane Sail CR.
+istio:
+  enabled: true
+  name: default
+  namespace: istio-system
+  version: v1.30.3
+  updateStrategy:
+    type: InPlace
+    inactiveRevisionDeletionGracePeriodSeconds: 30
+  values:
+    pilot:
+      env:
+        ENABLE_GATEWAY_API_INFERENCE_EXTENSION: "true"

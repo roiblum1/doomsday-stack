@@ -1,0 +1,33 @@
+apiVersion: v1
+items:
+- apiVersion: coordination.k8s.io/v1
+  kind: Lease
+  metadata:
+    creationTimestamp: "2026-09-29T13:28:41Z"
+    name: 5b9825d2.gateway.envoyproxy.io
+    namespace: envoy-gateway-system
+    resourceVersion: "55044812"
+    uid: abd4e54b-def5-4d98-8469-7e70cb4efa48
+  spec:
+    acquireTime: "2026-10-11T20:51:32.525450Z"
+    holderIdentity: envoy-gateway-87496bf76-wq2j8_627c8fe8-4bc3-4e09-8f8f-a2676182721d
+    leaseDurationSeconds: 15
+    leaseTransitions: 12
+    renewTime: "2026-10-12T13:57:07.814711Z"
+- apiVersion: coordination.k8s.io/v1
+  kind: Lease
+  metadata:
+    creationTimestamp: "2026-09-29T13:12:46Z"
+    name: envoy-ai-gateway-controller
+    namespace: envoy-gateway-system
+    resourceVersion: "534476"
+    uid: cf978815-5fcf-4910-be46-7c404289fb3c
+  spec:
+    acquireTime: "2026-09-29T13:17:31.981481Z"
+    holderIdentity: ai-gateway-controller-8bff79c7f-47vsf_a2bbd8d7-01d5-4cba-a313-bc10940f912e
+    leaseDurationSeconds: 15
+    leaseTransitions: 2
+    renewTime: "2026-09-29T13:19:30.175608Z"
+kind: List
+metadata:
+  resourceVersion: ""

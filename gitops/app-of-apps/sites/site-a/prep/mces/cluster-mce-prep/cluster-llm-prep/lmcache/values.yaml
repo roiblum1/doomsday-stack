@@ -1,0 +1,3 @@
+# Registering lmcache for this cluster (a directory here IS the
+# registration). Chart defaults in lmcache-chart.git already point at the
+# site mirror; nothing cluster-specific overrides them yet.

@@ -1,0 +1,48 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-11T20:48:33Z"
+    creationTimestamp: "2026-09-29T13:12:41Z"
+    labels:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: ai-gateway
+      app.kubernetes.io/version: v1.2.0
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+      helm.sh/chart: ai-gateway-v1.2.0
+    name: ai-gateway-controller
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54438625"
+    uid: e9991ee1-fa47-47ba-b04b-60b0cbd00ccb
+  subsets:
+  - addresses:
+    - ip: 192.0.2.102
+      nodeName: ocp-util-node-1
+      targetRef:
+        kind: Pod
+        name: ai-gateway-controller-796f5f5467-7fv5c
+        namespace: envoy-ai-gateway-system
+        uid: 4a752a3d-d0c8-4b47-b75f-e0a4154ec05d
+    ports:
+    - appProtocol: grpc
+      name: ratelimit-xds
+      port: 18002
+      protocol: TCP
+    - appProtocol: http
+      name: http-metrics
+      port: 8080
+      protocol: TCP
+    - appProtocol: grpc
+      name: grpc
+      port: 1063
+      protocol: TCP
+    - appProtocol: http
+      name: mutating-webhook
+      port: 9443
+      protocol: TCP
+kind: List
+metadata:
+  resourceVersion: ""

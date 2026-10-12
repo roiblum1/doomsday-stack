@@ -1,0 +1,14 @@
+{{- if .Values.leaderWorkerSetOperator.enabled }}
+apiVersion: operator.openshift.io/v1
+kind: LeaderWorkerSetOperator
+metadata:
+  name: {{ .Values.leaderWorkerSetOperator.name }}
+  namespace: {{ include "lws.namespace" . }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    {{- include "lws.labels" . | nindent 4 }}
+spec:
+  {{- toYaml .Values.leaderWorkerSetOperator.spec | nindent 2 }}
+{{- end }}

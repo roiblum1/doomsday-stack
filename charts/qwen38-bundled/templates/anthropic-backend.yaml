@@ -1,0 +1,59 @@
+{{- if .Values.anthropicBackend.enabled }}
+# Native Anthropic backend for the shared Envoy AI Gateway (VIP .145).
+#
+# WHY: vLLM (>= v0.25) serves the Anthropic Messages API natively at
+# /v1/messages -- including "thinking" content blocks and
+# /v1/messages/count_tokens (verified live on this deployment). Routing
+# Claude Code (/anthropic/v1/messages on the gateway) to an Anthropic-schema
+# AIServiceBackend is a protocol PASSTHROUGH: the extproc does no
+# translation, so thinking blocks and count_tokens reach the client intact.
+# The alternative -- an OpenAI-schema backend -- forces an
+# Anthropic->OpenAI->Anthropic translation in the extproc which (ai-gateway
+# v1.1.0) drops reasoning fields and 500s on count_tokens; Claude Code
+# depends on both. Same pattern as glm53-chart's anthropic-backend.yaml.
+#
+# THE CHAIN: AIGatewayRoute rule (model Qwen3.8-27B-FP8) -> AIServiceBackend
+# (schema Anthropic) -> Backend (Envoy Gateway, FQDN endpoint) ->
+# qwen38-l4-kserve-workload-svc:8000 -> vLLM Messages API.
+#
+# No chart-owned Service needed (unlike glm53's 8 DP rank ports): the
+# kserve workload svc carries port 8000, and this node's vLLM runs its DP
+# ranks BEHIND the single :8000 API server (internal load balancer), so
+# one endpoint covers all 3 ranks. This path also carries the aigw-ui
+# per-tenant quotas: QuotaPolicy targets the AIServiceBackend, so the
+# short model name is the quota-capable one.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: {{ .Values.anthropicBackend.backendName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen38.labels" . | nindent 4 }}
+spec:
+  endpoints:
+    - fqdn:
+        # KServe's workload service for the LLMInferenceService (not
+        # chart-owned; same naming convention the route's InferencePool
+        # ref relies on).
+        hostname: {{ .Values.llmisvc.name }}-kserve-workload-svc.{{ .Values.namespace }}.svc.cluster.local
+        port: 8000
+---
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: {{ .Values.anthropicBackend.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen38.labels" . | nindent 4 }}
+spec:
+  # Anthropic schema => /anthropic/v1/messages requests pass through to
+  # the backend's /v1/messages unmodified (thinking + count_tokens
+  # preserved). vLLM serves /v1/messages at exactly this path, so no
+  # prefix is needed.
+  schema:
+    name: Anthropic
+  backendRef:
+    group: gateway.envoyproxy.io
+    kind: Backend
+    name: {{ .Values.anthropicBackend.backendName }}
+{{- end }}

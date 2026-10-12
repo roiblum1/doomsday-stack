@@ -1,0 +1,9 @@
+name: numaresources
+projectNamespace: openshift-numaresources
+repourl: 'https://git.example.internal/popai/helm-charts/numaresources-chart.git'
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true

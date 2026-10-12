@@ -1,0 +1,63 @@
+apiVersion: v1
+items:
+- apiVersion: storage.k8s.io/v1
+  kind: StorageClass
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:storage.k8s.io/StorageClass:llm-glm53/local-static
+    creationTimestamp: "2026-09-29T16:42:30Z"
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: local-static
+    resourceVersion: "49317562"
+    uid: da9be4f5-42fb-4b8c-bb38-b44710e38844
+  provisioner: kubernetes.io/no-provisioner
+  reclaimPolicy: Retain
+  volumeBindingMode: WaitForFirstConsumer
+- allowVolumeExpansion: true
+  apiVersion: storage.k8s.io/v1
+  kind: StorageClass
+  metadata:
+    annotations:
+      description: Provides RWO and RWOP Filesystem & Block volumes
+      storageclass.kubernetes.io/is-default-class: "true"
+    creationTimestamp: "2026-09-29T13:26:27Z"
+    labels:
+      owned-by.topolvm.io/group: lvm.topolvm.io
+      owned-by.topolvm.io/kind: LVMCluster
+      owned-by.topolvm.io/name: lvmcluster
+      owned-by.topolvm.io/namespace: openshift-storage
+      owned-by.topolvm.io/uid: 77215489-26e3-4c0e-a8f1-0f9157afa62b
+      owned-by.topolvm.io/version: v1alpha1
+    name: lvms-vg1
+    resourceVersion: "540372"
+    uid: f7b1d0dd-4333-4084-bad3-4d5e8d69be73
+  parameters:
+    csi.storage.k8s.io/fstype: xfs
+    topolvm.io/device-class: vg1
+  provisioner: topolvm.io
+  reclaimPolicy: Delete
+  volumeBindingMode: WaitForFirstConsumer
+- apiVersion: storage.k8s.io/v1
+  kind: StorageClass
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:storage.k8s.io/StorageClass:llm-qwen38/qwen38-local-static
+    creationTimestamp: "2026-10-07T14:22:11Z"
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-local-static
+    resourceVersion: "51078384"
+    uid: ea0593a2-d936-4b61-91b2-18c36a28c6ff
+  provisioner: kubernetes.io/no-provisioner
+  reclaimPolicy: Retain
+  volumeBindingMode: WaitForFirstConsumer
+kind: List
+metadata:
+  resourceVersion: ""

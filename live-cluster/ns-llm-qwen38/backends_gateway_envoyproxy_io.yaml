@@ -1,0 +1,35 @@
+apiVersion: v1
+items:
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: Backend
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:gateway.envoyproxy.io/Backend:llm-qwen38/qwen38-anthropic-workload
+    creationTimestamp: "2026-10-07T18:28:34Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-anthropic-workload
+    namespace: llm-qwen38
+    resourceVersion: "51078424"
+    uid: 01db1954-2be3-4cd6-acc6-7e5cb3072ce1
+  spec:
+    endpoints:
+    - fqdn:
+        hostname: qwen38-l4-kserve-workload-svc.llm-qwen38.svc.cluster.local
+        port: 8000
+    type: Endpoints
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-07T18:28:34Z"
+      message: The Backend was accepted
+      observedGeneration: 1
+      reason: Accepted
+      status: "True"
+      type: Accepted
+kind: List
+metadata:
+  resourceVersion: ""

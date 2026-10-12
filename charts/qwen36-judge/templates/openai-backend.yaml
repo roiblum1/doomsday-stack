@@ -1,0 +1,57 @@
+{{- if .Values.openaiBackend.enabled }}
+# Direct OpenAI backend for the shared Envoy AI Gateway (VIP .145).
+#
+# WHY: Envoy AI Gateway QuotaPolicy -- what aigw-ui renders for
+# per-tenant token quotas -- can only targetRef an AIServiceBackend.
+# The judge's original rule used the InferencePool/EPP path, so the
+# model was listed by the gateway's /v1/models but could never be
+# quota-managed (aigw-ui showed "judge -- no quota possible"). This is
+# glm53-chart's anthropicBackend pattern, one protocol over: schema
+# OpenAI instead of Anthropic, one endpoint instead of 8 rank ports.
+#
+# THE CHAIN: AIGatewayRoute rule (model judge) -> AIServiceBackend
+# (schema OpenAI, protocol passthrough) -> Backend (Envoy Gateway,
+# FQDN endpoint) -> qwen36-judge-kserve-workload-svc:8000 -> vLLM.
+# No chart-owned Service needed (unlike glm53's ranks svc, which
+# exists only to expose DP rank ports 8000-8007): the judge runs TP2
+# on ONE pod and the kserve workload svc already carries port 8000
+# (the preset's fixed vLLM --port).
+#
+# NOTE: this path bypasses the EPP (no queue-aware endpoint picking;
+# kube-proxy load-balances the workload svc across replicas). Moot at
+# replicas=1; revisit if llmisvc.scaling goes above 1. The
+# publishers/... model name keeps the EPP path.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: {{ .Values.openaiBackend.backendName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen36-judge.labels" . | nindent 4 }}
+spec:
+  endpoints:
+    - fqdn:
+        # KServe's workload service for the LLMInferenceService (not
+        # chart-owned; same naming convention the route's InferencePool
+        # ref relies on).
+        hostname: {{ .Values.llmisvc.name }}-kserve-workload-svc.{{ .Values.namespace }}.svc.cluster.local
+        port: 8000
+---
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: {{ .Values.openaiBackend.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen36-judge.labels" . | nindent 4 }}
+spec:
+  # OpenAI schema => /v1/chat/completions passes through to vLLM's
+  # /v1/chat/completions unmodified. vLLM natively serves the "judge"
+  # model id (the preset's --served-model-name), so no rewrite.
+  schema:
+    name: OpenAI
+  backendRef:
+    group: gateway.envoyproxy.io
+    kind: Backend
+    name: {{ .Values.openaiBackend.backendName }}
+{{- end }}

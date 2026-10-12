@@ -1,0 +1,133 @@
+apiVersion: v1
+items:
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-11T20:46:39Z"
+    labels:
+      app.kubernetes.io/part-of: kserve-models-dashboards
+    name: prometheus-k8s
+    namespace: llm-judge
+    resourceVersion: "54437240"
+    uid: 052cd4f3-3798-4cc0-b243-1541236d315b
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: prometheus-k8s
+  subjects:
+  - kind: ServiceAccount
+    name: prometheus-k8s
+    namespace: openshift-monitoring
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    creationTimestamp: "2026-10-07T16:13:47Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen36-judge
+      app.kubernetes.io/part-of: llminferenceservice
+    name: qwen36-judge-epp-rb
+    namespace: llm-judge
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: qwen36-judge
+      uid: 3d24a4ee-260e-4bfe-8427-1839eb41b068
+    resourceVersion: "50925590"
+    uid: a2729ca9-1586-4c54-a38d-ce0a3644b73d
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: qwen36-judge-epp-role
+  subjects:
+  - kind: ServiceAccount
+    name: s3sa
+    namespace: llm-judge
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen36-judge-deploy:rbac.authorization.k8s.io/RoleBinding:llm-judge/s3sa-use-qwen36-judge-model-serving-scc
+    creationTimestamp: "2026-10-07T16:13:42Z"
+    labels:
+      app.kubernetes.io/instance: qwen36-judge
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen36-judge
+      helm.sh/chart: qwen36-judge-0.2.2
+    name: s3sa-use-qwen36-judge-model-serving-scc
+    namespace: llm-judge
+    resourceVersion: "54449926"
+    uid: 91f462e5-7f47-407d-bf7b-84c0428b1206
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: use-qwen36-judge-model-serving-scc
+  subjects:
+  - kind: ServiceAccount
+    name: s3sa
+    namespace: llm-judge
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows deploymentconfigs in this namespace to rollout
+        pods in this namespace.  It is auto-managed by a controller; remove subjects
+        to disable.
+    creationTimestamp: "2026-10-07T16:13:40Z"
+    name: system:deployers
+    namespace: llm-judge
+    resourceVersion: "50925446"
+    uid: 09a31316-e558-4580-b7f8-12a67639e1e1
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:deployer
+  subjects:
+  - kind: ServiceAccount
+    name: deployer
+    namespace: llm-judge
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows builds in this namespace to push images to
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-10-07T16:13:40Z"
+    name: system:image-builders
+    namespace: llm-judge
+    resourceVersion: "50925447"
+    uid: 37c2da6d-353f-4e53-8411-b89974499b31
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    name: builder
+    namespace: llm-judge
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows all pods in this namespace to pull images from
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-10-07T16:13:40Z"
+    name: system:image-pullers
+    namespace: llm-judge
+    resourceVersion: "50925445"
+    uid: 51b28e5d-7bf9-40d1-8455-bdd2b6124306
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:image-puller
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:serviceaccounts:llm-judge
+kind: List
+metadata:
+  resourceVersion: ""

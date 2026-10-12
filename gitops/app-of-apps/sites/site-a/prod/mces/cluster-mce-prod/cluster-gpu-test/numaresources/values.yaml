@@ -1,0 +1,2 @@
+# Per-cluster overrides for numaresources on cluster-gpu-test.
+# No cluster-specific overrides needed; chart defaults (operators/numaresources/values.yaml) apply.

@@ -1,0 +1,14 @@
+{{- if and .Values.clockLock.enabled .Values.clockLock.configMap.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.clockLock.configMap.name }}
+  namespace: {{ .Values.clockLock.namespace.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    {{- include "clock-lock.labels" . | nindent 4 }}
+data:
+  chronos.sh: |
+{{ .Files.Get "scripts/chronos.sh" | indent 4 }}
+{{- end }}

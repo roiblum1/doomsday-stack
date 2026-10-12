@@ -1,0 +1,38 @@
+name: monitoring
+projectNamespace: rdma-monitoring
+repourl: 'https://git.example.internal/popai/helm-charts/monitoring-chart.git'
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true
+# OpenShift's SA controller auto-injects the internal-registry dockercfg pull
+# secret into .secrets / .imagePullSecrets and the openshift.io/internal-registry-pull-secret-ref
+# annotation on every ServiceAccount. ArgoCD reads those injected fields as perpetual
+# drift, so ignore exactly those jsonPointers for the three monitoring SAs.
+ignoreDifferences:
+  - group: ''
+    kind: ServiceAccount
+    name: rdma-exporter
+    namespace: rdma-monitoring
+    jsonPointers:
+      - /secrets
+      - /imagePullSecrets
+      - /metadata/annotations/openshift.io~1internal-registry-pull-secret-ref
+  - group: ''
+    kind: ServiceAccount
+    name: grafana
+    namespace: openshift-monitoring
+    jsonPointers:
+      - /secrets
+      - /imagePullSecrets
+      - /metadata/annotations/openshift.io~1internal-registry-pull-secret-ref
+  - group: ''
+    kind: ServiceAccount
+    name: prometheus-mcp-server
+    namespace: prometheus-mcp
+    jsonPointers:
+      - /secrets
+      - /imagePullSecrets
+      - /metadata/annotations/openshift.io~1internal-registry-pull-secret-ref

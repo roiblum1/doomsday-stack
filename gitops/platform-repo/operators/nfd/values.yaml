@@ -1,0 +1,51 @@
+# Standalone NFD chart — deployable defaults for a single OCP 4.22 cluster.
+# Per-cluster overrides live in the popai.git mces/<mce>/<cluster>/nfd/values.yaml.
+
+namespace:
+  name: openshift-nfd
+  # CreateNamespace is handled by the ArgoCD syncOption (CreateNamespace=true),
+  # but we also render a Namespace object explicitly so labels/annotations are controlled.
+  create: true
+  labels: {}
+
+operatorGroup:
+  name: openshift-nfd
+  # NFD is single-namespace; targetNamespaces = own namespace.
+  targetNamespaces:
+    - openshift-nfd
+
+subscription:
+  name: nfd
+  namespace: openshift-nfd
+  channel: stable
+  source: generic-cs
+  sourceNamespace: openshift-marketplace
+  startingCSV: nfd.4.22.0-202608042055
+  installPlanApproval: Automatic
+
+# NodeFeatureDiscovery instance. Carried from the basepod-day2 nfd-operator subchart;
+# hardened for 4.22. PCI device-class whitelist surfaces NIC (0200), GPU (03) and
+# accelerator (12) devices so NFD labels exist for the GPU/network workloads.
+nfdInstance:
+  enabled: true
+  name: nfd-instance
+  spec:
+    enableTaints: false
+    instance: ''
+    operand:
+      imagePullPolicy: IfNotPresent
+      servicePort: 12000
+    prunerOnDelete: false
+    topologyUpdater: true
+    workerConfig:
+      configData: |
+        core:
+          sleepInterval: 60s
+        sources:
+          pci:
+            deviceClassWhitelist:
+              - "0200"
+              - "03"
+              - "12"
+            deviceLabelFields:
+              - "vendor"

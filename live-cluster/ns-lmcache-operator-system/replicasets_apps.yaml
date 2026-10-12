@@ -1,0 +1,128 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: ReplicaSet
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-lmcache-deploy:apps/Deployment:lmcache-operator-system/lmcache-operator-controller-manager
+      deployment.kubernetes.io/desired-replicas: "1"
+      deployment.kubernetes.io/max-replicas: "2"
+      deployment.kubernetes.io/revision: "1"
+    creationTimestamp: "2026-10-06T21:24:16Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: lmcache
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: operator
+      app.kubernetes.io/part-of: lmcache
+      app.kubernetes.io/version: v0.5.5
+      control-plane: controller-manager
+      helm.sh/chart: lmcache-operator-openshift-0.1.0
+      pod-template-hash: 674bdd89f4
+    name: lmcache-operator-controller-manager-674bdd89f4
+    namespace: lmcache-operator-system
+    ownerReferences:
+    - apiVersion: apps/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Deployment
+      name: lmcache-operator-controller-manager
+      uid: 17a5dab6-7039-49d3-8ad3-d8e440107cb2
+    resourceVersion: "50263915"
+    uid: 4969a5f4-9ab2-4dee-ab0c-b207b4f7019c
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: operator
+        control-plane: controller-manager
+        pod-template-hash: 674bdd89f4
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/default-container: manager
+        labels:
+          app.kubernetes.io/instance: lmcache
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/name: operator
+          app.kubernetes.io/part-of: lmcache
+          app.kubernetes.io/version: v0.5.5
+          control-plane: controller-manager
+          helm.sh/chart: lmcache-operator-openshift-0.1.0
+          pod-template-hash: 674bdd89f4
+      spec:
+        containers:
+        - args:
+          - --metrics-bind-address=:8443
+          - --leader-elect
+          - --health-probe-bind-address=:8081
+          - --webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
+          command:
+          - /manager
+          image: registry-internal/lmcache/lmcache/lmcache-operator:v0.5.5
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 8081
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            successThreshold: 1
+            timeoutSeconds: 1
+          name: manager
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /readyz
+              port: 8081
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp/k8s-webhook-server/serving-certs
+            name: webhook-certs
+            readOnly: true
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        serviceAccount: lmcache-operator-controller-manager
+        serviceAccountName: lmcache-operator-controller-manager
+        terminationGracePeriodSeconds: 10
+        volumes:
+        - name: webhook-certs
+          secret:
+            defaultMode: 420
+            secretName: webhook-server-cert
+  status:
+    availableReplicas: 1
+    fullyLabeledReplicas: 1
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    terminatingReplicas: 0
+kind: List
+metadata:
+  resourceVersion: ""

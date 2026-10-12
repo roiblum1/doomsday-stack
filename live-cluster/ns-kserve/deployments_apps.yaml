@@ -1,0 +1,156 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-kserve-deploy:apps/Deployment:kserve/llmisvc-controller-manager
+      deployment.kubernetes.io/revision: "1"
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+      prometheus.io/scrape: "true"
+    creationTimestamp: "2026-09-29T15:01:10Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/component: controller
+      app.kubernetes.io/instance: kserve
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: llmisvc-controller-manager
+      app.kubernetes.io/version: v0.21.0-rc1
+      control-plane: llmisvc-controller-manager
+      controller-tools.k8s.io: "1.0"
+      helm.sh/chart: kserve-llmisvc-resources-v0.21.0-rc1
+    name: llmisvc-controller-manager
+    namespace: kserve
+    resourceVersion: "39194743"
+    uid: de7a8c87-44fd-41a9-ac17-e6116f211b9d
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: kserve
+        app.kubernetes.io/name: llmisvc-controller-manager
+        control-plane: llmisvc-controller-manager
+        controller-tools.k8s.io: "1.0"
+    strategy:
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 0
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/default-container: manager
+        labels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/instance: kserve
+          app.kubernetes.io/name: llmisvc-controller-manager
+          control-plane: llmisvc-controller-manager
+          controller-tools.k8s.io: "1.0"
+      spec:
+        containers:
+        - args:
+          - --metrics-addr=127.0.0.1:8443
+          - --leader-elect
+          command:
+          - /manager
+          env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          image: registry-internal/kserve/kserve/llmisvc-controller:v0.21.0-rc1
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /healthz
+              port: 8081
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          name: manager
+          ports:
+          - containerPort: 9443
+            name: webhook-server
+            protocol: TCP
+          - containerPort: 8443
+            name: metrics
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /readyz
+              port: 8081
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 5
+          resources:
+            limits:
+              cpu: 100m
+              memory: 300Mi
+            requests:
+              cpu: 100m
+              memory: 300Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp/k8s-webhook-server/serving-certs
+            name: cert
+            readOnly: true
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        serviceAccount: llmisvc-controller-manager
+        serviceAccountName: llmisvc-controller-manager
+        terminationGracePeriodSeconds: 10
+        volumes:
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: llmisvc-webhook-server-cert
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-09-29T15:01:10Z"
+      lastUpdateTime: "2026-09-29T15:01:45Z"
+      message: ReplicaSet "llmisvc-controller-manager-555889c9b5" has successfully
+        progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    - lastTransitionTime: "2026-10-04T11:20:18Z"
+      lastUpdateTime: "2026-10-04T11:20:18Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    observedGeneration: 1
+    readyReplicas: 1
+    replicas: 1
+    terminatingReplicas: 0
+    updatedReplicas: 1
+kind: List
+metadata:
+  resourceVersion: ""

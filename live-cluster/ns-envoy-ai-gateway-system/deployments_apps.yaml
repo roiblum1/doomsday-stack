@@ -1,0 +1,172 @@
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-ai-deploy:apps/Deployment:envoy-ai-gateway-system/ai-gateway-controller
+      deployment.kubernetes.io/revision: "5"
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T13:12:41Z"
+    generation: 9
+    labels:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: ai-gateway
+      app.kubernetes.io/version: v1.2.0
+      helm.sh/chart: ai-gateway-v1.2.0
+    name: ai-gateway-controller
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54438628"
+    uid: f21d41d9-a840-454c-8839-850f0214a4a8
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: envoy-ai
+        app.kubernetes.io/name: ai-gateway
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        annotations:
+          kubectl.kubernetes.io/restartedAt: "2026-10-07T19:46:18+03:00"
+        labels:
+          app.kubernetes.io/instance: envoy-ai
+          app.kubernetes.io/name: ai-gateway
+      spec:
+        containers:
+        - args:
+          - -logLevel=info
+          - -logFormat=text
+          - --extProcImage=registry-internal/kserve/personal-ns-2/ai-gateway-extproc:v1.2.0-patched.1
+          - --extProcImagePullPolicy=IfNotPresent
+          - --extProcLogLevel=info
+          - --extProcLogFormat=text
+          - --envoyGatewayNamespace=envoy-gateway-system
+          - --endpointPrefixes=openai:,cohere:/cohere,anthropic:/anthropic,typesafe:/typesafe
+          - --tlsCertDir=/certs
+          - --tlsCertName=tls.crt
+          - --tlsKeyName=tls.key
+          - --webhookPort=9443
+          - --enableLeaderElection=true
+          - --rootPrefix=/
+          - --cacheSyncTimeout=2m
+          - --watchNamespaces=
+          - --quotaRateLimitServiceAddr=envoy-ai-gateway-ratelimit.envoy-gateway-system
+          - --quotaRateLimitTimeout=5
+          - --quotaRateLimitFailureModeDeny=false
+          - --mcpSessionEncryptionSeed=$(MCP_SESSION_ENCRYPTION_SEED)
+          - --mcpSessionEncryptionIterations=100000
+          env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: MCP_SESSION_ENCRYPTION_SEED
+            valueFrom:
+              secretKeyRef:
+                key: seed
+                name: ai-gateway-controller-mcp-session-encryption
+          image: registry-internal/kserve/personal-ns-2/ai-gateway-controller:v1.2.0-patched.1
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            grpc:
+              port: 1063
+              service: ""
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 1
+          name: ai-gateway
+          ports:
+          - containerPort: 9443
+            protocol: TCP
+          - containerPort: 1063
+            protocol: TCP
+          - containerPort: 8080
+            protocol: TCP
+          - containerPort: 18002
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            grpc:
+              port: 1063
+              service: ""
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources: {}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            runAsGroup: 65532
+            runAsNonRoot: true
+            runAsUser: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          startupProbe:
+            failureThreshold: 75
+            grpc:
+              port: 1063
+              service: ""
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 1
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /certs
+            name: certs
+            readOnly: true
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext:
+          runAsGroup: 65532
+          runAsNonRoot: true
+          runAsUser: 65532
+          seccompProfile:
+            type: RuntimeDefault
+        serviceAccount: ai-gateway-controller
+        serviceAccountName: ai-gateway-controller
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: certs
+          secret:
+            defaultMode: 420
+            secretName: self-signed-cert-for-mutating-webhook
+  status:
+    availableReplicas: 1
+    conditions:
+    - lastTransitionTime: "2026-09-29T13:12:41Z"
+      lastUpdateTime: "2026-10-11T16:37:15Z"
+      message: ReplicaSet "ai-gateway-controller-796f5f5467" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+    - lastTransitionTime: "2026-10-11T20:48:33Z"
+      lastUpdateTime: "2026-10-11T20:48:33Z"
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    observedGeneration: 9
+    readyReplicas: 1
+    replicas: 1
+    terminatingReplicas: 0
+    updatedReplicas: 1
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,2 @@
+# Per-cluster overrides for catalog-sources on cluster-gpu-test.
+# No cluster-specific overrides needed; chart defaults (operators/catalog-sources/values.yaml) apply.

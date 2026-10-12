@@ -1,0 +1,43 @@
+apiVersion: v1
+items:
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: main
+    usage:
+      cpu: 83965101n
+      memory: 39920936Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:55:17Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-workload
+      app.kubernetes.io/name: qwen36-judge
+      app.kubernetes.io/part-of: llminferenceservice
+      kserve.io/component: workload
+      llm-d.ai/role: both
+      pod-template-hash: 6f698d6b64
+    name: qwen36-judge-kserve-6f698d6b64-cq5tm
+    namespace: llm-judge
+  timestamp: "2026-10-12T13:55:08Z"
+  window: 16.677s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: main
+    usage:
+      cpu: 47635053n
+      memory: 29336Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:55:17Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen36-judge
+      app.kubernetes.io/part-of: llminferenceservice
+      pod-template-hash: 7f759dcd4f
+    name: qwen36-judge-kserve-router-scheduler-7f759dcd4f-s8qf2
+    namespace: llm-judge
+  timestamp: "2026-10-12T13:55:10Z"
+  window: 22.754s
+kind: List
+metadata:
+  resourceVersion: ""

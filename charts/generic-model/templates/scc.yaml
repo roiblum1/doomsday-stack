@@ -1,0 +1,92 @@
+{{- if .Values.scc.create }}
+# Minimal SCC for the vLLM serving pods:
+#   - IPC_LOCK capability (shared-memory / hugepage handling)
+#   - runAsUser RunAsAny (vllm-openai image runs as root)
+#   - csi/pvc/ephemeral volumes for the model + cache PVCs, emptyDir for
+#     hugepages/dshm, secret for S3 credentials
+# Modeled on the built-in "anyuid" SCC, plus allowedCapabilities: IPC_LOCK.
+# NOTE: cluster-scoped -- creating it requires cluster-admin.
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: {{ .Values.scc.name }}
+  annotations:
+    kubernetes.io/description: >-
+{{- range .Values.scc.description }}
+      {{ . }}
+{{- end }}
+  labels:
+    {{- include "genericmodel.labels" . | nindent 4 }}
+allowPrivilegedContainer: false
+allowHostDirVolumePlugin: false
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowedCapabilities:
+  - IPC_LOCK
+defaultAddCapabilities: null
+fsGroup:
+  type: RunAsAny
+priority: 9
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+  - KILL
+  - MKNOD
+  - SETUID
+  - SETGID
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: MustRunAs
+# Legacy string form, matching built-in restricted-v2/nonroot-v2 -- SCC
+# admission validates the pod's seccomp annotation against this list.
+seccompProfiles:
+  - runtime/default
+supplementalGroups:
+  type: RunAsAny
+userNamespaceLevel: "AllowHostLevel"
+users: []
+volumes:
+  - configMap
+  - csi
+  - downwardAPI
+  - emptyDir
+  - ephemeral
+  - persistentVolumeClaim
+  - projected
+  - secret
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: use-{{ .Values.scc.name }}-scc
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "genericmodel.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - security.openshift.io
+    resources:
+      - securitycontextconstraints
+    resourceNames:
+      - {{ .Values.scc.name }}
+    verbs:
+      - use
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.serviceAccount.name }}-use-{{ .Values.scc.name }}-scc
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "genericmodel.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: use-{{ .Values.scc.name }}-scc
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccount.name }}
+    namespace: {{ .Values.namespace }}
+{{- end }}

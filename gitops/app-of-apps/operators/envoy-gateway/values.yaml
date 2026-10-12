@@ -1,0 +1,32 @@
+# Values for the envoy-gateway chart. The disconnected overlay from
+# kserve-dissconnected (charts/envoy-gateway-openshift/values-mirror.yaml):
+# images stay in upstream docker.io/... form and global.imageRegistry
+# replaces their registry part with the oc-mirror layout
+# registry-internal/kserve/envoyproxy/...
+# (the subchart's helpers split every image at the first "/" and prepend
+# imageRegistry, so full mirror references would be doubled). Everything
+# else comes from the chart defaults.
+envoy-gateway:
+  global:
+    imageRegistry: registry-internal/kserve
+    images:
+      envoyProxy:
+        # Data-plane image, digest-pinned to what Docker Hub published, so
+        # the mirror holds the same bits. Rewritten to the path above.
+        image: docker.io/envoyproxy/envoy:distroless-v1.39.1@sha256:eb2c01c13125d1629637cb4e4cce7207009fb7cc2c8027f9742758549d15b6f4
+  # The shutdown-manager image is a plain user value the chart passes
+  # through the EnvoyGateway config verbatim (the wrapper's default is the
+  # docker.io reference), so it needs the full mirror path.
+  config:
+    envoyGateway:
+      provider:
+        kubernetes:
+          shutdownManager:
+            image: registry-internal/kserve/envoyproxy/gateway:v1.9.2
+  deployment:
+    envoyGateway:
+      image:
+        # Control plane, certgen and the shutdown manager all resolve
+        # through this one.
+        repository: docker.io/envoyproxy/gateway
+        tag: v1.9.2

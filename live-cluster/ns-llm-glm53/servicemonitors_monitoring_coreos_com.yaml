@@ -1,0 +1,36 @@
+apiVersion: v1
+items:
+- apiVersion: monitoring.coreos.com/v1
+  kind: ServiceMonitor
+  metadata:
+    creationTimestamp: "2026-10-06T21:24:47Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+    name: glm53-cache
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: lmcache.lmcache.ai/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: LMCacheEngine
+      name: glm53-cache
+      uid: 6621d695-f3b3-464e-a597-739e5a3279fe
+    resourceVersion: "50264112"
+    uid: 812453cb-faed-40e6-a0bb-64d413a1f834
+  spec:
+    endpoints:
+    - interval: 30s
+      port: metrics
+    namespaceSelector: {}
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: glm53-cache
+        app.kubernetes.io/managed-by: lmcache-operator
+        app.kubernetes.io/name: lmcache
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,2 @@
+# Per-cluster overrides for lws on cluster-gpu-test.
+# No cluster-specific overrides needed; chart defaults (operators/lws/values.yaml) apply.

@@ -1,0 +1,67 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  data:
+    ca.crt: |
+      REDACTED-PEM-BLOCK
+      REDACTED-PEM-BLOCK
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/description: Contains a CA bundle that can be used to verify the
+        kube-apiserver when using internal endpoints such as the internal service
+        IP or kubernetes.default.svc. No other usage is guaranteed across distributions
+        of Kubernetes clusters.
+    creationTimestamp: "2026-10-07T14:20:22Z"
+    name: kube-root-ca.crt
+    namespace: llm-qwen38
+    resourceVersion: "50858344"
+    uid: b6fe435d-05d3-4072-83b7-01a57619d5eb
+- apiVersion: v1
+  data:
+    service-ca.crt: |
+      REDACTED-PEM-BLOCK
+  kind: ConfigMap
+  metadata:
+    annotations:
+      service.beta.openshift.io/inject-cabundle: "true"
+    creationTimestamp: "2026-10-07T14:20:22Z"
+    name: openshift-service-ca.crt
+    namespace: llm-qwen38
+    resourceVersion: "50858353"
+    uid: 2035dace-7554-45f4-acd7-f7030efba94e
+- apiVersion: v1
+  data:
+    kv-transfer-config.json: |-
+      {
+        "kv_connector": "LMCacheMPConnector",
+        "kv_connector_extra_config": {
+          "lmcache.mp.host": "tcp://qwen38-cache.llm-qwen38.svc.cluster.local",
+          "lmcache.mp.isolated_ipc": true,
+          "lmcache.mp.port": "5555"
+        },
+        "kv_connector_module_path": "lmcache.integration.vllm.lmcache_mp_connector",
+        "kv_role": "kv_both"
+      }
+  kind: ConfigMap
+  metadata:
+    creationTimestamp: "2026-10-07T14:22:09Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: qwen38-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+    name: qwen38-cache-connection
+    namespace: llm-qwen38
+    ownerReferences:
+    - apiVersion: lmcache.lmcache.ai/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: LMCacheEngine
+      name: qwen38-cache
+      uid: 42d51c69-528c-4bdd-9b7b-651fbf109c90
+    resourceVersion: "50859387"
+    uid: 168b28d6-9f63-4836-9a8a-cf9fd0d0f8be
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: rdma-exporter
+description: RDMA exporter for Prometheus — RoCEv2 + GPUDirect RDMA observability
+type: application
+version: 4.2.0
+appVersion: "3.2.2"

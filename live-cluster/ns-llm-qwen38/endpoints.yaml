@@ -1,0 +1,133 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-11T21:08:45Z"
+    creationTimestamp: "2026-10-07T14:22:09Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: qwen38-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+    name: qwen38-cache
+    namespace: llm-qwen38
+    resourceVersion: "54450690"
+    uid: 2360c44c-08ce-42c3-a74e-8a631dcaf4ce
+  subsets:
+  - addresses:
+    - ip: 192.0.2.95
+      nodeName: ocp-util-node-1
+      targetRef:
+        kind: Pod
+        name: qwen38-cache-k2whm
+        namespace: llm-qwen38
+        uid: 06213e43-7cd2-46cb-8838-59007a3a571d
+    ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+    - name: server
+      port: 5555
+      protocol: TCP
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-11T21:08:45Z"
+    creationTimestamp: "2026-10-07T14:22:09Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: qwen38-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+      service.kubernetes.io/headless: ""
+    name: qwen38-cache-metrics
+    namespace: llm-qwen38
+    resourceVersion: "54450689"
+    uid: e99df41b-cdd1-4816-ae26-82bdc06923dd
+  subsets:
+  - addresses:
+    - ip: 192.0.2.95
+      nodeName: ocp-util-node-1
+      targetRef:
+        kind: Pod
+        name: qwen38-cache-k2whm
+        namespace: llm-qwen38
+        uid: 06213e43-7cd2-46cb-8838-59007a3a571d
+    ports:
+    - name: metrics
+      port: 8080
+      protocol: TCP
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-07T14:22:50Z"
+    creationTimestamp: "2026-10-07T14:22:18Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen38-l4
+      app.kubernetes.io/part-of: llminferenceservice
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+    name: qwen38-l4-epp-service
+    namespace: llm-qwen38
+    resourceVersion: "50860004"
+    uid: b16fc08f-4ca1-49c9-a0ed-0faf6ae976a4
+  subsets:
+  - addresses:
+    - ip: 192.0.2.96
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: qwen38-l4-kserve-router-scheduler-6bcb6d8d49-hqknm
+        namespace: llm-qwen38
+        uid: c570679b-dc0f-45e2-93b0-c86cf6e7f630
+    ports:
+    - name: grpc
+      port: 9002
+      protocol: TCP
+    - name: zmq
+      port: 5557
+      protocol: TCP
+    - name: grpc-health
+      port: 9003
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      protocol: TCP
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-11T21:11:37Z"
+    creationTimestamp: "2026-10-07T14:22:17Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-workload
+      app.kubernetes.io/name: qwen38-l4
+      app.kubernetes.io/part-of: llminferenceservice
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+    name: qwen38-l4-kserve-workload-svc
+    namespace: llm-qwen38
+    resourceVersion: "54452441"
+    uid: 4ddac409-3c7a-4f40-b3c4-f92795e041d0
+  subsets:
+  - addresses:
+    - ip: 192.0.2.97
+      nodeName: ocp-util-node-1
+      targetRef:
+        kind: Pod
+        name: qwen38-l4-kserve-6767844548-dzqz4
+        namespace: llm-qwen38
+        uid: e39830fa-e34b-4df2-8447-10b9f06df171
+    ports:
+    - appProtocol: http
+      name: http
+      port: 8000
+      protocol: TCP
+kind: List
+metadata:
+  resourceVersion: ""

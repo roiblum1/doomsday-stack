@@ -1,0 +1,70 @@
+apiVersion: v1
+items:
+- apiVersion: inference.networking.k8s.io/v1
+  kind: InferencePool
+  metadata:
+    creationTimestamp: "2026-09-29T16:48:05Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+    name: glm53-b200-inference-pool
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: glm53-b200
+      uid: 6acd4f43-424b-47ee-b53e-1ba129ceeadb
+    resourceVersion: "54508387"
+    uid: 45c40d6c-4ade-4ab5-ba74-c2bae8894a07
+  spec:
+    appProtocol: http
+    endpointPickerRef:
+      failureMode: FailOpen
+      group: ""
+      kind: Service
+      name: glm53-b200-epp-service
+      port:
+        number: 9002
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: glm53-b200
+        app.kubernetes.io/part-of: llminferenceservice
+        kserve.io/component: workload
+    targetPorts:
+    - number: 8000
+    - number: 8001
+    - number: 8002
+    - number: 8003
+    - number: 8004
+    - number: 8005
+    - number: 8006
+    - number: 8007
+  status:
+    parents:
+    - conditions:
+      - lastTransitionTime: "2026-10-11T22:45:54Z"
+        message: 'InferencePool has been Accepted by controller ai-gateway-controller:
+          InferencePool reconciled successfully'
+        observedGeneration: 2
+        reason: Accepted
+        status: "True"
+        type: Accepted
+      - lastTransitionTime: "2026-10-11T22:45:54Z"
+        message: 'Reference resolution by controller ai-gateway-controller: All references
+          resolved successfully'
+        observedGeneration: 2
+        reason: ResolvedRefs
+        status: "True"
+        type: ResolvedRefs
+      parentRef:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+kind: List
+metadata:
+  resourceVersion: ""

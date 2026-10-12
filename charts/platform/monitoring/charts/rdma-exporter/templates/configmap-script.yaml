@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rdma-exporter-script
+  namespace: rdma-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    {{- include "rdma-exporter.labels" . | nindent 4 }}
+data:
+  rdma_exporter.py: |
+{{ .Files.Get "scripts/rdma_exporter.py" | indent 4 }}

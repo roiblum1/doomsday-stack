@@ -1,0 +1,15 @@
+image:
+  repository: example.internal/registry-internal/prometheus-mcp-server
+  tag: latest
+  pullPolicy: IfNotPresent
+
+initImage:
+  repository: example.internal/registry-internal/busybox
+  tag: "1.2.0"
+
+prometheusUrl: https://thanos-querier.openshift-monitoring.svc:9091
+prometheusSslVerify: "false"
+prometheusDisableLinks: "false"
+prometheusRequestTimeout: "30"
+
+resources: {}

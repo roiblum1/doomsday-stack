@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hpc-observability.fullname" . }}-fabric
+  namespace: hpc-observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  labels:
+    {{- include "hpc-observability.labels" . | nindent 4 }}
+    hpc.observability/mode: fabric
+spec:
+  type: ClusterIP
+  ports:
+    - name: fabric-metrics
+      port: {{ .Values.fabric.port }}
+      protocol: TCP
+      targetPort: fabric-metrics
+  selector:
+    {{- include "hpc-observability.selectorLabels" . | nindent 4 }}
+    hpc.observability/mode: fabric
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hpc-observability.fullname" . }}-node
+  namespace: hpc-observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  labels:
+    {{- include "hpc-observability.labels" . | nindent 4 }}
+    hpc.observability/mode: node
+spec:
+  type: ClusterIP
+  ports:
+    - name: node-metrics
+      port: {{ .Values.node.port }}
+      protocol: TCP
+      targetPort: node-metrics
+  selector:
+    {{- include "hpc-observability.selectorLabels" . | nindent 4 }}
+    hpc.observability/mode: node

@@ -1,0 +1,78 @@
+{{- if .Values.pullJobs.enabled }}
+{{- if not .Values.storage.models.pvcName }}{{- fail "values: storage.models.pvcName is required when pullJobs.enabled" }}{{- end }}
+{{- if not .Values.model.s3.path }}{{- fail "values: model.s3.path is required when pullJobs.enabled" }}{{- end }}
+# One-shot model pull jobs: one per node, each writing into that node's
+# copy of the local PV (via the shared pre-created models PVC). Layout
+# matches model.uri pvc://<claim>/<subPath> -> /mnt/models/<subPath>.
+# Idempotent via the .download-complete marker.
+{{- range $i, $node := .Values.nodes.hostnames }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "genericmodel.fullname" $ }}-pull-{{ $node }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- include "genericmodel.labels" $ | nindent 4 }}
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "genericmodel.labels" $ | nindent 8 }}
+    spec:
+      serviceAccountName: {{ $.Values.serviceAccount.name }}
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: {{ $node }}
+      containers:
+        - name: pull
+          image: {{ $.Values.images.s5cmd }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -euo pipefail
+              MODEL_DIR="/models/{{ $.Values.model.subPath }}"
+              mkdir -p "${MODEL_DIR}"
+              if [ -f "${MODEL_DIR}/.download-complete" ]; then
+                echo "Model already present, skipping download"
+                exit 0
+              fi
+              START_TIME=$(date +%s)
+              /s5cmd --endpoint-url "${ENDPOINT}" cp \
+                --concurrency {{ $.Values.pullJobs.concurrency }} \
+                --part-size {{ $.Values.pullJobs.partSize }} \
+                "s3://{{ $.Values.model.s3.path }}/*" "${MODEL_DIR}/"
+              touch "${MODEL_DIR}/.download-complete"
+              END_TIME=$(date +%s)
+              ELAPSED=$((END_TIME - START_TIME))
+              echo "Download completed in ${ELAPSED} seconds ($((${ELAPSED}/60))m $((${ELAPSED}%60))s)"
+          env:
+            - name: ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  key: {{ $.Values.s3.keys.endpoint }}
+                  name: {{ $.Values.s3.secretName }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: {{ $.Values.s3.keys.accessKeyId }}
+                  name: {{ $.Values.s3.secretName }}
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: {{ $.Values.s3.keys.secretAccessKey }}
+                  name: {{ $.Values.s3.secretName }}
+          resources:
+            {{- toYaml $.Values.pullJobs.resources | nindent 12 }}
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: {{ $.Values.storage.models.pvcName }}
+{{- end }}
+{{- end }}

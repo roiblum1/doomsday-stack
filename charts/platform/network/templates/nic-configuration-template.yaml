@@ -1,0 +1,67 @@
+{{- /*
+NicConfigurationTemplate(s) for RoCE optimization.
+
+The chart supports either:
+  - a single template via .Values.nicConfigurationTemplate (backward-compatible default), or
+  - a list of pool-specific templates via .Values.nicConfigurationTemplates for clusters that
+    have multiple RoCE node pools (e.g. h200-roce, b200-roce) sharing the same OFED but
+    needing different PCI addresses / NIC selectors.
+
+When .Values.nicConfigurationTemplates is non-empty it takes precedence.
+*/}}
+{{- $templates := list }}
+{{- if .Values.nicConfigurationTemplates }}
+{{- $templates = .Values.nicConfigurationTemplates }}
+{{- else if .Values.nicConfigurationTemplate.enabled }}
+{{- $templates = list .Values.nicConfigurationTemplate }}
+{{- end }}
+{{- range $tmpl := $templates }}
+---
+apiVersion: configuration.net.nvidia.com/v1alpha1
+kind: NicConfigurationTemplate
+metadata:
+  name: {{ $tmpl.name }}
+  namespace: {{ include "network.namespace" $ }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    {{- include "network.labels" $ | nindent 4 }}
+spec:
+  nicSelector:
+    nicType: {{ $tmpl.nicType }}
+    {{- with $tmpl.pciAddresses }}
+    pciAddresses:
+      {{- range . }}
+      - {{ . }}
+      {{- end }}
+    {{- end }}
+  nodeSelector:
+    {{- toYaml $tmpl.nodeSelector | nindent 4 }}
+  resetToDefault: {{ $tmpl.resetToDefault | default false }}
+  template:
+    gpuDirectOptimized:
+      enabled: {{ $tmpl.gpuDirectOptimized.enabled }}
+      env: {{ $tmpl.gpuDirectOptimized.env }}
+    linkType: {{ $tmpl.linkType }}
+    numVfs: {{ $tmpl.numVfs | default 0 }}
+    pciPerformanceOptimized:
+      enabled: {{ $tmpl.pciPerformanceOptimized.enabled }}
+      maxAccOutRead: {{ $tmpl.pciPerformanceOptimized.maxAccOutRead }}
+      maxReadRequest: {{ $tmpl.pciPerformanceOptimized.maxReadRequest }}
+    roceOptimized:
+      enabled: {{ $tmpl.roceOptimized.enabled }}
+      qos:
+        pfc: {{ $tmpl.roceOptimized.qos.pfc | quote }}
+        trust: {{ $tmpl.roceOptimized.qos.trust }}
+        {{- with $tmpl.roceOptimized.qos.tos }}
+        tos: {{ . }}
+        {{- end }}
+    {{- with $tmpl.rawNvConfig }}
+    rawNvConfig:
+      {{- range . }}
+      - name: {{ .name }}
+        value: {{ .value | quote }}
+      {{- end }}
+    {{- end }}
+{{- end }}

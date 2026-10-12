@@ -1,0 +1,78 @@
+apiVersion: v1
+items:
+- apiVersion: node.k8s.io/v1
+  handler: nvidia
+  kind: RuntimeClass
+  metadata:
+    creationTimestamp: "2026-09-29T13:24:47Z"
+    labels:
+      app.kubernetes.io/component: gpu-operator
+    name: nvidia
+    ownerReferences:
+    - apiVersion: nvidia.com/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ClusterPolicy
+      name: gpu-cluster-policy
+      uid: 2f3f5043-0939-4938-98e8-b92d539dd26e
+    resourceVersion: "538399"
+    uid: 39eb0f94-60fa-49a7-95c9-fb117799aa02
+- apiVersion: node.k8s.io/v1
+  handler: nvidia-cdi
+  kind: RuntimeClass
+  metadata:
+    creationTimestamp: "2026-09-29T13:24:47Z"
+    labels:
+      app.kubernetes.io/component: gpu-operator
+    name: nvidia-cdi
+    ownerReferences:
+    - apiVersion: nvidia.com/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ClusterPolicy
+      name: gpu-cluster-policy
+      uid: 2f3f5043-0939-4938-98e8-b92d539dd26e
+    resourceVersion: "538401"
+    uid: b79932e9-6c83-4aef-b743-e4a02ff9fef4
+- apiVersion: node.k8s.io/v1
+  handler: nvidia-legacy
+  kind: RuntimeClass
+  metadata:
+    creationTimestamp: "2026-09-29T13:24:47Z"
+    labels:
+      app.kubernetes.io/component: gpu-operator
+    name: nvidia-legacy
+    ownerReferences:
+    - apiVersion: nvidia.com/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: ClusterPolicy
+      name: gpu-cluster-policy
+      uid: 2f3f5043-0939-4938-98e8-b92d539dd26e
+    resourceVersion: "538400"
+    uid: 2df3911d-2d51-484d-a997-9749d69930e9
+- apiVersion: node.k8s.io/v1
+  handler: high-performance
+  kind: RuntimeClass
+  metadata:
+    creationTimestamp: "2026-09-29T12:43:31Z"
+    name: performance-gpu-hpc-performanceprofile-extras-b200
+    resourceVersion: "522917"
+    uid: 383c67cb-cd51-4249-974d-6a2f7da6d06e
+  scheduling:
+    nodeSelector:
+      node-role.kubernetes.io/b200: ""
+- apiVersion: node.k8s.io/v1
+  handler: high-performance
+  kind: RuntimeClass
+  metadata:
+    creationTimestamp: "2026-10-06T23:52:35Z"
+    name: performance-gpu-hpc-performanceprofile-extras-l4
+    resourceVersion: "50350332"
+    uid: 06a5d282-e9e4-44aa-9c92-b850bbd6a3b3
+  scheduling:
+    nodeSelector:
+      node-role.kubernetes.io/l4: ""
+kind: List
+metadata:
+  resourceVersion: ""

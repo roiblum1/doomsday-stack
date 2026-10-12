@@ -1,0 +1,51 @@
+apiVersion: v1
+items:
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: SecurityPolicy
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:gateway.envoyproxy.io/SecurityPolicy:llm-glm53/glm53-b200-kserve-route-internal
+    creationTimestamp: "2026-10-11T18:33:09Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-b200-kserve-route-internal
+    namespace: llm-glm53
+    resourceVersion: "54504407"
+    uid: 51ee925a-afa6-4c45-b89a-73a9534a1afe
+  spec:
+    apiKeyAuth:
+      credentialRefs:
+      - group: ""
+        kind: Secret
+        name: glm53-internal-key
+      extractFrom:
+      - headers:
+        - Authorization
+      sanitize: true
+    targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: glm53-b200-kserve-route
+  status:
+    ancestors:
+    - ancestorRef:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+        sectionName: http
+      conditions:
+      - lastTransitionTime: "2026-10-11T22:39:03Z"
+        message: Policy has been accepted.
+        observedGeneration: 1
+        reason: Accepted
+        status: "True"
+        type: Accepted
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+kind: List
+metadata:
+  resourceVersion: ""

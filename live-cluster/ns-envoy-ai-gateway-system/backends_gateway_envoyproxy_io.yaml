@@ -1,0 +1,42 @@
+apiVersion: v1
+items:
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: Backend
+  metadata:
+    creationTimestamp: "2026-10-11T22:41:57Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: aigw-ui
+    name: fleet-glm-5-3
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54506077"
+    uid: 75895d4b-85ca-4d9a-847e-c2cfe2fe5953
+  spec:
+    endpoints:
+    - fqdn:
+        hostname: envoy-ai-gateway.envoy-gateway-system.svc.cluster.local
+        port: 8443
+      zone: cluster-llm-prep
+    tls:
+      caCertificateRefs:
+      - group: ""
+        kind: ConfigMap
+        name: llm-peer-ca
+      clientCertificateRef:
+        group: ""
+        kind: Secret
+        name: llm-peer-client
+      insecureSkipVerify: false
+      sni: host.example.internal
+    type: Endpoints
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-11T22:41:57Z"
+      message: The Backend was accepted
+      observedGeneration: 1
+      reason: Accepted
+      status: "True"
+      type: Accepted
+kind: List
+metadata:
+  resourceVersion: ""

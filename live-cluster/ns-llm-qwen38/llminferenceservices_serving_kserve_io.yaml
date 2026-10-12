@@ -1,0 +1,343 @@
+apiVersion: v1
+items:
+- apiVersion: serving.kserve.io/v1alpha2
+  kind: LLMInferenceService
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:serving.kserve.io/LLMInferenceService:llm-qwen38/qwen38-l4
+    creationTimestamp: "2026-10-07T14:22:12Z"
+    finalizers:
+    - serving.kserve.io/llmisvc-finalizer
+    generation: 17
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-l4
+    namespace: llm-qwen38
+    resourceVersion: "55038113"
+    uid: 4ad66e96-4bef-49a7-a56a-2f4df47b3806
+  spec:
+    model:
+      name: Qwen3.8-27B-FP8
+      uri: pvc://qwen38-models/Qwen3.8-27B-FP8
+    replicas: 1
+    rolloutStrategy:
+      maxSurge: 0
+      maxUnavailable: 1
+    router:
+      gateway:
+        refs:
+        - name: envoy-ai-gateway
+          namespace: envoy-ai-gateway-system
+      route: {}
+      scheduler:
+        config:
+          inline:
+            apiVersion: llm-d.ai/v1alpha1
+            kind: EndpointPickerConfig
+            plugins:
+            - type: single-profile-handler
+            - type: approx-prefix-cache-producer
+            - type: inflight-load-producer
+            - type: prefix-cache-scorer
+            - type: active-request-scorer
+            - type: token-load-scorer
+            - type: max-score-picker
+            schedulingProfiles:
+            - name: default
+              plugins:
+              - pluginRef: active-request-scorer
+                weight: 3
+              - pluginRef: token-load-scorer
+                weight: 1
+              - pluginRef: prefix-cache-scorer
+                weight: 1
+              - pluginRef: max-score-picker
+        pool:
+          spec:
+            appProtocol: http
+            endpointPickerRef:
+              failureMode: FailOpen
+              group: ""
+              kind: Service
+              name: qwen38-l4-epp-service
+              port:
+                number: 9002
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: qwen38-l4
+                app.kubernetes.io/part-of: llminferenceservice
+                kserve.io/component: workload
+            targetPorts:
+            - number: 8000
+        template:
+          containers: []
+          serviceAccountName: s3sa
+    template:
+      containers:
+      - args:
+        - --tensor-parallel-size=4
+        - --data-parallel-size=1
+        - --max-model-len=65536
+        - --kv-cache-dtype=fp8_e4m3
+        - --gpu-memory-utilization=0.90
+        - --max-num-seqs=32
+        - --max-num-batched-tokens=8192
+        - --kv-cache-metrics
+        - --enable-prefix-caching
+        - --enable-prompt-tokens-details
+        - --enable-force-include-usage
+        - --enable-chunked-prefill
+        - --speculative-config.method=mtp
+        - --speculative-config.num_speculative_tokens=2
+        - --per-request-spec-decode-metrics=summary
+        - --reasoning-parser=qwen3
+        - --tool-call-parser=qwen3_xml
+        - --enable-auto-tool-choice
+        - --trust-remote-code
+        - --kv-transfer-config
+        - '''{"kv_connector":"LMCacheMPConnector","kv_connector_extra_config":{"lmcache.mp.host":"tcp://qwen38-cache.llm-qwen38.svc.cluster.local","lmcache.mp.isolated_ipc":true,"lmcache.mp.port":"5555"},"kv_connector_module_path":"lmcache.integration.vllm.lmcache_mp_connector","kv_role":"kv_both"}'''
+        env:
+        - name: FLASHINFER_WORKSPACE_BASE
+          value: /cache/flashinfer
+        - name: HF_HOME
+          value: /cache/hf
+        - name: HF_HUB_OFFLINE
+          value: "1"
+        - name: NCCL_IB_DISABLE
+          value: "1"
+        - name: OMP_NUM_THREADS
+          value: "16"
+        - name: TORCHINDUCTOR_CACHE_DIR
+          value: /cache/inductor
+        - name: TORCHINDUCTOR_FX_GRAPH_CACHE
+          value: "1"
+        - name: TRANSFORMERS_OFFLINE
+          value: "1"
+        - name: TRITON_CACHE_DIR
+          value: /cache/triton
+        - name: VLLM_CACHE_ROOT
+          value: /cache/vllm
+        - name: VLLM_ENGINE_READY_TIMEOUT_S
+          value: "3600"
+        - name: PYTHONHASHSEED
+          value: "0"
+        - name: VLLM_DEEP_GEMM_WARMUP
+          value: skip
+        image: registry-internal/lmcache/lmcache/vllm-openai:v0.5.5
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: 30
+          timeoutSeconds: 5
+        name: main
+        readinessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: "96"
+            memory: 128Gi
+            nvidia.com/gpu: "4"
+          requests:
+            cpu: "48"
+            memory: 64Gi
+            nvidia.com/gpu: "4"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+            - IPC_LOCK
+          runAsNonRoot: false
+        startupProbe:
+          failureThreshold: 180
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - mountPath: /cache
+          name: compile-cache
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-L4
+      runtimeClassName: performance-gpu-hpc-performanceprofile-extras-l4
+      schedulerName: default-scheduler
+      serviceAccountName: s3sa
+      terminationGracePeriodSeconds: 300
+      volumes:
+      - emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+        name: dshm
+      - name: compile-cache
+        persistentVolumeClaim:
+          claimName: qwen38-cache
+  status:
+    addresses:
+    - models:
+      - name: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+      name: gateway-external-model-routing
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: http://192.0.2.7/
+    - models:
+      - name: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+      - name: Qwen3.8-27B-FP8
+      name: gateway-external
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: http://192.0.2.7/llm-qwen38/qwen38-l4
+    - models:
+      - name: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+      - name: Qwen3.8-27B-FP8
+      name: gateway-external
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: http://192.0.2.7/publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+    - models:
+      - name: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+      name: gateway-external-model-routing
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: https://192.0.2.7:8443/
+    - models:
+      - name: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+      - name: Qwen3.8-27B-FP8
+      name: gateway-external
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: https://192.0.2.7:8443/llm-qwen38/qwen38-l4
+    - models:
+      - name: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+      - name: Qwen3.8-27B-FP8
+      name: gateway-external
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: https://192.0.2.7:8443/publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+    annotations:
+      serving.kserve.io/config-llm-decode-template: kserve-config-llm-decode-template
+      serving.kserve.io/config-llm-decode-worker-data-parallel: kserve-config-llm-decode-worker-data-parallel
+      serving.kserve.io/config-llm-prefill-template: kserve-config-llm-prefill-template
+      serving.kserve.io/config-llm-prefill-worker-data-parallel: kserve-config-llm-prefill-worker-data-parallel
+      serving.kserve.io/config-llm-router-route: kserve-config-llm-router-route
+      serving.kserve.io/config-llm-scheduler: kserve-config-llm-scheduler
+      serving.kserve.io/config-llm-scheduler-eppconfig-default: kserve-config-llm-scheduler-eppconfig-default
+      serving.kserve.io/config-llm-scheduler-eppconfig-default-pd: kserve-config-llm-scheduler-eppconfig-default-pd
+      serving.kserve.io/config-llm-scheduler-latency-predictor: kserve-config-llm-scheduler-latency-predictor
+      serving.kserve.io/config-llm-template: kserve-config-llm-template
+      serving.kserve.io/config-llm-tokenizer: kserve-config-llm-tokenizer
+      serving.kserve.io/config-llm-tracing: kserve-config-llm-tracing
+      serving.kserve.io/config-llm-worker-data-parallel: kserve-config-llm-worker-data-parallel
+    appliedConfigs:
+    - name: kserve-config-llm-scheduler
+      namespace: kserve
+      source: Preset
+    - name: kserve-config-llm-router-route
+      namespace: kserve
+      source: Preset
+    - name: kserve-config-llm-template
+      namespace: kserve
+      source: Preset
+    conditions:
+    - lastTransitionTime: "2026-10-12T13:46:25Z"
+      severity: Info
+      status: "True"
+      type: GatewaysReady
+    - lastTransitionTime: "2026-10-07T14:22:38Z"
+      severity: Info
+      status: "True"
+      type: HTTPRoutesReady
+    - lastTransitionTime: "2026-10-07T16:46:44Z"
+      severity: Info
+      status: "True"
+      type: InferencePoolReady
+    - lastTransitionTime: "2026-10-07T14:22:24Z"
+      severity: Info
+      status: "True"
+      type: MainWorkloadReady
+    - lastTransitionTime: "2026-10-07T14:22:18Z"
+      status: "True"
+      type: PresetsCombined
+    - lastTransitionTime: "2026-10-12T13:46:25Z"
+      status: "True"
+      type: Ready
+    - lastTransitionTime: "2026-10-12T13:46:25Z"
+      status: "True"
+      type: RouterReady
+    - lastTransitionTime: "2026-10-07T14:22:58Z"
+      severity: Info
+      status: "True"
+      type: SchedulerWorkloadReady
+    - lastTransitionTime: "2026-10-07T14:22:24Z"
+      status: "True"
+      type: WorkloadsReady
+    observedGeneration: 17
+    router:
+      gateways:
+      - group: gateway.networking.k8s.io
+        httpRoutes:
+        - group: gateway.networking.k8s.io
+          kind: HTTPRoute
+          name: qwen38-l4-kserve-route
+          namespace: llm-qwen38
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      scheduler:
+        inferencePool:
+          group: inference.networking.k8s.io
+          kind: InferencePool
+          name: qwen38-l4-inference-pool
+        service:
+          group: ""
+          kind: Service
+          name: qwen38-l4-epp-service
+    url: http://192.0.2.7/llm-qwen38/qwen38-l4
+    workloads:
+      primary:
+        apiGroup: apps
+        kind: Deployment
+        name: qwen38-l4-kserve
+        readyReplicas: 1
+      scheduler:
+        apiGroup: apps
+        kind: Deployment
+        name: qwen38-l4-kserve-router-scheduler
+        readyReplicas: 1
+      service:
+        kind: Service
+        name: qwen38-l4-kserve-workload-svc
+kind: List
+metadata:
+  resourceVersion: ""

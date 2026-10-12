@@ -1,0 +1,123 @@
+apiVersion: v1
+items:
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: ratelimit
+    usage:
+      cpu: 371525n
+      memory: 13136Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:57:24Z"
+    labels:
+      app: envoy-ai-gateway-ratelimit
+      pod-template-hash: 5f84449dd6
+    name: envoy-ai-gateway-ratelimit-5f84449dd6-72p98
+    namespace: envoy-gateway-system
+  timestamp: "2026-10-12T13:57:08Z"
+  window: 11.154s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: shutdown-manager
+    usage:
+      cpu: 50771n
+      memory: 18876Ki
+  - name: ai-gateway-extproc
+    usage:
+      cpu: 102126n
+      memory: 19720Ki
+  - name: envoy
+    usage:
+      cpu: 15947899n
+      memory: 97476Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:57:24Z"
+    labels:
+      app.kubernetes.io/component: proxy
+      app.kubernetes.io/managed-by: envoy-gateway
+      app.kubernetes.io/name: envoy
+      gateway.envoyproxy.io/owning-gateway-name: envoy-ai-gateway
+      gateway.envoyproxy.io/owning-gateway-namespace: envoy-ai-gateway-system
+      pod-template-hash: 68f98cd7bc
+    name: envoy-envoy-ai-gateway-system-envoy-ai-gateway-04213612-685lkn4
+    namespace: envoy-gateway-system
+  timestamp: "2026-10-12T13:57:07Z"
+  window: 16.046s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: envoy
+    usage:
+      cpu: 22035654n
+      memory: 150144Ki
+  - name: shutdown-manager
+    usage:
+      cpu: 126968n
+      memory: 19932Ki
+  - name: ai-gateway-extproc
+    usage:
+      cpu: 431655n
+      memory: 27436Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:57:24Z"
+    labels:
+      app.kubernetes.io/component: proxy
+      app.kubernetes.io/managed-by: envoy-gateway
+      app.kubernetes.io/name: envoy
+      gateway.envoyproxy.io/owning-gateway-name: envoy-ai-gateway
+      gateway.envoyproxy.io/owning-gateway-namespace: envoy-ai-gateway-system
+      pod-template-hash: 68f98cd7bc
+    name: envoy-envoy-ai-gateway-system-envoy-ai-gateway-04213612-685wsc7
+    namespace: envoy-gateway-system
+  timestamp: "2026-10-12T13:56:58Z"
+  window: 13.988s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: ai-gateway-extproc
+    usage:
+      cpu: 1029949n
+      memory: 33988Ki
+  - name: envoy
+    usage:
+      cpu: 24385559n
+      memory: 150992Ki
+  - name: shutdown-manager
+    usage:
+      cpu: 65171n
+      memory: 20052Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:57:24Z"
+    labels:
+      app.kubernetes.io/component: proxy
+      app.kubernetes.io/managed-by: envoy-gateway
+      app.kubernetes.io/name: envoy
+      gateway.envoyproxy.io/owning-gateway-name: envoy-ai-gateway
+      gateway.envoyproxy.io/owning-gateway-namespace: envoy-ai-gateway-system
+      pod-template-hash: 68f98cd7bc
+    name: envoy-envoy-ai-gateway-system-envoy-ai-gateway-04213612-68xh27n
+    namespace: envoy-gateway-system
+  timestamp: "2026-10-12T13:57:07Z"
+  window: 11.907s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: envoy-gateway
+    usage:
+      cpu: 2037755n
+      memory: 98064Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:57:24Z"
+    labels:
+      app.kubernetes.io/instance: envoy-gateway
+      app.kubernetes.io/name: gateway-helm
+      control-plane: envoy-gateway
+      pod-template-hash: 87496bf76
+    name: envoy-gateway-87496bf76-wq2j8
+    namespace: envoy-gateway-system
+  timestamp: "2026-10-12T13:57:00Z"
+  window: 16.289s
+kind: List
+metadata:
+  resourceVersion: ""

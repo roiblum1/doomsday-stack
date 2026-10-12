@@ -1,0 +1,48 @@
+apiVersion: v1
+items:
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: HTTPRouteFilter
+  metadata:
+    creationTimestamp: "2026-10-07T16:13:42Z"
+    generation: 1
+    name: ai-eg-host-rewrite-qwen36-judge
+    namespace: llm-judge
+    ownerReferences:
+    - apiVersion: aigateway.envoyproxy.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: AIGatewayRoute
+      name: qwen36-judge
+      uid: eb8598b7-c8b7-4e62-b7ed-2236ab7a6bd7
+    resourceVersion: "50925468"
+    uid: 83abfaa4-4e33-44dd-bd7e-957b3defb14a
+  spec:
+    urlRewrite:
+      hostname:
+        type: Backend
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: HTTPRouteFilter
+  metadata:
+    creationTimestamp: "2026-10-07T16:13:42Z"
+    generation: 1
+    name: ai-eg-route-not-found-response-qwen36-judge
+    namespace: llm-judge
+    ownerReferences:
+    - apiVersion: aigateway.envoyproxy.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: AIGatewayRoute
+      name: qwen36-judge
+      uid: eb8598b7-c8b7-4e62-b7ed-2236ab7a6bd7
+    resourceVersion: "50925469"
+    uid: 4f1756a0-6171-4a2e-88cf-189f32d4b827
+  spec:
+    directResponse:
+      body:
+        inline: No matching route found. It is likely because the model specified
+          in your request is not configured in the Gateway.
+        type: Inline
+      statusCode: 404
+kind: List
+metadata:
+  resourceVersion: ""

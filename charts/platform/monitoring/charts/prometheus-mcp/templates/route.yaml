@@ -1,0 +1,21 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: prometheus-mcp-server
+  namespace: prometheus-mcp
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  labels:
+    app.kubernetes.io/name: prometheus-mcp-server
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  port:
+    targetPort: http
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: prometheus-mcp-server
+    weight: 100
+  wildcardPolicy: None

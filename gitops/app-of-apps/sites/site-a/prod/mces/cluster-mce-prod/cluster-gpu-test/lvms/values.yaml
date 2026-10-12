@@ -1,0 +1,15 @@
+# Per-cluster overrides for lvms on cluster-gpu-test.
+# Mirrors the LIVE LVMCluster (openshift-storage/test-lvmcluster): thin pool, vg1, xfs,
+# /dev/md/lvmdata, scoped to node-role.kubernetes.io/roce nodes.
+lvmCluster:
+  enabled: true
+  name: lvmcluster
+  storage:
+    deviceClasses:
+      - name: vg1
+        default: true
+        fstype: xfs
+        deviceSelector:
+          forceWipeDevicesAndDestroyAllData: true
+          paths:
+            - /dev/md/lvmdata

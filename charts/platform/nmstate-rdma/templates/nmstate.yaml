@@ -1,0 +1,17 @@
+{{- if .Values.nmstate.enabled }}
+apiVersion: nmstate.io/v1
+kind: NMState
+metadata:
+  name: {{ .Values.nmstate.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    {{- include "nmstate-rdma.labels" . | nindent 4 }}
+spec:
+  {{- $spec := deepCopy .Values.nmstate.spec }}
+  {{- if .Values.nmstateProbeHost }}
+  {{- $_ := set $spec.probeConfiguration.dns "host" .Values.nmstateProbeHost }}
+  {{- end }}
+  {{- toYaml $spec | nindent 2 }}
+{{- end }}

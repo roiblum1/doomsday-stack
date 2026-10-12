@@ -1,0 +1,225 @@
+# The serving workload: ONE LLMInferenceService behind the llm-d router
+# (EPP + InferencePool). Per-model shape comes from values:
+#   - replicas (fixed) or llmisvc.scaling.enabled (WVA/KEDA block)
+#   - spec.parallelism.tensor (renders --tensor-parallel-size) for
+#     non-DP models; DP/EP models pass the flags in llmisvc.args
+#   - model.uri: pvc://<claim>/<subPath> (pre-pulled, node-prep + pull
+#     jobs) or model.uri verbatim (s3:// -> storage-initializer)
+#   - runtimeClassName, initContainers, scheduler, volumes, probe ports:
+#     all optional, gated on values (see values.yaml notes)
+#
+# Merged on the base preset kserve-config-llm-template which already runs
+# `vllm serve /mnt/models --served-model-name ... --port 8000 ... "$@"`
+# (bash eval) -> args must be single tokens (dotted keys, no JSON).
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: {{ .Values.llmisvc.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "genericmodel.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.llmisvc.scaling.enabled }}
+  # WVA-driven autoscaling (llm-d Workload Variant Autoscaler -> KEDA ->
+  # HPA). Prerequisites (KEDA + WVA + inferenceservice-config) must be
+  # installed first -- see values.yaml.
+  scaling:
+    minReplicas: {{ .Values.llmisvc.scaling.minReplicas }}
+    maxReplicas: {{ .Values.llmisvc.scaling.maxReplicas }}
+    wva:
+      keda:
+        pollingInterval: {{ .Values.llmisvc.scaling.wva.keda.pollingInterval }}
+        cooldownPeriod: {{ .Values.llmisvc.scaling.wva.keda.cooldownPeriod }}
+  {{- else }}
+  replicas: {{ .Values.llmisvc.replicas }}
+  {{- end }}
+  model:
+    name: {{ .Values.model.name }}
+    uri: {{ include "genericmodel.modelUri" . }}
+  {{- with .Values.llmisvc.rolloutStrategy }}
+  rolloutStrategy:
+    maxSurge: {{ .maxSurge }}
+    maxUnavailable: {{ .maxUnavailable }}
+  {{- end }}
+  {{- if and .Values.llmisvc.kvCacheOffloading (not .Values.lmcache.enabled) }}
+  # Rendered by the controller into the vLLM launcher's KV_TRANSFER_ARGS
+  # (OffloadingConnector, CPU tier in /dev/shm -- see values.yaml for the
+  # sizing contract with volumes.dshmSize). Omitted when unset, and mutually
+  # exclusive with lmcache.enabled: LMCache replaces vLLM's built-in
+  # offloading connector (and only one --kv-transfer-config may exist).
+  {{- with .Values.llmisvc.kvCacheOffloading }}
+  kvCacheOffloading:
+    cpu: {{ .cpu }}
+    {{- with .evictionPolicy }}
+    evictionPolicy: {{ . }}
+    {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.llmisvc.parallelism.tensor }}
+  # The base preset renders --tensor-parallel-size from this field. Do NOT
+  # also pass --tensor-parallel-size in args (duplicate flag).
+  parallelism:
+    tensor: {{ .Values.llmisvc.parallelism.tensor }}
+  {{- end }}
+  router:
+    # The KServe router HTTPRoute attaches to the SHARED Envoy AI Gateway
+    # (the same one the AIGatewayRoute uses), so there is ONE external VIP.
+    # The KServe-generated paths (/llm-<ns>/<llmisvc>/... and /publishers/)
+    # are more specific (longer path prefixes) so they never shadow the
+    # extproc-driven rules and are not translated by the extproc themselves.
+    gateway:
+      refs:
+        - name: {{ .Values.gateway.aiGateway.name }}
+          namespace: {{ .Values.gateway.aiGateway.namespace }}
+    route: {}
+    scheduler:
+      # Pin the EPP to the chart's ServiceAccount instead of letting kserve
+      # mint its own <name>-epp-sa. Unpinned, the controller deep-copies the
+      # WORKLOAD SA into the epp-sa -- dragging along OpenShift's rotating
+      # dockercfg secret (s3sa-dockercfg-*), which OCM then re-adopts onto
+      # the copy, fighting the original SA's owner for it every few seconds.
+      # With this set the controller uses s3sa directly ("Using existing
+      # service account for scheduler", verified against the
+      # llmisvc-controller v0.21.0-rc1 binary) and creates no child SA.
+      # When llmisvc.scheduler is set, its pool spec + EndpointPickerConfig
+      # follow verbatim (multi-port LB / custom scorers); without it the
+      # controller's default EPP profile applies.
+      template:
+        serviceAccountName: {{ $.Values.serviceAccount.name }}
+      {{- with .Values.llmisvc.scheduler }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+  template:
+    serviceAccountName: {{ .Values.serviceAccount.name }}
+    {{- with .Values.llmisvc.runtimeClassName }}
+    runtimeClassName: {{ . }}
+    {{- end }}
+    schedulerName: {{ .Values.llmisvc.schedulerName }}
+    terminationGracePeriodSeconds: {{ .Values.llmisvc.terminationGracePeriodSeconds }}
+    nodeSelector:
+      nvidia.com/gpu.product: {{ .Values.nodes.gpuProduct }}
+    {{- if .Values.llmisvc.storageInitializer.enabled }}
+    # Image/resources override for the controller-injected
+    # storage-initializer (s3:// model URIs): the controller merges this
+    # patch -- image/resources here win, args/command stay the
+    # controller's. inferenceservice-config points at docker.io
+    # kserve/storage-initializer:latest and docker.io is NOT in the
+    # cluster's IDMS mirrors -- without the override the pod dies in
+    # ImagePullBackOff.
+    initContainers:
+      - name: storage-initializer
+        image: {{ .Values.llmisvc.storageInitializer.image | default .Values.images.storageInitializer }}
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: "2"
+            memory: 2Gi
+          limits:
+            cpu: "8"
+            memory: 8Gi
+    {{- end }}
+    containers:
+      - name: main
+        image: {{ .Values.images.vllm }}
+        imagePullPolicy: IfNotPresent
+        args:
+          {{- toYaml .Values.llmisvc.args | nindent 10 }}
+          {{- if $.Values.lmcache.enabled }}
+          # --- LMCache: hand KV-cache ownership to the LMCacheMPConnector.
+          # One JSON blob, compact (no spaces). It MUST be wrapped in single
+          # quotes: the kserve preset launcher evals `vllm serve ... $@`, and
+          # in that eval re-parse a bare {"a":"b","c":"d"} hits bash BRACE
+          # EXPANSION (splits at the commas into words; quote removal then
+          # eats the double quotes) -- vLLM received "kv_connector:..." and
+          # died on json_invalid. The kserve controller's own KV_TRANSFER_ARGS
+          # wraps its OffloadingConnector JSON the same way. With this arg
+          # present, the controller no longer renders KV_TRANSFER_ARGS from
+          # kvCacheOffloading (which must be unset -- see above).
+          - --kv-transfer-config
+          - {{ printf "'%s'" (include "genericmodel.kvTransferConfig" $) | quote }}
+          {{- end }}
+        env:
+          {{- range $key, $value := .Values.llmisvc.env }}
+          - name: {{ $key }}
+            value: {{ $value | quote }}
+          {{- end }}
+          {{- if $.Values.lmcache.enabled }}
+          # Deterministic prefix hashing across vLLM processes and restarts
+          # (the operator's webhook sets it on injected pods too).
+          - name: PYTHONHASHSEED
+            value: "0"
+          # Skip deep_gemm's eager boot warmup (it allocates a max-M-sized
+          # buffer after the KV pool is sized -- OOM risk; DeepGEMM's JIT
+          # cache is persistent on the cache LV anyway, so kernels compile
+          # on first use instead of at boot).
+          - name: VLLM_DEEP_GEMM_WARMUP
+            value: "skip"
+          {{- end }}
+        resources:
+          {{- toYaml .Values.llmisvc.resources | nindent 10 }}
+        securityContext:
+          runAsNonRoot: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+              - IPC_LOCK
+        # Probe targets from values: port + per-probe path (DP multi-port
+        # external LB recipes point at the supervisor's aggregated
+        # /health + /readyz on --data-parallel-supervisor-port; internal-LB
+        # and TP recipes point at the API server on :8000 -- /readyz does
+        # not exist there, use /health).
+        startupProbe:
+          httpGet:
+            path: {{ .Values.llmisvc.probes.startup.path }}
+            port: {{ .Values.llmisvc.probes.port }}
+            scheme: HTTP
+          periodSeconds: {{ .Values.llmisvc.probes.startup.periodSeconds }}
+          failureThreshold: {{ .Values.llmisvc.probes.startup.failureThreshold }}
+          timeoutSeconds: {{ .Values.llmisvc.probes.startup.timeoutSeconds }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.llmisvc.probes.readiness.path }}
+            port: {{ .Values.llmisvc.probes.port }}
+            scheme: HTTP
+          periodSeconds: {{ .Values.llmisvc.probes.readiness.periodSeconds }}
+          failureThreshold: {{ .Values.llmisvc.probes.readiness.failureThreshold }}
+          timeoutSeconds: {{ .Values.llmisvc.probes.readiness.timeoutSeconds }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.llmisvc.probes.liveness.path }}
+            port: {{ .Values.llmisvc.probes.port }}
+            scheme: HTTP
+          periodSeconds: {{ .Values.llmisvc.probes.liveness.periodSeconds }}
+          failureThreshold: {{ .Values.llmisvc.probes.liveness.failureThreshold }}
+          timeoutSeconds: {{ .Values.llmisvc.probes.liveness.timeoutSeconds }}
+        {{- if or .Values.storage.cache.pvcName .Values.llmisvc.volumes.hugepagesSize }}
+        volumeMounts:
+          {{- if .Values.storage.cache.pvcName }}
+          - mountPath: /cache
+            name: compile-cache
+          {{- end }}
+          {{- if .Values.llmisvc.volumes.hugepagesSize }}
+          - mountPath: /dev/hugepages
+            name: hugepages
+          {{- end }}
+        {{- end }}
+    {{- if or .Values.storage.cache.pvcName .Values.llmisvc.volumes.dshmSize .Values.llmisvc.volumes.hugepagesSize }}
+    volumes:
+      {{- if .Values.llmisvc.volumes.dshmSize }}
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.llmisvc.volumes.dshmSize }}
+      {{- end }}
+      {{- if .Values.llmisvc.volumes.hugepagesSize }}
+      - name: hugepages
+        emptyDir:
+          medium: HugePages
+          sizeLimit: {{ .Values.llmisvc.volumes.hugepagesSize }}
+      {{- end }}
+      {{- if .Values.storage.cache.pvcName }}
+      - name: compile-cache
+        persistentVolumeClaim:
+          claimName: {{ .Values.storage.cache.pvcName }}
+      {{- end }}
+    {{- end }}

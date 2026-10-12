@@ -1,0 +1,37 @@
+apiVersion: v1
+items:
+- apiVersion: aigateway.envoyproxy.io/v1beta1
+  kind: AIServiceBackend
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:aigateway.envoyproxy.io/AIServiceBackend:llm-qwen38/qwen38-anthropic
+    creationTimestamp: "2026-10-07T18:28:34Z"
+    finalizers:
+    - aigateway.envoyproxy.io/finalizer
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-anthropic
+    namespace: llm-qwen38
+    resourceVersion: "54438754"
+    uid: 26f41588-d8bc-42ba-9f1e-bf1f7d336b5b
+  spec:
+    backendRef:
+      group: gateway.envoyproxy.io
+      kind: Backend
+      name: qwen38-anthropic-workload
+    schema:
+      name: Anthropic
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-11T20:48:47Z"
+      message: AIServiceBackend reconciled successfully
+      reason: ReconciliationSucceeded
+      status: "True"
+      type: Accepted
+kind: List
+metadata:
+  resourceVersion: ""

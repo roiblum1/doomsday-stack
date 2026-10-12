@@ -1,0 +1,461 @@
+# Per-cluster overrides for nmstate-rdma on cluster-gpu-test.
+#
+# TARGET layout for the 2026-09-10/11 DC re-patch (per the DC plan CSV
+# /tmp/roce_cabling_plan.csv): every active rail is the f0np0 port of one
+# dual-port CX-6 Dx card — fabric A (Leaf_01, subnets 100-103) on ens32-35f0np0,
+# fabric B (Leaf_02, subnets 104-107) on ens36-39f0np0. This matches the
+# NicNodePolicy rdma-shared-dp ifNames (ens32-39f0np0) and the
+# NicConfigurationTemplate h200-roce pciAddresses (9c,bc,cc,dc,5e,4d,1a,3c f0)
+# WITHOUT changes — after the DC re-patch, host config, device plugin and NIC
+# template all describe the same 8 ports.
+#
+# Server<->leaf-port notation Ethernet1/<server+1>/<rail+1> decodes directly:
+#   server0 = 2sb9mc4  (leaf ports Eth1/1/*)  -> host .1, gateway .0
+#   server1 = dsb9mc4  (leaf ports Eth1/2/*)  -> host .3, gateway .2
+#   server2 = f5fgdb4  (leaf ports Eth1/3/*)  -> host .5, gateway .4
+#   server3 = 7d7sdb4  (leaf ports Eth1/4/*)  -> host .7, gateway .6
+# Host/gateway IPs are UNCHANGED from the pre-fix layout; only the interface
+# each rail lives on moves.
+#
+# NEW NIC->rail mapping (target, identical on all 4 nodes):
+#   ens32f0np0 -> Leaf_01 Eth1/<s>/1 = fabric-A rail0/GPU0 -> 192.168.100.x (table 200)
+#   ens33f0np0 -> Leaf_01 Eth1/<s>/2 = fabric-A rail1/GPU1 -> 192.168.101.x (table 201)
+#   ens34f0np0 -> Leaf_01 Eth1/<s>/3 = fabric-A rail2/GPU2 -> 192.168.102.x (table 202)
+#   ens35f0np0 -> Leaf_01 Eth1/<s>/4 = fabric-A rail3/GPU3 -> 192.168.103.x (table 203)
+#   ens36f0np0 -> Leaf_02 Eth1/<s>/1 = fabric-B rail4/GPU4 -> 192.168.104.x (table 204)
+#   ens37f0np0 -> Leaf_02 Eth1/<s>/2 = fabric-B rail5/GPU5 -> 192.168.105.x (table 205)
+#   ens38f0np0 -> Leaf_02 Eth1/<s>/3 = fabric-B rail6/GPU6 -> 192.168.106.x (table 206)
+#   ens39f0np0 -> Leaf_02 Eth1/<s>/4 = fabric-B rail7/GPU7 -> 192.168.107.x (table 207)
+#
+# HISTORY: the pre-fix cabling (LLDP-verified 2026-09-09, commit ef39a2e) had
+# fabric A on the f1np1 ports of cards ens32-35 and fabric B on their f0np0
+# ports, with ens36-39 uncabled. The DC re-patch moves Leaf_01 DACs to
+# ens32-35f0np0 and Leaf_02 DACs to ens36-39f0np0, and replaces the 4 flapping
+# DACs (2sb9mc4: Leaf_01 Eth1/1/3 + Leaf_02 Eth1/1/3; dsb9mc4: Leaf_01
+# Eth1/2/1 + Leaf_02 Eth1/2/1; if errors persist after DAC swap, reseat/replace
+# the suspect cards — 2sb9mc4 ens34 (cc), dsb9mc4 ens32 (9c)).
+#
+# !!! POST-SYNC PURGE REQUIRED (known kubernetes-nmstate gotcha) !!!
+# kubernetes-nmstate does NOT revert state when these old NNCPs disappear from
+# git, and does NOT remove stale static routes on desiredState change. After
+# the Argo sync and BEFORE the mesh check, purge on every node:
+#   1. the four f1np1 ports keep their old 192.168.100-103.x addresses -> now
+#      DUPLICATED on ens32-35f0np0. Flush them:
+#      ip addr flush dev ens32f1np1; ip addr flush dev ens33f1np1
+#      ip addr flush dev ens34f1np1; ip addr flush dev ens35f1np1
+#   2. stale routes from the old mapping (old 104-107 tables on ens32-35f0np0
+#      via old /31 gateways). Flush and re-check:
+#      for t in 200 201 202 203 204 205 206 207; do ip route flush table $t; done
+#      ip route flush cache
+#      then `ip route show table all` and delete leftovers pointing at
+#      ens32-35f0np0 via 192.168.104-107.* gateways manually.
+#   3. route rules for the old f1 IPs are source-based on the SAME IPs that
+#      moved, so they survive correctly (ip-from <ip>/32 -> same table).
+#   Run the flush AFTER the new NNCPs are Available, and re-verify with
+#   `ip -4 addr show` if any node reboots before/after the DC re-patch.
+#
+# NMState operator itself is cluster-scoped and will install. With mode: roce,
+# NNCPs render only for the nodes listed in roce.nodes; all other nodes are
+# untouched (the B300 GPU nodes are standalone GPU, no RoCE).
+
+mode: roce
+roleLabel: roce
+roce:
+  mtu: 9000
+  nodes:
+  # ----- server0: gpu-node-x...-2sb9mc4 (leaf ports Eth1/1/*) -----
+  - name: gpu-node-x
+    nics:
+    - name: ens32f0np0
+      ip: 192.0.2.17/31
+      gateway: 192.0.2.3
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.3/24
+        tableID: 254
+      tableID: 200
+      routeRulePriority: 1000
+    - name: ens33f0np0
+      ip: 192.0.2.18/31
+      gateway: 192.0.2.19
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.19/24
+        tableID: 254
+      tableID: 201
+      routeRulePriority: 1001
+    - name: ens34f0np0
+      ip: 192.0.2.20/31
+      gateway: 192.0.2.21
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.21/24
+        tableID: 254
+      tableID: 202
+      routeRulePriority: 1002
+    - name: ens35f0np0
+      ip: 192.0.2.22/31
+      gateway: 192.0.2.23
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.23/24
+        tableID: 254
+      tableID: 203
+      routeRulePriority: 1003
+    - name: ens36f0np0
+      ip: 192.0.2.24/31
+      gateway: 192.0.2.25
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.25/24
+        tableID: 254
+      tableID: 204
+      routeRulePriority: 1004
+    - name: ens37f0np0
+      ip: 192.0.2.26/31
+      gateway: 192.0.2.27
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.27/24
+        tableID: 254
+      tableID: 205
+      routeRulePriority: 1005
+    - name: ens38f0np0
+      ip: 192.0.2.28/31
+      gateway: 192.0.2.29
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.29/24
+        tableID: 254
+      tableID: 206
+      routeRulePriority: 1006
+    - name: ens39f0np0
+      ip: 192.0.2.30/31
+      gateway: 192.0.2.31
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.31/24
+        tableID: 254
+      tableID: 207
+      routeRulePriority: 1007
+  # ----- server1: gpu-node-x...-dsb9mc4 (leaf ports Eth1/2/*) -----
+  - name: gpu-node-x
+    nics:
+    - name: ens32f0np0
+      ip: 192.0.2.5/31
+      gateway: 192.0.2.4
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.3/24
+        tableID: 254
+      tableID: 200
+      routeRulePriority: 1000
+    - name: ens33f0np0
+      ip: 192.0.2.32/31
+      gateway: 192.0.2.33
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.19/24
+        tableID: 254
+      tableID: 201
+      routeRulePriority: 1001
+    - name: ens34f0np0
+      ip: 192.0.2.34/31
+      gateway: 192.0.2.35
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.21/24
+        tableID: 254
+      tableID: 202
+      routeRulePriority: 1002
+    - name: ens35f0np0
+      ip: 192.0.2.36/31
+      gateway: 192.0.2.37
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.23/24
+        tableID: 254
+      tableID: 203
+      routeRulePriority: 1003
+    - name: ens36f0np0
+      ip: 192.0.2.38/31
+      gateway: 192.0.2.39
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.25/24
+        tableID: 254
+      tableID: 204
+      routeRulePriority: 1004
+    - name: ens37f0np0
+      ip: 192.0.2.40/31
+      gateway: 192.0.2.41
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.27/24
+        tableID: 254
+      tableID: 205
+      routeRulePriority: 1005
+    - name: ens38f0np0
+      ip: 192.0.2.42/31
+      gateway: 192.0.2.43
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.29/24
+        tableID: 254
+      tableID: 206
+      routeRulePriority: 1006
+    - name: ens39f0np0
+      ip: 192.0.2.44/31
+      gateway: 192.0.2.45
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.31/24
+        tableID: 254
+      tableID: 207
+      routeRulePriority: 1007
+  # ----- server2: gpu-node-x...-f5fgdb4 (leaf ports Eth1/3/*) -----
+  - name: gpu-node-x
+    nics:
+    - name: ens32f0np0
+      ip: 192.0.2.46/31
+      gateway: 192.0.2.47
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.3/24
+        tableID: 254
+      tableID: 200
+      routeRulePriority: 1000
+    - name: ens33f0np0
+      ip: 192.0.2.48/31
+      gateway: 192.0.2.49
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.19/24
+        tableID: 254
+      tableID: 201
+      routeRulePriority: 1001
+    - name: ens34f0np0
+      ip: 192.0.2.50/31
+      gateway: 192.0.2.51
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.21/24
+        tableID: 254
+      tableID: 202
+      routeRulePriority: 1002
+    - name: ens35f0np0
+      ip: 192.0.2.52/31
+      gateway: 192.0.2.53
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.23/24
+        tableID: 254
+      tableID: 203
+      routeRulePriority: 1003
+    - name: ens36f0np0
+      ip: 192.0.2.54/31
+      gateway: 192.0.2.55
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.25/24
+        tableID: 254
+      tableID: 204
+      routeRulePriority: 1004
+    - name: ens37f0np0
+      ip: 192.0.2.56/31
+      gateway: 192.0.2.57
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.27/24
+        tableID: 254
+      tableID: 205
+      routeRulePriority: 1005
+    - name: ens38f0np0
+      ip: 192.0.2.58/31
+      gateway: 192.0.2.59
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.29/24
+        tableID: 254
+      tableID: 206
+      routeRulePriority: 1006
+    - name: ens39f0np0
+      ip: 192.0.2.60/31
+      gateway: 192.0.2.61
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.31/24
+        tableID: 254
+      tableID: 207
+      routeRulePriority: 1007
+  # ----- server3: gpu-node-x...-7d7sdb4 (leaf ports Eth1/4/*) -----
+  - name: gpu-node-x
+    nics:
+    - name: ens32f0np0
+      ip: 192.0.2.62/31
+      gateway: 192.0.2.63
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.3/24
+        tableID: 254
+      tableID: 200
+      routeRulePriority: 1000
+    - name: ens33f0np0
+      ip: 192.0.2.64/31
+      gateway: 192.0.2.65
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.19/24
+        tableID: 254
+      tableID: 201
+      routeRulePriority: 1001
+    - name: ens34f0np0
+      ip: 192.0.2.66/31
+      gateway: 192.0.2.67
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.21/24
+        tableID: 254
+      tableID: 202
+      routeRulePriority: 1002
+    - name: ens35f0np0
+      ip: 192.0.2.68/31
+      gateway: 192.0.2.69
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.23/24
+        tableID: 254
+      tableID: 203
+      routeRulePriority: 1003
+    - name: ens36f0np0
+      ip: 192.0.2.70/31
+      gateway: 192.0.2.71
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.25/24
+        tableID: 254
+      tableID: 204
+      routeRulePriority: 1004
+    - name: ens37f0np0
+      ip: 192.0.2.72/31
+      gateway: 192.0.2.73
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.27/24
+        tableID: 254
+      tableID: 205
+      routeRulePriority: 1005
+    - name: ens38f0np0
+      ip: 192.0.2.74/31
+      gateway: 192.0.2.75
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.29/24
+        tableID: 254
+      tableID: 206
+      routeRulePriority: 1006
+    - name: ens39f0np0
+      ip: 192.0.2.76/31
+      gateway: 192.0.2.77
+      routes:
+      - destination: 0.0.0.0/0
+      - destination: 192.0.2.2/16
+      - destination: 192.0.2.2/16
+        tableID: 254
+      - destination: 192.0.2.31/24
+        tableID: 254
+      tableID: 207
+      routeRulePriority: 1007

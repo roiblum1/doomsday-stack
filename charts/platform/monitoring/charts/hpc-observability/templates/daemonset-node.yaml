@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "hpc-observability.fullname" . }}-node
+  namespace: hpc-observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    {{- include "hpc-observability.labels" . | nindent 4 }}
+    hpc.observability/mode: node
+spec:
+  selector:
+    matchLabels:
+      {{- include "hpc-observability.selectorLabels" . | nindent 6 }}
+      hpc.observability/mode: node
+  revisionHistoryLimit: 10
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        {{- include "hpc-observability.labels" . | nindent 8 }}
+        hpc.observability/mode: node
+    spec:
+      serviceAccount: {{ include "hpc-observability.fullname" . }}
+      serviceAccountName: {{ include "hpc-observability.fullname" . }}
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      {{- with .Values.daemonset.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.daemonset.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: node-exporter
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /usr/local/bin/hpc-observability-exporter
+          env:
+            - name: HPC_EXPORTER_MODE
+              value: node
+            - name: HPC_EXPORTER_ADDR
+              value: "0.0.0.0"
+            - name: HPC_EXPORTER_PORT
+              value: {{ .Values.node.port | quote }}
+            - name: HPC_NODE_POLL_INTERVAL
+              value: {{ .Values.node.env.pollInterval | quote }}
+            - name: HPC_ENABLE_CPU
+              value: {{ .Values.node.env.enableCpu | quote }}
+            - name: HPC_ENABLE_NUMA
+              value: {{ .Values.node.env.enableNuma | quote }}
+            - name: HPC_ENABLE_NVME
+              value: {{ .Values.node.env.enableNvme | quote }}
+            - name: HPC_ENABLE_RAID
+              value: {{ .Values.node.env.enableRaid | quote }}
+            - name: HPC_ENABLE_PCIE_AER
+              value: {{ .Values.node.env.enablePcieAer | quote }}
+            - name: HPC_LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: HPC_CLUSTER_ID
+              value: {{ .Values.clusterId | default .Values.global.clusterName | quote }}
+          ports:
+            - containerPort: {{ .Values.node.port }}
+              name: node-metrics
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /health
+              port: node-metrics
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            successThreshold: 1
+            timeoutSeconds: 5
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: node-metrics
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          startupProbe:
+            failureThreshold: 6
+            httpGet:
+              path: /health
+              port: node-metrics
+              scheme: HTTP
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          {{- with .Values.node.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+            privileged: true
+            readOnlyRootFilesystem: true
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /sys
+              name: sys
+            - mountPath: /host
+              name: host-root
+            - mountPath: /dev
+              name: dev
+            - mountPath: /proc
+              name: proc
+            - mountPath: /tmp
+              name: tmp
+      volumes:
+        - hostPath:
+            path: /sys
+            type: Directory
+          name: sys
+        - hostPath:
+            path: /
+            type: Directory
+          name: host-root
+        - hostPath:
+            path: /dev
+            type: Directory
+          name: dev
+        - hostPath:
+            path: /proc
+            type: Directory
+          name: proc
+        - emptyDir: {}
+          name: tmp

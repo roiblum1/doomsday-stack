@@ -1,0 +1,56 @@
+apiVersion: v1
+items:
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: Backend
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:gateway.envoyproxy.io/Backend:llm-glm53/glm53-ranks
+    creationTimestamp: "2026-10-05T16:00:48Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-ranks
+    namespace: llm-glm53
+    resourceVersion: "49317638"
+    uid: 7a93ca42-ae56-4547-9dfb-72cd3a79edf1
+  spec:
+    endpoints:
+    - fqdn:
+        hostname: glm53-b200-ranks-svc.llm-glm53.svc.cluster.local
+        port: 8000
+    - fqdn:
+        hostname: glm53-b200-ranks-svc.llm-glm53.svc.cluster.local
+        port: 8001
+    - fqdn:
+        hostname: glm53-b200-ranks-svc.llm-glm53.svc.cluster.local
+        port: 8002
+    - fqdn:
+        hostname: glm53-b200-ranks-svc.llm-glm53.svc.cluster.local
+        port: 8003
+    - fqdn:
+        hostname: glm53-b200-ranks-svc.llm-glm53.svc.cluster.local
+        port: 8004
+    - fqdn:
+        hostname: glm53-b200-ranks-svc.llm-glm53.svc.cluster.local
+        port: 8005
+    - fqdn:
+        hostname: glm53-b200-ranks-svc.llm-glm53.svc.cluster.local
+        port: 8006
+    - fqdn:
+        hostname: glm53-b200-ranks-svc.llm-glm53.svc.cluster.local
+        port: 8007
+    type: Endpoints
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-05T16:01:08Z"
+      message: The Backend was accepted
+      observedGeneration: 1
+      reason: Accepted
+      status: "True"
+      type: Accepted
+kind: List
+metadata:
+  resourceVersion: ""

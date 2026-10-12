@@ -1,0 +1,256 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: "2026-09-29T16:48:05Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+    name: glm53-b200-epp-service
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: glm53-b200
+      uid: 6acd4f43-424b-47ee-b53e-1ba129ceeadb
+    resourceVersion: "660623"
+    uid: 5e36c474-2a78-4cef-b307-b2858d851b6a
+  spec:
+    clusterIP: 192.0.2.87
+    clusterIPs:
+    - 192.0.2.87
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: grpc
+      port: 9002
+      protocol: TCP
+      targetPort: grpc
+    - name: grpc-health
+      port: 9003
+      protocol: TCP
+      targetPort: grpc-health
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: metrics
+    - name: zmq
+      port: 5557
+      protocol: TCP
+      targetPort: zmq
+    selector:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: "2026-09-29T15:27:01Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-workload
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+    name: glm53-b200-kserve-workload-svc
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: glm53-b200
+      uid: 6acd4f43-424b-47ee-b53e-1ba129ceeadb
+    resourceVersion: "608644"
+    uid: 4b56456f-953d-4007-850f-41958cc9c531
+  spec:
+    clusterIP: 192.0.2.88
+    clusterIPs:
+    - 192.0.2.88
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - appProtocol: http
+      name: http
+      port: 8000
+      protocol: TCP
+      targetPort: 8000
+    selector:
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+      kserve.io/component: workload
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:/Service:llm-glm53/glm53-b200-ranks-svc
+    creationTimestamp: "2026-10-05T16:00:48Z"
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-b200-ranks-svc
+    namespace: llm-glm53
+    resourceVersion: "49317603"
+    uid: b5bee35b-308a-427f-b89a-8927aefe9e9d
+  spec:
+    clusterIP: 192.0.2.89
+    clusterIPs:
+    - 192.0.2.89
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - appProtocol: http
+      name: rank-0
+      port: 8000
+      protocol: TCP
+      targetPort: 8000
+    - appProtocol: http
+      name: rank-1
+      port: 8001
+      protocol: TCP
+      targetPort: 8001
+    - appProtocol: http
+      name: rank-2
+      port: 8002
+      protocol: TCP
+      targetPort: 8002
+    - appProtocol: http
+      name: rank-3
+      port: 8003
+      protocol: TCP
+      targetPort: 8003
+    - appProtocol: http
+      name: rank-4
+      port: 8004
+      protocol: TCP
+      targetPort: 8004
+    - appProtocol: http
+      name: rank-5
+      port: 8005
+      protocol: TCP
+      targetPort: 8005
+    - appProtocol: http
+      name: rank-6
+      port: 8006
+      protocol: TCP
+      targetPort: 8006
+    - appProtocol: http
+      name: rank-7
+      port: 8007
+      protocol: TCP
+      targetPort: 8007
+    selector:
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+      kserve.io/component: workload
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: "2026-10-06T21:24:47Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+    name: glm53-cache
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: lmcache.lmcache.ai/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: LMCacheEngine
+      name: glm53-cache
+      uid: 6621d695-f3b3-464e-a597-739e5a3279fe
+    resourceVersion: "50264081"
+    uid: 8f4e38fb-f981-47b7-ad36-e2632d26e470
+  spec:
+    clusterIP: 192.0.2.90
+    clusterIPs:
+    - 192.0.2.90
+    internalTrafficPolicy: Local
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: server
+      port: 5555
+      protocol: TCP
+      targetPort: 5555
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: "2026-10-06T21:24:47Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+    name: glm53-cache-metrics
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: lmcache.lmcache.ai/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: LMCacheEngine
+      name: glm53-cache
+      uid: 6621d695-f3b3-464e-a597-739e5a3279fe
+    resourceVersion: "50312709"
+    uid: fc639400-46cd-4127-af80-99b600f8fffb
+  spec:
+    clusterIP: None
+    clusterIPs:
+    - None
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: metrics
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+kind: List
+metadata:
+  resourceVersion: ""

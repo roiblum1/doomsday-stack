@@ -1,0 +1,130 @@
+apiVersion: v1
+items:
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: ClientTrafficPolicy
+  metadata:
+    annotations:
+      argocd.argoproj.io/sync-wave: "2"
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-ai-deploy:gateway.envoyproxy.io/ClientTrafficPolicy:envoy-ai-gateway-system/client-buffer-limit
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-11T16:37:19Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: envoy-ai-gateway-openshift
+      app.kubernetes.io/part-of: envoy-ai-gateway
+      helm.sh/chart: envoy-ai-gateway-openshift-0.1.0
+    name: client-buffer-limit
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54492580"
+    uid: 17daefbb-edde-40f8-bc4a-a50c5cb5be9b
+  spec:
+    connection:
+      bufferLimit: 50Mi
+      maxAcceptPerSocketEvent: 1
+    headers:
+      earlyRequestHeaders:
+        remove:
+        - x-aigw-client-id
+        - x-llm-d-inference-objective
+        - x-llm-d-inference-fairness-id
+        - x-gateway-inference-objective
+        - x-gateway-inference-fairness-id
+        - x-gateway-destination-endpoint
+        - x-gateway-destination-endpoint-subset
+        - x-llm-d-model-name-rewrite
+        - x-gateway-model-name-rewrite
+        - x-site-pin
+    http2:
+      initialConnectionWindowSize: 24Mi
+      initialStreamWindowSize: 16Mi
+    targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: envoy-ai-gateway
+      sectionName: http
+    timeout:
+      http:
+        idleTimeout: 3600s
+  status:
+    ancestors:
+    - ancestorRef:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+        sectionName: http
+      conditions:
+      - lastTransitionTime: "2026-10-11T22:19:26Z"
+        message: Policy has been accepted.
+        observedGeneration: 2
+        reason: Accepted
+        status: "True"
+        type: Accepted
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: ClientTrafficPolicy
+  metadata:
+    annotations:
+      argocd.argoproj.io/sync-wave: "2"
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-ai-deploy:gateway.envoyproxy.io/ClientTrafficPolicy:envoy-ai-gateway-system/peers
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-11T22:19:27Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: envoy-ai-gateway-openshift
+      app.kubernetes.io/part-of: envoy-ai-gateway
+      helm.sh/chart: envoy-ai-gateway-openshift-0.1.0
+    name: peers
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54505720"
+    uid: 60697ce5-0870-461a-a071-b7d2ba1815d0
+  spec:
+    connection:
+      bufferLimit: 50Mi
+      maxAcceptPerSocketEvent: 1
+    headers:
+      lateResponseHeaders:
+        set:
+        - name: x-llm-served-by
+          value: cluster-llm-prep
+      requestID: PreserveOrGenerate
+    http2:
+      initialConnectionWindowSize: 24Mi
+      initialStreamWindowSize: 16Mi
+    targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: envoy-ai-gateway
+      sectionName: peers
+    timeout:
+      http:
+        idleTimeout: 3600s
+    tls:
+      clientValidation:
+        caCertificateRefs:
+        - group: ""
+          kind: ConfigMap
+          name: llm-peer-ca
+  status:
+    ancestors:
+    - ancestorRef:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+        sectionName: peers
+      conditions:
+      - lastTransitionTime: "2026-10-11T22:41:21Z"
+        message: Policy has been accepted.
+        observedGeneration: 1
+        reason: Accepted
+        status: "True"
+        type: Accepted
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+kind: List
+metadata:
+  resourceVersion: ""

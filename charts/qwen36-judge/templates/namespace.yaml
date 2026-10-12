@@ -1,0 +1,8 @@
+# Namespace for everything the chart deploys. Applied first so plain
+# `oc apply -f` (non-Helm) installs also work in one shot.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen36-judge.labels" . | nindent 4 }}

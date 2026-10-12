@@ -1,0 +1,26 @@
+apiVersion: v1
+items:
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-kserve-deploy:rbac.authorization.k8s.io/Role:kserve/llmisvc-leader-election-role
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T15:01:10Z"
+    name: llmisvc-leader-election-role
+    namespace: kserve
+    resourceVersion: "593911"
+    uid: 5eb75b3b-a921-4c2a-91e0-9de62ca9573b
+  rules:
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
+    - get
+    - list
+    - update
+kind: List
+metadata:
+  resourceVersion: ""

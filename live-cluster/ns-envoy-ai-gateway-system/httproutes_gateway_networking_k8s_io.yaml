@@ -1,0 +1,96 @@
+apiVersion: v1
+items:
+- apiVersion: gateway.networking.k8s.io/v1
+  kind: HTTPRoute
+  metadata:
+    annotations:
+      gateway.envoyproxy.io/ai-gateway-generated: "true"
+      gateway.envoyproxy.io/aigw-ui-quota-revision: 80784cff5709
+      gateway.envoyproxy.io/backend-ref-priority: 0:fleet-glm-5-3:0
+    creationTimestamp: "2026-10-11T22:41:57Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/managed-by: aigw-ui
+    name: fleet-glm-5-3
+    namespace: envoy-ai-gateway-system
+    ownerReferences:
+    - apiVersion: aigateway.envoyproxy.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: AIGatewayRoute
+      name: fleet-glm-5-3
+      uid: faedd7e7-86c3-4847-887d-3fed96046115
+    resourceVersion: "54919598"
+    uid: e92654c8-5ac4-42d4-b47d-7ee8d42de9c8
+  spec:
+    parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: envoy-ai-gateway
+      sectionName: http
+    rules:
+    - backendRefs:
+      - group: gateway.envoyproxy.io
+        kind: Backend
+        name: fleet-glm-5-3
+        weight: 1
+      filters:
+      - extensionRef:
+          group: gateway.envoyproxy.io
+          kind: HTTPRouteFilter
+          name: ai-eg-host-rewrite-fleet-glm-5-3
+        type: ExtensionRef
+      matches:
+      - headers:
+        - name: x-ai-eg-model
+          type: Exact
+          value: glm-5.3
+        path:
+          type: PathPrefix
+          value: /
+      name: fleet
+      timeouts:
+        request: 3600s
+    - filters:
+      - extensionRef:
+          group: gateway.envoyproxy.io
+          kind: HTTPRouteFilter
+          name: ai-eg-route-not-found-response-fleet-glm-5-3
+        type: ExtensionRef
+      matches:
+      - path:
+          type: PathPrefix
+          value: /
+      name: route-not-found
+  status:
+    parents:
+    - conditions:
+      - lastTransitionTime: "2026-10-12T10:30:13Z"
+        message: Route is accepted
+        observedGeneration: 1
+        reason: Accepted
+        status: "True"
+        type: Accepted
+      - lastTransitionTime: "2026-10-12T10:30:13Z"
+        message: Resolved all the Object references for the Route
+        observedGeneration: 1
+        reason: ResolvedRefs
+        status: "True"
+        type: ResolvedRefs
+      - lastTransitionTime: "2026-10-12T10:30:13Z"
+        message: 'Overlapping match conditions with route(s): HTTPRoute llm-glm53/glm53,
+          HTTPRoute llm-glm53/glm53-anthropic-alias, HTTPRoute llm-judge/qwen36-judge,
+          HTTPRoute llm-qwen38/qwen38'
+        observedGeneration: 1
+        reason: RouteRulesOverlap
+        status: "True"
+        type: RouteRulesOverlap
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+      parentRef:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        sectionName: http
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: hpc-observability
+description: HPC observability exporter — fabric (RDMA/GPU/PCIe) + node (CPU/NUMA/NVMe/RAID) DaemonSets
+type: application
+version: 0.1.6
+appVersion: "0.1.7"

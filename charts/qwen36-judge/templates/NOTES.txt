@@ -1,0 +1,26 @@
+Qwen3.6-35B-A3B-FP8 judge ({{ .Chart.Name }}-{{ .Chart.Version }}) deployed to namespace "{{ .Values.namespace }}".
+
+Model storage: no PVC -- the storage-initializer init container downloads
+the model from {{ .Values.model.uri }} into the pod at every (re)start.
+Prerequisite: secret "{{ .Values.s3.secretName }}" must exist with keys
+AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY and the
+serving.kserve.io/s3-endpoint annotation (see values.yaml).
+
+Check bring-up:
+  oc -n {{ .Values.namespace }} get llmisvc {{ .Values.llmisvc.name }}                       # WaitingForGateway->Ready (the gateway "not accepted" status on the shared InferencePool is cosmetic -- traffic flows)
+  oc -n {{ .Values.namespace }} get pods -w                                                   # storage-initializer -> main: 0/1 -> 1/1
+  oc -n {{ .Values.namespace }} logs deploy/{{ .Values.llmisvc.name }}-predictor -c storage-initializer   # download progress
+
+Smoke test once Ready (in-cluster, via the shared gateway -> EPP -> vLLM):
+  curl http://envoy-ai-gateway.envoy-ai-gateway-system.svc/v1/chat/completions \
+    -H 'content-type: application/json' \
+    -H 'x-ai-eg-model: {{ .Values.model.name }}' \
+    -d '{"model":"{{ .Values.model.name }}","messages":[{"role":"user","content":"Reply with the single word: ready"}],"max_tokens":8}'
+
+External: same request against http://192.0.2.7 (the shared gateway VIP).
+
+Judge hook wiring (out of band): judge.json -> base_url http://192.0.2.7,
+model "{{ .Values.model.name }}".
+
+Autoscaling: WVA/KEDA prerequisites are NOT installed on this cluster yet --
+the judge runs pinned at minReplicas until they are (see docs/RECIPE.md).

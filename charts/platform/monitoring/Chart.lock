@@ -1,0 +1,12 @@
+dependencies:
+- name: rdma-exporter
+  repository: file://charts/rdma-exporter
+  version: 4.2.0
+- name: prometheus-mcp
+  repository: file://charts/prometheus-mcp
+  version: 1.1.0
+- name: grafana
+  repository: file://charts/grafana
+  version: 9.2.4
+digest: sha256:e38a8ca35438479e7ab31af5ddc48636a332519faae3edddb3b85bcc5607f7c0
+generated: "2026-08-20T02:06:59.528968924+03:00"

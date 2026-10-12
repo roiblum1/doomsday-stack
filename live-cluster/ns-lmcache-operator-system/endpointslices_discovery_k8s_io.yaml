@@ -1,0 +1,98 @@
+apiVersion: v1
+items:
+- addressType: IPv4
+  apiVersion: discovery.k8s.io/v1
+  endpoints:
+  - addresses:
+    - 192.0.2.115
+    conditions:
+      ready: true
+      serving: true
+      terminating: false
+    nodeName: gpu-node-x
+    targetRef:
+      kind: Pod
+      name: lmcache-operator-controller-manager-674bdd89f4-npvgl
+      namespace: lmcache-operator-system
+      uid: 60bad8fb-f291-4e86-8aa8-267febad5e97
+  kind: EndpointSlice
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-06T21:24:30Z"
+    creationTimestamp: "2026-10-06T21:24:16Z"
+    generateName: lmcache-operator-controller-manager-metrics-service-
+    generation: 3
+    labels:
+      app.kubernetes.io/instance: lmcache
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: operator
+      app.kubernetes.io/part-of: lmcache
+      app.kubernetes.io/version: v0.5.5
+      control-plane: controller-manager
+      endpointslice.kubernetes.io/managed-by: endpointslice-controller.k8s.io
+      helm.sh/chart: lmcache-operator-openshift-0.1.0
+      kubernetes.io/service-name: lmcache-operator-controller-manager-metrics-service
+    name: lmcache-operator-controller-manager-metrics-service-4tzd7
+    namespace: lmcache-operator-system
+    ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Service
+      name: lmcache-operator-controller-manager-metrics-service
+      uid: 1b019c7e-5746-42a9-bc81-6c5d7fcc8b3d
+    resourceVersion: "50263914"
+    uid: 460d3566-7fa7-40f6-a7f6-b2fd7cee2e0f
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+- addressType: IPv4
+  apiVersion: discovery.k8s.io/v1
+  endpoints:
+  - addresses:
+    - 192.0.2.115
+    conditions:
+      ready: true
+      serving: true
+      terminating: false
+    nodeName: gpu-node-x
+    targetRef:
+      kind: Pod
+      name: lmcache-operator-controller-manager-674bdd89f4-npvgl
+      namespace: lmcache-operator-system
+      uid: 60bad8fb-f291-4e86-8aa8-267febad5e97
+  kind: EndpointSlice
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-06T21:24:30Z"
+    creationTimestamp: "2026-10-06T21:24:16Z"
+    generateName: lmcache-operator-webhook-service-
+    generation: 3
+    labels:
+      app.kubernetes.io/instance: lmcache
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: operator
+      app.kubernetes.io/part-of: lmcache
+      app.kubernetes.io/version: v0.5.5
+      endpointslice.kubernetes.io/managed-by: endpointslice-controller.k8s.io
+      helm.sh/chart: lmcache-operator-openshift-0.1.0
+      kubernetes.io/service-name: lmcache-operator-webhook-service
+    name: lmcache-operator-webhook-service-t42kh
+    namespace: lmcache-operator-system
+    ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Service
+      name: lmcache-operator-webhook-service
+      uid: ba1577b0-1270-41d6-8e34-d2aa278b9894
+    resourceVersion: "50263913"
+    uid: b4d9666c-b900-4dcc-b563-1a266212dca9
+  ports:
+  - name: ""
+    port: 9443
+    protocol: TCP
+kind: List
+metadata:
+  resourceVersion: ""

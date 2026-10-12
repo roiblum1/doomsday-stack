@@ -1,0 +1,88 @@
+apiVersion: v1
+items:
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: lmcache
+    usage:
+      cpu: 3608022n
+      memory: 211290408Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:56:00Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: qwen38-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      controller-revision-hash: "6599997558"
+      pod-template-generation: "8"
+    name: qwen38-cache-k2whm
+    namespace: llm-qwen38
+  timestamp: "2026-10-12T13:55:57Z"
+  window: 17.45s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: main
+    usage:
+      cpu: 111266u
+      memory: 13952724Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:56:00Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-workload
+      app.kubernetes.io/name: qwen38-l4
+      app.kubernetes.io/part-of: llminferenceservice
+      kserve.io/component: workload
+      llm-d.ai/role: both
+      pod-template-hash: "6767844548"
+    name: qwen38-l4-kserve-6767844548-dzqz4
+    namespace: llm-qwen38
+  timestamp: "2026-10-12T13:55:52Z"
+  window: 11.609s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: main
+    usage:
+      cpu: 60243802n
+      memory: 32112Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:56:00Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen38-l4
+      app.kubernetes.io/part-of: llminferenceservice
+      pod-template-hash: 6bcb6d8d49
+    name: qwen38-l4-kserve-router-scheduler-6bcb6d8d49-hqknm
+    namespace: llm-qwen38
+  timestamp: "2026-10-12T13:55:47Z"
+  window: 14.2s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: cubin-src
+    usage:
+      cpu: "0"
+      memory: 572Ki
+  - name: node-prep
+    usage:
+      cpu: "0"
+      memory: 29192Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:56:00Z"
+    labels:
+      app: qwen38-node-prep
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      controller-revision-hash: 587c4654cc
+      helm.sh/chart: qwen38-bundled-0.2.6
+      pod-template-generation: "7"
+    name: qwen38-node-prep-lm2f7
+    namespace: llm-qwen38
+  timestamp: "2026-10-12T13:55:39Z"
+  window: 11.498s
+kind: List
+metadata:
+  resourceVersion: ""

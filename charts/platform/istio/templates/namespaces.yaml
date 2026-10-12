@@ -1,0 +1,22 @@
+{{- if .Values.namespaces.istioSystem.create }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespaces.istioSystem.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    {{- include "istio.labels" . | nindent 4 }}
+{{- end }}
+{{- if .Values.namespaces.istioCNI.create }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespaces.istioCNI.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    {{- include "istio.labels" . | nindent 4 }}
+{{- end }}

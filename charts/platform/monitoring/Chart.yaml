@@ -1,0 +1,23 @@
+apiVersion: v2
+name: monitoring
+description: HPC/RDMA monitoring stack (standalone) — rdma-exporter DaemonSet + hpc-observability exporters + prometheus-mcp server + grafana. No OLM operator; plain workloads. Self-contained with vendored subcharts.
+type: application
+version: 4.2.0
+appVersion: "3.2.2"
+dependencies:
+  - name: rdma-exporter
+    version: 4.2.0
+    repository: file://charts/rdma-exporter
+    condition: rdma-exporter.enabled
+  - name: hpc-observability
+    version: 0.1.6
+    repository: file://charts/hpc-observability
+    condition: hpc-observability.enabled
+  - name: prometheus-mcp
+    version: 1.1.0
+    repository: file://charts/prometheus-mcp
+    condition: prometheus-mcp.enabled
+  - name: grafana
+    version: 9.2.4
+    repository: file://charts/grafana
+    condition: grafana.enabled

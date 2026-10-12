@@ -1,0 +1,88 @@
+{{- /*
+RoCE mode: one NodeNetworkConfigurationPolicy per (node, NIC). Each node's rail NIC has a
+unique host IP, so the policy is pinned to that node by hostname (a cluster-wide policy
+cannot carry a different IP per node). Per NIC: static IPv4 + routes, optionally split
+across a per-NIC routing table (table-id) with source-based route-rules for deterministic
+NIC selection (NCCL_CROSS_NIC=0 enforced host-side).
+Schema: nmstate.io ethernet interface + top-level routes.config[] + route-rules.config[].
+*/}}
+{{- if eq .Values.mode "roce" }}
+{{- range $node := .Values.roce.nodes }}
+{{- range $nicIdx, $nic := $node.nics }}
+{{- $parts := splitList "/" $nic.ip }}
+{{- $ip := index $parts 0 }}
+{{- $prefix := index $parts 1 }}
+---
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: roce-{{ $node.name }}-{{ $nic.name }}
+  labels:
+    {{- include "nmstate-rdma.labels" $ | nindent 4 }}
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: {{ $node.name }}
+  desiredState:
+    interfaces:
+      - name: {{ $nic.name }}
+        type: ethernet
+        state: up
+        mtu: {{ $.Values.roce.mtu }}
+        ipv4:
+          enabled: true
+          dhcp: false
+          address:
+            - ip: {{ $ip }}
+              prefix-length: {{ $prefix }}
+        ipv6:
+          enabled: false
+    {{- if or $nic.routeRules $nic.tableID }}
+    route-rules:
+      config:
+        {{- if $nic.routeRules }}
+        {{- range $rule := $nic.routeRules }}
+        - ip-from: {{ $rule.ipFrom }}
+          priority: {{ $rule.priority }}
+          route-table: {{ $rule.routeTable }}
+        {{- end }}
+        {{- else if $nic.tableID }}
+        - ip-from: {{ $ip }}/32
+          priority: {{ $nic.routeRulePriority | default (add 1000 $nicIdx) }}
+          route-table: {{ $nic.tableID }}
+        {{- end }}
+    {{- end }}
+    routes:
+      config:
+        {{- if $nic.absentRoutes }}
+        {{- range $absent := $nic.absentRoutes }}
+        - destination: {{ $absent.dst }}
+          next-hop-address: {{ $absent.nh }}
+          next-hop-interface: {{ $nic.name }}
+          state: absent
+        {{- end }}
+        {{- end }}
+        {{- range $route := $nic.routes }}
+        {{- $isStr := kindIs "string" $route }}
+        {{- $dst := $route }}
+        {{- $tableID := $nic.tableID }}
+        {{- $nh := $nic.gateway }}
+        {{- $iface := $nic.name }}
+        {{- if not $isStr }}
+        {{- $dst = $route.destination }}
+        {{- if $route.tableID }}{{ $tableID = $route.tableID }}{{ end }}
+        {{- if $route.nextHopAddress }}{{ $nh = $route.nextHopAddress }}{{ end }}
+        {{- if $route.nextHopInterface }}{{ $iface = $route.nextHopInterface }}{{ end }}
+        {{- end }}
+        - destination: {{ $dst }}
+          next-hop-address: {{ $nh }}
+          next-hop-interface: {{ $iface }}
+          {{- if $tableID }}
+          table-id: {{ $tableID }}
+          {{- end }}
+        {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

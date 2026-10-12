@@ -1,0 +1,4 @@
+# Compiled / rendered artifacts
+*.tgz
+rendered/
+__pycache__/

@@ -1,0 +1,581 @@
+apiVersion: v1
+items:
+- apiVersion: operators.coreos.com/v1alpha1
+  kind: ClusterServiceVersion
+  metadata:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "maintenance.nvidia.com/v1alpha1",
+            "kind": "MaintenanceOperatorConfig",
+            "metadata": {
+              "labels": {
+                "app.kubernetes.io/created-by": "maintenance-operator",
+                "app.kubernetes.io/instance": "maintenanceoperatorconfig-sample",
+                "app.kubernetes.io/managed-by": "kustomize",
+                "app.kubernetes.io/name": "maintenanceoperatorconfig",
+                "app.kubernetes.io/part-of": "maintenance-operator"
+              },
+              "name": "maintenanceoperatorconfig-sample"
+            },
+            "spec": {
+              "logLevel": "info",
+              "maxNodeMaintenanceTimeSeconds": 1600,
+              "maxParallelOperations": 1,
+              "maxUnavailable": "30%"
+            }
+          },
+          {
+            "apiVersion": "maintenance.nvidia.com/v1alpha1",
+            "kind": "NodeMaintenance",
+            "metadata": {
+              "labels": {
+                "app.kubernetes.io/created-by": "maintenance-operator",
+                "app.kubernetes.io/instance": "nodemaintenance-sample",
+                "app.kubernetes.io/managed-by": "kustomize",
+                "app.kubernetes.io/name": "nodemaintenance",
+                "app.kubernetes.io/part-of": "maintenance-operator"
+              },
+              "name": "nodemaintenance-sample"
+            },
+            "spec": {
+              "cordon": true,
+              "drainSpec": {
+                "deleteEmptyDir": true,
+                "force": true,
+                "podEvictionFilters": [
+                  {
+                    "byResourceNameRegex": "nvidia.com/gpu-*"
+                  },
+                  {
+                    "byResourceNameRegex": "nvidia.com/rdma*"
+                  }
+                ],
+                "podSelector": "app=rdma-workload",
+                "timeoutSeconds": 0
+              },
+              "nodeName": "worker-node-01",
+              "requestorID": "some-cluster-component.vendor.com",
+              "waitForPodCompletion": {
+                "podSelector": "app=rdma-workload",
+                "timeoutSeconds": 0
+              }
+            }
+          }
+        ]
+      capabilities: Basic Install
+      containerImage: nvcr.io/nvidia/mellanox/maintenance-operator@sha256:fa285b8b3ea1b2ee8136136ef73ff92ccaf66818b3f62d90d02da556de754292
+      createdAt: "2026-06-15T13:00:33Z"
+      description: Node maintenance in K8s cluster in a coordinated manner
+      features.operators.openshift.io/cnf: "false"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "false"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "false"
+      features.operators.openshift.io/proxy-aware: "true"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.operatorGroup: nvidia-maintenance-operator
+      olm.operatorNamespace: nvidia-maintenance-operator
+      operatorframework.io/properties: '{"properties":[{"type":"olm.gvk","value":{"group":"maintenance.nvidia.com","kind":"MaintenanceOperatorConfig","version":"v1alpha1"}},{"type":"olm.gvk","value":{"group":"maintenance.nvidia.com","kind":"NodeMaintenance","version":"v1alpha1"}},{"type":"olm.package","value":{"packageName":"nvidia-maintenance-operator","version":"26.4.0"}}]}'
+      operatorframework.io/suggested-namespace: nvidia-maintenance-operator
+      operators.operatorframework.io/builder: operator-sdk-v1.39.1
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
+      provider: NVIDIA
+      repository: https://github.com/Mellanox/maintenance-operator/
+      support: NVIDIA
+    creationTimestamp: "2026-09-29T13:19:44Z"
+    generation: 1
+    labels:
+      olm.copiedFrom: nvidia-maintenance-operator
+      olm.managed: "true"
+      operatorframework.io/arch.amd64: supported
+      operatorframework.io/arch.arm64: supported
+    name: nvidia-maintenance-operator.v26.4.0
+    namespace: kserve
+    resourceVersion: "543350"
+    uid: 41501ab3-2a61-4129-a0bd-d5b5c29c65e4
+  spec:
+    apiservicedefinitions: {}
+    cleanup:
+      enabled: false
+    customresourcedefinitions:
+      owned:
+      - description: MaintenanceOperatorConfig is the Schema for the maintenanceoperatorconfigs
+          API
+        displayName: Maintenance Operator Config
+        kind: MaintenanceOperatorConfig
+        name: maintenanceoperatorconfigs.maintenance.nvidia.com
+        version: v1alpha1
+      - description: NodeMaintenance is the Schema for the nodemaintenances API
+        displayName: Node Maintenance
+        kind: NodeMaintenance
+        name: nodemaintenances.maintenance.nvidia.com
+        version: v1alpha1
+    description: Coordinates And Performs Common Node Preparations For Maintenance
+    displayName: NVIDIA Maintenance Operator
+    icon:
+    - base64data: REDACTED-B64
+      mediatype: image/png
+    install:
+      spec:
+        clusterPermissions:
+        - rules:
+          - apiGroups:
+            - ""
+            resources:
+            - events
+            verbs:
+            - create
+            - patch
+            - update
+          - apiGroups:
+            - ""
+            resources:
+            - nodes
+            verbs:
+            - get
+            - list
+            - patch
+            - update
+            - watch
+          - apiGroups:
+            - ""
+            resources:
+            - pods
+            verbs:
+            - delete
+            - get
+            - list
+            - patch
+            - update
+            - watch
+          - apiGroups:
+            - ""
+            resources:
+            - pods/eviction
+            verbs:
+            - create
+            - delete
+            - get
+            - list
+            - patch
+            - update
+          - apiGroups:
+            - apps
+            resources:
+            - daemonsets
+            verbs:
+            - get
+            - list
+            - watch
+          - apiGroups:
+            - config.openshift.io
+            resources:
+            - infrastructures
+            verbs:
+            - get
+            - list
+            - watch
+          - apiGroups:
+            - machineconfiguration.openshift.io
+            resources:
+            - machineconfigpools
+            verbs:
+            - get
+            - list
+            - patch
+            - update
+            - watch
+          - apiGroups:
+            - machineconfiguration.openshift.io
+            resources:
+            - machineconfigs
+            verbs:
+            - get
+            - list
+            - watch
+          - apiGroups:
+            - maintenance.nvidia.com
+            resources:
+            - maintenanceoperatorconfigs
+            - nodemaintenances
+            verbs:
+            - create
+            - delete
+            - get
+            - list
+            - patch
+            - update
+            - watch
+          - apiGroups:
+            - maintenance.nvidia.com
+            resources:
+            - maintenanceoperatorconfigs/finalizers
+            - nodemaintenances/finalizers
+            verbs:
+            - update
+          - apiGroups:
+            - maintenance.nvidia.com
+            resources:
+            - maintenanceoperatorconfigs/status
+            - nodemaintenances/status
+            verbs:
+            - get
+            - patch
+            - update
+          serviceAccountName: maintenance-operator-controller-manager
+        deployments:
+        - label:
+            app.kubernetes.io/component: maintenance-operator-controller-manager
+            app.kubernetes.io/created-by: maintenance-operator
+            app.kubernetes.io/instance: controller-manager
+            app.kubernetes.io/managed-by: kustomize
+            app.kubernetes.io/name: deployment
+            app.kubernetes.io/part-of: maintenance-operator
+            control-plane: controller-manager
+          name: maintenance-operator-controller-manager
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                control-plane: controller-manager
+            strategy: {}
+            template:
+              metadata:
+                annotations:
+                  kubectl.kubernetes.io/default-container: manager
+                labels:
+                  app.kubernetes.io/component: maintenance-operator-controller-manager
+                  control-plane: controller-manager
+              spec:
+                affinity:
+                  nodeAffinity:
+                    preferredDuringSchedulingIgnoredDuringExecution:
+                    - preference:
+                        matchExpressions:
+                        - key: node-role.kubernetes.io/master
+                          operator: Exists
+                      weight: 1
+                    - preference:
+                        matchExpressions:
+                        - key: node-role.kubernetes.io/control-plane
+                          operator: Exists
+                      weight: 1
+                containers:
+                - args:
+                  - --leader-elect
+                  command:
+                  - /manager
+                  env:
+                  - name: OPERATOR_NAMESPACE
+                    valueFrom:
+                      fieldRef:
+                        fieldPath: metadata.namespace
+                  - name: ENABLE_WEBHOOKS
+                    value: "true"
+                  image: nvcr.io/nvidia/mellanox/maintenance-operator@sha256:fa285b8b3ea1b2ee8136136ef73ff92ccaf66818b3f62d90d02da556de754292
+                  livenessProbe:
+                    httpGet:
+                      path: /healthz
+                      port: 8081
+                    initialDelaySeconds: 15
+                    periodSeconds: 20
+                  name: manager
+                  ports:
+                  - containerPort: 9443
+                    name: webhook-server
+                    protocol: TCP
+                  readinessProbe:
+                    httpGet:
+                      path: /readyz
+                      port: 8081
+                    initialDelaySeconds: 5
+                    periodSeconds: 10
+                  resources:
+                    limits:
+                      cpu: 500m
+                      memory: 128Mi
+                    requests:
+                      cpu: 10m
+                      memory: 64Mi
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop:
+                      - ALL
+                  volumeMounts:
+                  - mountPath: /tmp/k8s-webhook-server/serving-certs
+                    name: cert
+                    readOnly: true
+                priorityClassName: system-cluster-critical
+                securityContext:
+                  runAsNonRoot: true
+                  seccompProfile:
+                    type: RuntimeDefault
+                serviceAccountName: maintenance-operator-controller-manager
+                terminationGracePeriodSeconds: 10
+                tolerations:
+                - effect: NoSchedule
+                  key: node-role.kubernetes.io/master
+                  operator: Exists
+                - effect: NoSchedule
+                  key: node-role.kubernetes.io/control-plane
+                  operator: Exists
+                volumes:
+                - name: cert
+                  secret:
+                    defaultMode: 420
+                    secretName: webhook-server-cert
+        permissions:
+        - rules:
+          - apiGroups:
+            - ""
+            resources:
+            - configmaps
+            verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+          - apiGroups:
+            - coordination.k8s.io
+            resources:
+            - leases
+            verbs:
+            - get
+            - list
+            - watch
+            - create
+            - update
+            - patch
+            - delete
+          - apiGroups:
+            - ""
+            resources:
+            - events
+            verbs:
+            - create
+            - patch
+          serviceAccountName: maintenance-operator-controller-manager
+      strategy: deployment
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: false
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: true
+      type: AllNamespaces
+    keywords:
+    - node
+    - maintenance
+    - drain
+    links:
+    - name: NVIDIA Maintenance Operator
+      url: https://github.com/Mellanox/maintenance-operator/
+    maintainers:
+    - email: nvidia-network-operator-support@nvidia.com
+      name: NVIDIA
+    maturity: alpha
+    minKubeVersion: 1.30.0
+    provider:
+      name: NVIDIA
+      url: https://github.com/Mellanox/maintenance-operator/
+    relatedImages:
+    - image: nvcr.io/nvidia/mellanox/maintenance-operator@sha256:fa285b8b3ea1b2ee8136136ef73ff92ccaf66818b3f62d90d02da556de754292
+      name: nvidia-maintenance-operator
+    replaces: nvidia-maintenance-operator.v0.2.3
+    version: 26.4.0
+    webhookdefinitions:
+    - admissionReviewVersions:
+      - v1
+      containerPort: 443
+      deploymentName: maintenance-operator-controller-manager
+      failurePolicy: Fail
+      generateName: vnodemaintenance.kb.io
+      rules:
+      - apiGroups:
+        - maintenance.nvidia.com
+        apiVersions:
+        - v1alpha1
+        operations:
+        - CREATE
+        resources:
+        - nodemaintenances
+      sideEffects: None
+      targetPort: 9443
+      type: ValidatingAdmissionWebhook
+      webhookPath: /validate-maintenance-nvidia-com-v1alpha1-nodemaintenance
+  status:
+    certsLastUpdated: "2026-09-29T13:19:47Z"
+    certsRotateAt: "2028-09-27T13:19:46Z"
+    cleanup: {}
+    conditions:
+    - lastTransitionTime: "2026-09-29T13:19:44Z"
+      lastUpdateTime: "2026-09-29T13:19:44Z"
+      message: requirements not yet checked
+      phase: Pending
+      reason: RequirementsUnknown
+    - lastTransitionTime: "2026-09-29T13:19:44Z"
+      lastUpdateTime: "2026-09-29T13:19:44Z"
+      message: one or more requirements couldn't be found
+      phase: Pending
+      reason: RequirementsNotMet
+    - lastTransitionTime: "2026-09-29T13:19:46Z"
+      lastUpdateTime: "2026-09-29T13:19:46Z"
+      message: all requirements found, attempting install
+      phase: InstallReady
+      reason: AllRequirementsMet
+    - lastTransitionTime: "2026-09-29T13:19:46Z"
+      lastUpdateTime: "2026-09-29T13:19:46Z"
+      message: waiting for install components to report healthy
+      phase: Installing
+      reason: InstallSucceeded
+    - lastTransitionTime: "2026-09-29T13:19:46Z"
+      lastUpdateTime: "2026-09-29T13:19:47Z"
+      message: 'installing: waiting for deployment maintenance-operator-controller-manager
+        to become ready: deployment "maintenance-operator-controller-manager" not
+        available: Deployment does not have minimum availability.'
+      phase: Installing
+      reason: InstallWaiting
+    - lastTransitionTime: "2026-09-29T13:20:00Z"
+      lastUpdateTime: "2026-09-29T13:20:00Z"
+      message: install strategy completed with no errors
+      phase: Succeeded
+      reason: InstallSucceeded
+    - lastTransitionTime: "2026-09-29T13:26:47Z"
+      lastUpdateTime: "2026-09-29T13:26:47Z"
+      message: 'installing: waiting for deployment maintenance-operator-controller-manager
+        to become ready: deployment "maintenance-operator-controller-manager" not
+        available: Deployment does not have minimum availability.'
+      phase: Failed
+      reason: ComponentUnhealthy
+    - lastTransitionTime: "2026-09-29T13:26:47Z"
+      lastUpdateTime: "2026-09-29T13:26:47Z"
+      message: 'installing: waiting for deployment maintenance-operator-controller-manager
+        to become ready: deployment "maintenance-operator-controller-manager" not
+        available: Deployment does not have minimum availability.'
+      phase: Pending
+      reason: NeedsReinstall
+    - lastTransitionTime: "2026-09-29T13:26:47Z"
+      lastUpdateTime: "2026-09-29T13:26:47Z"
+      message: all requirements found, attempting install
+      phase: InstallReady
+      reason: AllRequirementsMet
+    - lastTransitionTime: "2026-09-29T13:26:47Z"
+      lastUpdateTime: "2026-09-29T13:26:47Z"
+      message: waiting for install components to report healthy
+      phase: Installing
+      reason: InstallSucceeded
+    - lastTransitionTime: "2026-09-29T13:26:47Z"
+      lastUpdateTime: "2026-09-29T13:26:48Z"
+      message: 'installing: waiting for deployment maintenance-operator-controller-manager
+        to become ready: deployment "maintenance-operator-controller-manager" not
+        available: Deployment does not have minimum availability.'
+      phase: Installing
+      reason: InstallWaiting
+    - lastTransitionTime: "2026-09-29T13:27:02Z"
+      lastUpdateTime: "2026-09-29T13:27:02Z"
+      message: install strategy completed with no errors
+      phase: Succeeded
+      reason: InstallSucceeded
+    lastTransitionTime: "2026-09-29T13:27:02Z"
+    lastUpdateTime: "2026-09-29T13:27:02Z"
+    message: The operator is running in nvidia-maintenance-operator but is managing
+      this namespace
+    phase: Succeeded
+    reason: Copied
+    requirementStatus:
+    - group: operators.coreos.com
+      kind: ClusterServiceVersion
+      message: CSV minKubeVersion (1.30.0) less than server version (v1.35.6)
+      name: nvidia-maintenance-operator.v26.4.0
+      status: Present
+      version: v1alpha1
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      message: CRD is present and Established condition is true
+      name: maintenanceoperatorconfigs.maintenance.nvidia.com
+      status: Present
+      uuid: 0cc6785b-8915-48f1-833b-44357088e31f
+      version: v1
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      message: CRD is present and Established condition is true
+      name: nodemaintenances.maintenance.nvidia.com
+      status: Present
+      uuid: a04e76bb-55c1-4686-937f-bbb2633e7515
+      version: v1
+    - dependents:
+      - group: rbac.authorization.k8s.io
+        kind: PolicyRule
+        message: cluster rule:{"verbs":["create","patch","update"],"apiGroups":[""],"resources":["events"]}
+        status: Satisfied
+        version: v1
+      - group: rbac.authorization.k8s.io
+        kind: PolicyRule
+        message: cluster rule:{"verbs":["get","list","patch","update","watch"],"apiGroups":[""],"resources":["nodes"]}
+        status: Satisfied
+        version: v1
+      - group: rbac.authorization.k8s.io
+        kind: PolicyRule
+        message: cluster rule:{"verbs":["delete","get","list","patch","update","watch"],"apiGroups":[""],"resources":["pods"]}
+        status: Satisfied
+        version: v1
+      - group: rbac.authorization.k8s.io
+        kind: PolicyRule
+        message: cluster rule:{"verbs":["create","delete","get","list","patch","update"],"apiGroups":[""],"resources":["pods/eviction"]}
+        status: Satisfied
+        version: v1
+      - group: rbac.authorization.k8s.io
+        kind: PolicyRule
+        message: cluster rule:{"verbs":["get","list","watch"],"apiGroups":["apps"],"resources":["daemonsets"]}
+        status: Satisfied
+        version: v1
+      - group: rbac.authorization.k8s.io
+        kind: PolicyRule
+        message: cluster rule:{"verbs":["get","list","watch"],"apiGroups":["config.openshift.io"],"resources":["infrastructures"]}
+        status: Satisfied
+        version: v1
+      - group: rbac.authorization.k8s.io
+        kind: PolicyRule
+        message: cluster rule:{"verbs":["get","list","patch","update","watch"],"apiGroups":["machineconfiguration.openshift.io"],"resources":["machineconfigpools"]}
+        status: Satisfied
+        version: v1
+      - group: rbac.authorization.k8s.io
+        kind: PolicyRule
+        message: cluster rule:{"verbs":["get","list","watch"],"apiGroups":["machineconfiguration.openshift.io"],"resources":["machineconfigs"]}
+        status: Satisfied
+        version: v1
+      - group: rbac.authorization.k8s.io
+        kind: PolicyRule
+        message: cluster rule:{"verbs":["create","delete","get","list","patch","update","watch"],"apiGroups":["maintenance.nvidia.com"],"resources":["maintenanceoperatorconfigs","nodemaintenances"]}
+        status: Satisfied
+        version: v1
+      - group: rbac.authorization.k8s.io
+        kind: PolicyRule
+        message: cluster rule:{"verbs":["update"],"apiGroups":["maintenance.nvidia.com"],"resources":["maintenanceoperatorconfigs/finalizers","nodemaintenances/finalizers"]}
+        status: Satisfied
+        version: v1
+      - group: rbac.authorization.k8s.io
+        kind: PolicyRule
+        message: cluster rule:{"verbs":["get","patch","update"],"apiGroups":["maintenance.nvidia.com"],"resources":["maintenanceoperatorconfigs/status","nodemaintenances/status"]}
+        status: Satisfied
+        version: v1
+      group: ""
+      kind: ServiceAccount
+      message: ""
+      name: maintenance-operator-controller-manager
+      status: Present
+      version: v1
+kind: List
+metadata:
+  resourceVersion: ""

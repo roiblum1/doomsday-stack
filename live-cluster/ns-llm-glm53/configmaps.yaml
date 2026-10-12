@@ -1,0 +1,230 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  data:
+    run.py: |
+      #!/usr/bin/env python3
+      """Max-concurrent-users probe for GLM-5.3 with ~100k-token distinct prompts.
+
+      Phase A: one solo 100k-token request -> measures single-prompt prefill time.
+      Phase B: 100 concurrent DISTINCT ~100k-token streaming requests -> expects
+               ~96 running (6 per DP rank x 16 ranks, KV-bound) and ~4+ queued.
+      Monitor: scrapes vLLM /metrics on both serving pods for running/waiting/KV usage.
+      """
+      import json, random, threading, time
+      from concurrent.futures import ThreadPoolExecutor
+
+      import requests
+      from transformers import AutoTokenizer
+
+      # Dedicated glm53-kserve gateway: the shared envoy-ai-gateway path buffers
+      # request bodies in the aigateway extproc (413 above ~16-64KB), the dedicated
+      # gateway's EPP ext_proc streams bodies -> no size limit.
+      URL = "http://glm53-kserve.envoy-gateway-system.svc:80/llm-glm53/glm53-b200/v1/chat/completions"
+      HEAD = {"Content-Type": "application/json"}
+      POD_IPS = ["192.0.2.78", "192.0.2.79"]  # m2q4q, sqmrm
+      TARGET_TOKENS = 99_500
+      N_USERS = 100
+      MAX_TOKENS = 128
+
+      print("[setup] loading tokenizer", flush=True)
+      tok = AutoTokenizer.from_pretrained("/models/GLM-5.3", trust_remote_code=True)
+
+      WORDS = ("the quick brown fox jumps over lazy dog system model language processing "
+               "network server cluster compute memory storage bandwidth latency throughput "
+               "research science engineering data structure algorithm quantum photon energy "
+               "market economy finance policy government city river mountain ocean forest "
+               "student teacher doctor engineer artist writer musician history future past "
+               "machine learning inference training vector matrix tensor gradient descent").split()
+
+      random.seed(1234)
+      pool, counts, total = [], [], 0
+      t0 = time.time()
+      while total < 300_000:  # ~5400 paragraphs, enough for 100 distinct requests
+          p = " ".join(random.choices(WORDS, k=52))
+          n = len(tok(p).input_ids)
+          pool.append(p)
+          counts.append(n)
+          total += n
+      print(f"[setup] paragraph pool: {len(pool)} paragraphs, {total} tokens "
+            f"({time.time()-t0:.1f}s)", flush=True)
+
+      def build_prompt(i):
+          rng = random.Random(9000 + i)
+          take = rng.sample(range(len(pool)), k=len(pool))
+          acc, j = 0, 0
+          parts = []
+          for j in take:
+              if acc + counts[j] > TARGET_TOKENS - 60:
+                  break
+              parts.append(pool[j])
+              acc += counts[j]
+          parts.append(f"Request {i}: summarize the text above in one sentence.")
+          return "\n\n".join(parts), acc
+
+      print(f"[setup] building {N_USERS + 1} distinct prompts (~{TARGET_TOKENS} tok each)",
+            flush=True)
+      t0 = time.time()
+      prompts = {}
+      for i in range(N_USERS + 1):
+          prompts[i], n = build_prompt(i)
+          assert n > TARGET_TOKENS - 4000, n
+      print(f"[setup] built in {time.time()-t0:.1f}s, sizes ok", flush=True)
+
+      RES, LOCK = {}, threading.Lock()
+      STOP = threading.Event()
+      MON = []  # (t, running, waiting, max_kv)
+
+      def monitor():
+          while not STOP.is_set():
+              run = wait = 0
+              usage, err = [], 0
+              for ip in POD_IPS:
+                  try:
+                      m = requests.get(f"http://{ip}:8000/metrics", timeout=5).text
+                      for L in m.splitlines():
+                          v = L.rsplit(" ", 1)[1]
+                          if L.startswith("vllm:num_requests_running{"):
+                              run += float(v)
+                          elif L.startswith("vllm:num_requests_waiting{"):
+                              wait += float(v)
+                          elif L.startswith("vllm:gpu_cache_usage_perc"):
+                              usage.append(float(v))
+                  except Exception:
+                      err += 1
+              MON.append((int(run), int(wait), max(usage, default=0.0)))
+              print(f"[monitor] running={int(run)} waiting={int(wait)} "
+                    f"max_kv_usage={max(usage, default=0):.3f} scrape_err={err}", flush=True)
+              time.sleep(10)
+
+      def one(i):
+          body = {"model": "glm-5.3",
+                  "messages": [{"role": "user", "content": prompts[i]}],
+                  "max_tokens": MAX_TOKENS, "stream": True}
+          t0 = time.time(); ttft = None; chunks = 0; code = -1
+          try:
+              with requests.post(URL, headers=HEAD, json=body, stream=True,
+                                 timeout=2700) as r:
+                  code = r.status_code
+                  for line in r.iter_lines():
+                      if line and line.startswith(b"data:") and b"[DONE]" not in line:
+                          if ttft is None:
+                              ttft = time.time() - t0
+                          chunks += 1
+              with LOCK:
+                  RES[i] = {"code": code, "ttft": round(ttft or -1, 2),
+                            "total": round(time.time() - t0, 1), "chunks": chunks}
+          except Exception as e:
+              with LOCK:
+                  RES[i] = {"code": code, "ttft": round(ttft or -1, 2),
+                            "total": round(time.time() - t0, 1),
+                            "err": str(e)[:150]}
+
+      # ---- Phase A: solo request ----
+      print("[phaseA] solo 100k-token request", flush=True)
+      mt = threading.Thread(target=monitor, daemon=True); mt.start()
+      one(0)
+      print(f"[phaseA] solo result: {RES[0]}", flush=True)
+
+      # ---- Phase B: 100 concurrent distinct prompts ----
+      print(f"[phaseB] firing {N_USERS} concurrent distinct 100k prompts", flush=True)
+      t0 = time.time()
+      with ThreadPoolExecutor(max_workers=N_USERS) as ex:
+          list(ex.map(one, range(1, N_USERS + 1)))
+      wall = time.time() - t0
+      STOP.set()
+
+      ok = [r for r in RES.values() if r["code"] == 200 and r["chunks"] > 0]
+      ttfts = sorted(r["ttft"] for r in ok if r["ttft"] > 0)
+      totals = sorted(r["total"] for r in ok)
+
+      def pct(a, p):
+          return a[min(len(a) - 1, int(len(a) * p))] if a else None
+
+      print("===== RESULTS =====", flush=True)
+      print(json.dumps({
+          "n_users": N_USERS,
+          "success": len(ok),
+          "failed": N_USERS - len(ok),
+          "solo_ttft_s": RES[0]["ttft"],
+          "wall_clock_s": round(wall, 1),
+          "ttft_s": {"p50": pct(ttfts, .5), "p90": pct(ttfts, .9),
+                     "p99": pct(ttfts, .99), "max": ttfts[-1] if ttfts else None},
+          "total_req_s": {"p50": pct(totals, .5), "max": totals[-1] if totals else None},
+          "peak_running": max((m[0] for m in MON), default=0),
+          "peak_waiting": max((m[1] for m in MON), default=0),
+          "peak_kv_usage": max((m[2] for m in MON), default=0),
+          "failures": [r for r in RES.values() if r["code"] != 200 or r["chunks"] == 0],
+      }, indent=2), flush=True)
+  kind: ConfigMap
+  metadata:
+    creationTimestamp: "2026-10-04T08:04:51Z"
+    name: glm53-100k-script
+    namespace: llm-glm53
+    resourceVersion: "38500415"
+    uid: 91123e03-c04c-4bbd-9b0e-d24c6837e605
+- apiVersion: v1
+  data:
+    kv-transfer-config.json: |-
+      {
+        "kv_connector": "LMCacheMPConnector",
+        "kv_connector_extra_config": {
+          "lmcache.mp.host": "tcp://glm53-cache.llm-glm53.svc.cluster.local",
+          "lmcache.mp.isolated_ipc": true,
+          "lmcache.mp.port": "5555"
+        },
+        "kv_connector_module_path": "lmcache.integration.vllm.lmcache_mp_connector",
+        "kv_role": "kv_both"
+      }
+  kind: ConfigMap
+  metadata:
+    creationTimestamp: "2026-10-06T21:24:47Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+    name: glm53-cache-connection
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: lmcache.lmcache.ai/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: LMCacheEngine
+      name: glm53-cache
+      uid: 6621d695-f3b3-464e-a597-739e5a3279fe
+    resourceVersion: "50264088"
+    uid: 91cc6b74-45b1-4984-b1fd-059eac4545c9
+- apiVersion: v1
+  data:
+    ca.crt: |
+      REDACTED-PEM-BLOCK
+      REDACTED-PEM-BLOCK
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/description: Contains a CA bundle that can be used to verify the
+        kube-apiserver when using internal endpoints such as the internal service
+        IP or kubernetes.default.svc. No other usage is guaranteed across distributions
+        of Kubernetes clusters.
+    creationTimestamp: "2026-09-29T15:13:11Z"
+    name: kube-root-ca.crt
+    namespace: llm-glm53
+    resourceVersion: "600525"
+    uid: 24ec3c80-aa5c-45fd-aaf5-2e6bbfec1c9f
+- apiVersion: v1
+  data:
+    service-ca.crt: |
+      REDACTED-PEM-BLOCK
+  kind: ConfigMap
+  metadata:
+    annotations:
+      service.beta.openshift.io/inject-cabundle: "true"
+    creationTimestamp: "2026-09-29T15:13:11Z"
+    name: openshift-service-ca.crt
+    namespace: llm-glm53
+    resourceVersion: "600535"
+    uid: 72f7fb30-1b56-4ea1-9904-5683b82fc0b6
+kind: List
+metadata:
+  resourceVersion: ""

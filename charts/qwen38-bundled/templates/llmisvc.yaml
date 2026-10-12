@@ -1,0 +1,153 @@
+# The serving workload: ONE LLMInferenceService pod on the single L4 node
+# (replicas = number of nodes), behind the llm-d router (EPP +
+# InferencePool).
+#
+# Storage: model.uri pvc://<claim>/<subPath> references the pre-created
+# PVC bound to a static `local` PV whose nodeAffinity lists ALL target
+# nodes at the same host path (each node holds its own copy, see
+# local-storage.yaml + node-prep.yaml). The controller mounts the claim
+# read-only at /mnt/models and strips the storage-initializer.
+#
+# Parallelism: TP2 x DP3 intra-node over PCIe. The EPP (InferencePool)
+# balances at rank level via the multi-port external LB ports 8000-8002.
+#
+# rolloutStrategy maxSurge 0: the default surge pod would need free GPUs
+# that don't exist -> rollout deadlock.
+#
+# Merged on the base preset kserve-config-llm-template which already runs
+# `vllm serve /mnt/models --served-model-name ... --port 8000 ... "$@"`
+# (bash eval) -> args must be single tokens (dotted keys, no JSON).
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: {{ .Values.llmisvc.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen38.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.llmisvc.replicas }}
+  model:
+    name: {{ .Values.model.name }}
+    uri: {{ include "qwen38.modelUri" . }}
+  rolloutStrategy:
+    maxSurge: {{ .Values.llmisvc.rolloutStrategy.maxSurge }}
+    maxUnavailable: {{ .Values.llmisvc.rolloutStrategy.maxUnavailable }}
+  router:
+    # The KServe router HTTPRoute attaches to the SHARED Envoy AI Gateway
+    # (the same one glm53's AIGatewayRoute uses), so there is ONE external
+    # VIP. The KServe-generated paths (/llm-qwen38/qwen38-l4/...) are more
+    # specific (longer path prefixes) than the AIGatewayRoute's model-header
+    # rules, so they never shadow them and are not translated by the
+    # extproc themselves.
+    gateway:
+      refs:
+        - name: {{ .Values.gateway.aiGateway.name }}
+          namespace: {{ .Values.gateway.aiGateway.namespace }}
+    route: {}
+    {{- with .Values.llmisvc.scheduler }}
+    scheduler:
+      # Pin the EPP to the chart's ServiceAccount instead of letting kserve
+      # mint its own <name>-epp-sa. Unpinned, the controller deep-copies the
+      # WORKLOAD SA into the epp-sa -- dragging along OpenShift's rotating
+      # dockercfg secret (s3sa-dockercfg-*), which OCM then re-adopts onto
+      # the copy, fighting the original SA's owner for it every few seconds.
+      # With this set the controller uses s3sa directly ("Using existing
+      # service account for scheduler", verified against the
+      # llmisvc-controller v0.21.0-rc1 binary) and creates no child SA.
+      template:
+        serviceAccountName: {{ $.Values.serviceAccount.name }}
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  template:
+    serviceAccountName: {{ .Values.serviceAccount.name }}
+    runtimeClassName: {{ .Values.llmisvc.runtimeClassName }}
+    schedulerName: {{ .Values.llmisvc.schedulerName }}
+    terminationGracePeriodSeconds: {{ .Values.llmisvc.terminationGracePeriodSeconds }}
+    nodeSelector:
+      nvidia.com/gpu.product: {{ .Values.nodes.gpuProduct }}
+    containers:
+      - name: main
+        image: {{ .Values.images.vllm }}
+        imagePullPolicy: IfNotPresent
+        args:
+          {{- toYaml .Values.llmisvc.args | nindent 10 }}
+          {{- if $.Values.lmcache.enabled }}
+          # --- LMCache: hand KV-cache ownership to the LMCacheMPConnector.
+          # One JSON blob, compact (no spaces). It MUST be wrapped in single
+          # quotes: the kserve preset launcher evals `vllm serve ... $@`, and
+          # in that eval re-parse a bare {"a":"b","c":"d"} hits bash BRACE
+          # EXPANSION (splits at the commas into words; quote removal then
+          # eats the double quotes) -- vLLM received "kv_connector:..." and
+          # died on json_invalid. The kserve controller's own KV_TRANSFER_ARGS
+          # wraps its OffloadingConnector JSON the same way.
+          - --kv-transfer-config
+          - {{ printf "'%s'" (include "qwen38.kvTransferConfig" $) | quote }}
+          {{- end }}
+        env:
+          {{- range $key, $value := .Values.llmisvc.env }}
+          - name: {{ $key }}
+            value: {{ $value | quote }}
+          {{- end }}
+          {{- if $.Values.lmcache.enabled }}
+          # Deterministic prefix hashing across vLLM processes and restarts
+          # (the operator's webhook sets it on injected pods too).
+          - name: PYTHONHASHSEED
+            value: "0"
+          # Skip deep_gemm's eager boot warmup (it allocates a max-M-sized
+          # buffer after the KV pool is sized -- OOM risk on the L4's 24GiB;
+          # DeepGEMM's JIT cache is persistent on the cache LV anyway, so
+          # kernels compile on first use instead of at boot).
+          - name: VLLM_DEEP_GEMM_WARMUP
+            value: "skip"
+          {{- end }}
+        resources:
+          {{- toYaml .Values.llmisvc.resources | nindent 10 }}
+        securityContext:
+          runAsNonRoot: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+              - IPC_LOCK
+        # Probes hit the vLLM API server on the preset's base port 8000:
+        # with vLLM's INTERNAL DP load balancer there is one API server
+        # process serving all DP ranks (the external multi-port supervisor
+        # on 8208 only exists in MoE-gated external-LB mode).
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: {{ .Values.llmisvc.probes.startup.periodSeconds }}
+          failureThreshold: {{ .Values.llmisvc.probes.startup.failureThreshold }}
+          timeoutSeconds: {{ .Values.llmisvc.probes.startup.timeoutSeconds }}
+        readinessProbe:
+          # /readyz does not exist in vLLM 0.29 (404 -- verified live);
+          # /health returns 200 only when the engine is serving. The
+          # startupProbe already gates the long cold boot, so /health here
+          # only flips endpoints out when the server is actually stuck.
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: {{ .Values.llmisvc.probes.readiness.periodSeconds }}
+          failureThreshold: {{ .Values.llmisvc.probes.readiness.failureThreshold }}
+          timeoutSeconds: {{ .Values.llmisvc.probes.readiness.timeoutSeconds }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: {{ .Values.llmisvc.probes.liveness.periodSeconds }}
+          failureThreshold: {{ .Values.llmisvc.probes.liveness.failureThreshold }}
+          timeoutSeconds: {{ .Values.llmisvc.probes.liveness.timeoutSeconds }}
+        volumeMounts:
+          - mountPath: /cache
+            name: compile-cache
+    volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: {{ .Values.llmisvc.volumes.dshmSize }}
+      - name: compile-cache
+        persistentVolumeClaim:
+          claimName: {{ .Values.storage.cache.pvcName }}

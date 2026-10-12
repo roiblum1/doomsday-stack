@@ -1,0 +1,73 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "hpc-observability.fullname" . }}-fabric
+  namespace: hpc-observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    {{- include "hpc-observability.labels" . | nindent 4 }}
+    hpc.observability/mode: fabric
+spec:
+  endpoints:
+    - interval: {{ .Values.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+      path: /metrics
+      port: fabric-metrics
+      relabelings:
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_pod_node_name
+          targetLabel: node
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_pod_name
+          targetLabel: pod
+        - action: replace
+          replacement: {{ .Values.clusterId | default .Values.global.clusterName }}
+          targetLabel: cluster_id
+  jobLabel: {{ include "hpc-observability.fullname" . }}-fabric
+  namespaceSelector:
+    matchNames:
+      - hpc-observability
+  selector:
+    matchLabels:
+      {{- include "hpc-observability.selectorLabels" . | nindent 6 }}
+      hpc.observability/mode: fabric
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "hpc-observability.fullname" . }}-node
+  namespace: hpc-observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    {{- include "hpc-observability.labels" . | nindent 4 }}
+    hpc.observability/mode: node
+spec:
+  endpoints:
+    - interval: {{ .Values.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+      path: /metrics
+      port: node-metrics
+      relabelings:
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_pod_node_name
+          targetLabel: node
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_pod_name
+          targetLabel: pod
+        - action: replace
+          replacement: {{ .Values.clusterId | default .Values.global.clusterName }}
+          targetLabel: cluster_id
+  jobLabel: {{ include "hpc-observability.fullname" . }}-node
+  namespaceSelector:
+    matchNames:
+      - hpc-observability
+  selector:
+    matchLabels:
+      {{- include "hpc-observability.selectorLabels" . | nindent 6 }}
+      hpc.observability/mode: node

@@ -1,0 +1,68 @@
+apiVersion: v1
+items:
+- apiVersion: cert-manager.io/v1
+  kind: CertificateRequest
+  metadata:
+    annotations:
+      cert-manager.io/certificate-name: lmcache-operator-serving-cert
+      cert-manager.io/certificate-revision: "1"
+      cert-manager.io/private-key-secret-name: lmcache-operator-serving-cert-5rg6v
+    creationTimestamp: "2026-10-06T21:24:16Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: lmcache
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: lmcache-operator
+      app.kubernetes.io/part-of: lmcache
+      app.kubernetes.io/version: v0.5.5
+      helm.sh/chart: lmcache-operator-openshift-0.1.0
+    name: lmcache-operator-serving-cert-1
+    namespace: lmcache-operator-system
+    ownerReferences:
+    - apiVersion: cert-manager.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Certificate
+      name: lmcache-operator-serving-cert
+      uid: 0df1d50a-7900-47d7-bda4-ef724fccf6d2
+    resourceVersion: "50263762"
+    uid: 2e33511a-8499-451f-a07d-a55da3a04b9c
+  spec:
+    extra:
+      authentication.kubernetes.io/credential-id:
+      - JTI=1c7260bb-42bd-4da0-a7bd-b0432bcaf46d
+      authentication.kubernetes.io/node-name:
+      - gpu-node-x
+      authentication.kubernetes.io/node-uid:
+      - 3b1e5686-2954-4841-89c9-02a404699ce0
+      authentication.kubernetes.io/pod-name:
+      - cert-manager-6b54cd75d9-qw9rm
+      authentication.kubernetes.io/pod-uid:
+      - 685558be-bf3d-47d5-b2f7-5cb880de2c98
+    groups:
+    - system:serviceaccounts
+    - system:serviceaccounts:cert-manager
+    - system:authenticated
+    issuerRef:
+      kind: Issuer
+      name: lmcache-operator-selfsigned-issuer
+    request: REDACTED-B64
+    uid: 04b7811e-0107-461a-a8d7-e148646b7b91
+    username: system:serviceaccount:cert-manager:cert-manager
+  status:
+    ca: REDACTED-B64
+    certificate: REDACTED-B64
+    conditions:
+    - lastTransitionTime: "2026-10-06T21:24:16Z"
+      message: Certificate request has been approved by cert-manager.io
+      reason: cert-manager.io
+      status: "True"
+      type: Approved
+    - lastTransitionTime: "2026-10-06T21:24:16Z"
+      message: Certificate fetched from issuer successfully
+      reason: Issued
+      status: "True"
+      type: Ready
+kind: List
+metadata:
+  resourceVersion: ""

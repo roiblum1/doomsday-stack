@@ -1,0 +1,9 @@
+name: nfd
+projectNamespace: openshift-nfd
+repourl: 'https://git.example.internal/popai/helm-charts/nfd-chart.git'
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true

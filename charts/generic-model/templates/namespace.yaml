@@ -1,0 +1,17 @@
+{{- include "genericmodel.requiredChecks" . }}
+# Namespace for everything the chart deploys. Applied first so plain
+# `oc apply -f` (non-Helm) installs also work in one shot.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  labels:
+    {{- include "genericmodel.labels" . | nindent 4 }}
+    {{- if and .Values.lmcache.enabled .Values.lmcache.prometheus.enabled .Values.lmcache.prometheus.serviceMonitor.enabled }}
+    # Lets the platform Prometheus (openshift-monitoring k8s instance, which
+    # selects ServiceMonitors only from namespaces carrying this label --
+    # hpc-observability does the same) scrape the LMCache engine's
+    # ServiceMonitor. thanos-querier fronts it, which is what the POPAI
+    # Grafana's prometheus datasource queries.
+    openshift.io/cluster-monitoring: "true"
+    {{- end }}

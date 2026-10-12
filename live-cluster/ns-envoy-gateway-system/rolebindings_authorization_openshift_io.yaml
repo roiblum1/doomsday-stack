@@ -1,0 +1,224 @@
+apiVersion: v1
+items:
+- apiVersion: authorization.openshift.io/v1
+  groupNames:
+  - system:serviceaccounts:envoy-gateway-system
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/sync-wave: "-5"
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-ai-deploy:rbac.authorization.k8s.io/RoleBinding:envoy-gateway-system/envoy-ai-envoy-ai-gateway-openshift-scc-use-dataplane
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-07T22:44:37Z"
+    labels:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: envoy-ai-gateway-openshift
+      app.kubernetes.io/part-of: envoy-ai-gateway
+      helm.sh/chart: envoy-ai-gateway-openshift-0.1.0
+    name: envoy-ai-envoy-ai-gateway-openshift-scc-use-dataplane
+    namespace: envoy-gateway-system
+    resourceVersion: "54492368"
+    uid: cba75d61-73c7-417e-bbab-5d4862642b8b
+  roleRef:
+    name: envoy-ai-envoy-ai-gateway-openshift-scc-use
+  subjects:
+  - kind: SystemGroup
+    name: system:serviceaccounts:envoy-gateway-system
+  userNames: null
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-gateway-deploy:rbac.authorization.k8s.io/RoleBinding:envoy-gateway-system/envoy-gateway-certgen
+      helm.sh/hook: pre-install, pre-upgrade
+      helm.sh/hook-weight: "-1"
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-11T17:14:50Z"
+    labels:
+      app.kubernetes.io/instance: envoy-gateway
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: gateway-helm
+      app.kubernetes.io/version: v1.9.2
+      helm.sh/chart: envoy-gateway-v1.9.2
+    name: envoy-gateway-certgen
+    namespace: envoy-gateway-system
+    resourceVersion: "54313245"
+    uid: 0a11fc33-87b0-47b9-8c60-92e0802498e3
+  roleRef:
+    name: envoy-gateway-certgen
+    namespace: envoy-gateway-system
+  subjects:
+  - kind: ServiceAccount
+    name: envoy-gateway-certgen
+    namespace: envoy-gateway-system
+  userNames:
+  - system:serviceaccount:envoy-gateway-system:envoy-gateway-certgen
+- apiVersion: authorization.openshift.io/v1
+  groupNames:
+  - system:serviceaccounts:envoy-gateway-system
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-gateway-deploy:rbac.authorization.k8s.io/RoleBinding:envoy-gateway-system/envoy-gateway-envoy-gateway-openshift-scc-nonroot-v2
+      helm.sh/hook: pre-install,pre-upgrade
+      helm.sh/hook-delete-policy: before-hook-creation
+      helm.sh/hook-weight: "-5"
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-11T17:14:44Z"
+    labels:
+      app.kubernetes.io/instance: envoy-gateway
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: envoy-gateway-openshift
+      app.kubernetes.io/part-of: envoy-ai-gateway
+      helm.sh/chart: envoy-gateway-openshift-0.1.0
+    name: envoy-gateway-envoy-gateway-openshift-scc-nonroot-v2
+    namespace: envoy-gateway-system
+    resourceVersion: "54313148"
+    uid: c43d6b1b-5138-4e09-aa62-489934c8c19d
+  roleRef:
+    name: system:openshift:scc:nonroot-v2
+  subjects:
+  - kind: SystemGroup
+    name: system:serviceaccounts:envoy-gateway-system
+  userNames: null
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-gateway-deploy:rbac.authorization.k8s.io/RoleBinding:envoy-gateway-system/envoy-gateway-infra-manager
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T13:28:40Z"
+    labels:
+      app.kubernetes.io/instance: envoy-gateway
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: gateway-helm
+      app.kubernetes.io/version: v1.9.2
+      helm.sh/chart: envoy-gateway-v1.9.2
+    name: envoy-gateway-infra-manager
+    namespace: envoy-gateway-system
+    resourceVersion: "54288178"
+    uid: 3bb591d9-d820-4702-b211-70a848151c6a
+  roleRef:
+    name: envoy-gateway-infra-manager
+    namespace: envoy-gateway-system
+  subjects:
+  - kind: ServiceAccount
+    name: envoy-gateway
+    namespace: envoy-gateway-system
+  userNames:
+  - system:serviceaccount:envoy-gateway-system:envoy-gateway
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-gateway-deploy:rbac.authorization.k8s.io/RoleBinding:envoy-gateway-system/envoy-gateway-leader-election-rolebinding
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T13:28:40Z"
+    labels:
+      app.kubernetes.io/instance: envoy-gateway
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: gateway-helm
+      app.kubernetes.io/version: v1.9.2
+      helm.sh/chart: envoy-gateway-v1.9.2
+    name: envoy-gateway-leader-election-rolebinding
+    namespace: envoy-gateway-system
+    resourceVersion: "54288179"
+    uid: fb7bf668-8d1f-485d-9bc2-76e77b088b65
+  roleRef:
+    name: envoy-gateway-leader-election-role
+    namespace: envoy-gateway-system
+  subjects:
+  - kind: ServiceAccount
+    name: envoy-gateway
+    namespace: envoy-gateway-system
+  userNames:
+  - system:serviceaccount:envoy-gateway-system:envoy-gateway
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-11T20:46:15Z"
+    labels:
+      app.kubernetes.io/managed-by: envoy-ai-gateway-observability
+    name: prometheus-k8s
+    namespace: envoy-gateway-system
+    resourceVersion: "54437003"
+    uid: 2785e137-235c-432f-9c45-392795bbd824
+  roleRef:
+    name: prometheus-k8s
+    namespace: envoy-gateway-system
+  subjects:
+  - kind: ServiceAccount
+    name: prometheus-k8s
+    namespace: openshift-monitoring
+  userNames:
+  - system:serviceaccount:openshift-monitoring:prometheus-k8s
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows deploymentconfigs in this namespace to rollout
+        pods in this namespace.  It is auto-managed by a controller; remove subjects
+        to disable.
+    creationTimestamp: "2026-09-29T13:11:55Z"
+    name: system:deployers
+    namespace: envoy-gateway-system
+    resourceVersion: "530357"
+    uid: 8393c110-1c33-4b44-9f9b-c9e9cec06408
+  roleRef:
+    name: system:deployer
+  subjects:
+  - kind: ServiceAccount
+    name: deployer
+    namespace: envoy-gateway-system
+  userNames:
+  - system:serviceaccount:envoy-gateway-system:deployer
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows builds in this namespace to push images to
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-09-29T13:11:55Z"
+    name: system:image-builders
+    namespace: envoy-gateway-system
+    resourceVersion: "530358"
+    uid: 5ba8a56c-26f9-4b81-9e46-6944a0f71603
+  roleRef:
+    name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    name: builder
+    namespace: envoy-gateway-system
+  userNames:
+  - system:serviceaccount:envoy-gateway-system:builder
+- apiVersion: authorization.openshift.io/v1
+  groupNames:
+  - system:serviceaccounts:envoy-gateway-system
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows all pods in this namespace to pull images from
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-09-29T13:11:55Z"
+    name: system:image-pullers
+    namespace: envoy-gateway-system
+    resourceVersion: "530359"
+    uid: d6fdc4bc-dafe-4400-a597-46e05119cfa9
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:serviceaccounts:envoy-gateway-system
+  userNames: null
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,37 @@
+apiVersion: v1
+items:
+- apiVersion: cert-manager.io/v1
+  kind: Certificate
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-kserve-deploy:cert-manager.io/Certificate:kserve/llmisvc-serving-cert
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T15:01:10Z"
+    generation: 1
+    name: llmisvc-serving-cert
+    namespace: kserve
+    resourceVersion: "593980"
+    uid: 2aefe651-fe2c-4d73-ab3f-bceef6d92666
+  spec:
+    commonName: llmisvc-webhook-server-service.kserve.svc
+    dnsNames:
+    - llmisvc-webhook-server-service.kserve.svc
+    issuerRef:
+      kind: Issuer
+      name: selfsigned-issuer
+    secretName: llmisvc-webhook-server-cert
+  status:
+    conditions:
+    - lastTransitionTime: "2026-09-29T15:01:11Z"
+      message: Certificate is up to date and has not expired
+      observedGeneration: 1
+      reason: Ready
+      status: "True"
+      type: Ready
+    notAfter: "2026-12-28T15:01:11Z"
+    notBefore: "2026-09-29T15:01:11Z"
+    renewalTime: "2026-11-28T15:01:11Z"
+    revision: 1
+kind: List
+metadata:
+  resourceVersion: ""

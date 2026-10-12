@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: openshift-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      serviceAccountName: grafana
+      initContainers:
+        - name: setup-datasource
+          image: {{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              TOKEN=$(cat /var/run/secrets/grafana/token)
+              mkdir -p /etc/grafana/provisioning/datasources
+              cat > /etc/grafana/provisioning/datasources/datasource.yaml <<DS
+              apiVersion: 1
+              # Remove any datasource that is no longer provisioned below (e.g. the
+              # removed prometheus-tools datasource). Without this, Grafana keeps
+              # read-only provisioned datasources even after they vanish from the file.
+              deleteDatasources:
+              - name: prometheus-tools
+                orgId: 1
+              datasources:
+              - name: Prometheus
+                uid: prometheus
+                type: prometheus
+                url: https://thanos-querier.openshift-monitoring.svc:9091
+                access: proxy
+                isDefault: true
+                editable: false
+                jsonData:
+                  httpHeaderName1: Authorization
+                  tlsSkipVerify: true
+                secureJsonData:
+                  httpHeaderValue1: Bearer $TOKEN
+              DS
+          volumeMounts:
+            - mountPath: /etc/grafana/provisioning/datasources
+              name: grafana-datasources
+            - mountPath: /var/run/secrets/grafana
+              name: grafana-token
+              readOnly: true
+      containers:
+        - name: grafana
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: REDACTED-ENV
+            - name: GF_INSTALL_PLUGINS
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: /var/lib/grafana
+              name: grafana-storage
+            - mountPath: /etc/grafana/grafana.ini
+              name: grafana-config
+              subPath: grafana.ini
+            - mountPath: /etc/grafana/provisioning/datasources
+              name: grafana-datasources
+            - mountPath: /etc/grafana/provisioning/dashboards
+              name: grafana-dashboards-provider
+              readOnly: true
+            - mountPath: /var/lib/grafana/dashboards
+              name: grafana-dashboards
+              readOnly: true
+      volumes:
+        - name: grafana-storage
+          persistentVolumeClaim:
+            claimName: grafana-data
+        - configMap:
+            name: grafana-config
+          name: grafana-config
+        - emptyDir: {}
+          name: grafana-datasources
+        - configMap:
+            name: grafana-dashboards-provider
+          name: grafana-dashboards-provider
+        # Projected volume combines the per-dashboard ConfigMaps into
+        # /var/lib/grafana/dashboards (one file per dashboard).
+        - name: grafana-dashboards
+          projected:
+            sources:
+              {{- range $path, $_ := .Files.Glob "files/dashboards/*.json" }}
+              - configMap:
+                  name: grafana-dashboard-{{ base $path | trimSuffix ".json" }}
+              {{- end }}
+        - name: grafana-token
+          secret:
+            secretName: grafana-token

@@ -1,0 +1,71 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-04T11:20:18Z"
+    creationTimestamp: "2026-09-29T15:01:10Z"
+    labels:
+      app.kubernetes.io/component: controller
+      app.kubernetes.io/instance: kserve
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: llmisvc-controller-manager
+      app.kubernetes.io/version: v0.21.0-rc1
+      control-plane: llmisvc-controller-manager
+      controller-tools.k8s.io: "1.0"
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+      helm.sh/chart: kserve-llmisvc-resources-v0.21.0-rc1
+    name: llmisvc-controller-manager-service
+    namespace: kserve
+    resourceVersion: "39194739"
+    uid: 85a2f53d-9bce-40ce-94e0-f734f9b37a98
+  subsets:
+  - addresses:
+    - ip: 192.0.2.112
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: llmisvc-controller-manager-555889c9b5-6j2rq
+        namespace: kserve
+        uid: eea59cbe-c7a2-4355-9514-226bb679f061
+    ports:
+    - name: https
+      port: 8443
+      protocol: TCP
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-04T11:20:18Z"
+    creationTimestamp: "2026-09-29T15:01:10Z"
+    labels:
+      app.kubernetes.io/component: controller
+      app.kubernetes.io/instance: kserve
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: llmisvc-controller-manager
+      app.kubernetes.io/version: v0.21.0-rc1
+      control-plane: llmisvc-controller-manager
+      controller-tools.k8s.io: "1.0"
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+      helm.sh/chart: kserve-llmisvc-resources-v0.21.0-rc1
+    name: llmisvc-webhook-server-service
+    namespace: kserve
+    resourceVersion: "39194738"
+    uid: 018a6cd0-6e62-4e3e-a9df-b4c242389256
+  subsets:
+  - addresses:
+    - ip: 192.0.2.112
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: llmisvc-controller-manager-555889c9b5-6j2rq
+        namespace: kserve
+        uid: eea59cbe-c7a2-4355-9514-226bb679f061
+    ports:
+    - name: https
+      port: 9443
+      protocol: TCP
+kind: List
+metadata:
+  resourceVersion: ""

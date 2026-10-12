@@ -1,0 +1,147 @@
+{{- if .Values.lmcache.enabled }}
+{{- $l := .Values.lmcache }}
+{{- if $l.l2.enabled }}
+{{- if ge (float64 $l.l2.maxCapacityGB) (float64 (regexReplaceAll "Gi$" .Values.storage.l2.pvSize "")) }}
+{{- fail (printf "lmcache.l2.maxCapacityGB (%v) must be smaller than storage.l2.pvSize (%v)" $l.l2.maxCapacityGB .Values.storage.l2.pvSize) }}
+{{- end }}
+{{- end }}
+{{- if mod (int $l.server.chunkSize) 1600 }}
+{{- fail "lmcache.server.chunkSize must be a multiple of 1600 (Qwen3_5 hybrid-attention block alignment at TP4+MTP; measured at connector init: 784 at TP2/no-spec, 1600 at TP4+spec)" }}
+{{- end }}
+# One LMCache engine per L4 node (DaemonSet the lmcache operator runs) plus
+# the ServiceAccount/SCC binding its pods need. Wave -1: apply (and start)
+# before the LLMInferenceService at wave 0, which points vLLM's
+# --kv-transfer-config at the engine's node-local Service.
+#
+# Field names mirror the operator's CRD exactly (v0.5.5) and the values
+# mirror the upstream lmcache-engine chart that ships in the operator package;
+# see docs/03-connect-vllm.md there for the connector geometry:
+#   - the operator creates Service <name> with internalTrafficPolicy: Local,
+#     so each vLLM pod only ever reaches the engine on its own node (CUDA IPC
+#     is same-node only);
+#   - a vLLM pod on a node whose engine is down has NO endpoint -- the EPP's
+#     prefix-cache-scorer keeps a prefix on the pod/node that already has it.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $l.serviceAccountName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen38.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+---
+{{- if .Values.scc.create }}
+# Root (RunAsAny) for the upstream engine image, local-static PVC for the
+# L2 disk tier. The Role comes from templates/scc.yaml; the SCC forbids
+# privileged containers, so lmcache.privileged: true would need a different
+# binding (see the note in values.yaml).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $l.serviceAccountName }}-use-{{ .Values.scc.name }}-scc
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen38.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: use-{{ .Values.scc.name }}-scc
+subjects:
+  - kind: ServiceAccount
+    name: {{ $l.serviceAccountName }}
+    namespace: {{ .Values.namespace }}
+{{- end }}
+---
+apiVersion: lmcache.lmcache.ai/v1alpha1
+kind: LMCacheEngine
+metadata:
+  name: {{ $l.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen38.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  image:
+    repository: {{ $l.image.repository }}
+    tag: {{ $l.image.tag | quote }}
+    pullPolicy: {{ $l.image.pullPolicy }}
+  isolatedIPC: {{ $l.isolatedIPC }}
+  privileged: {{ $l.privileged }}
+  gpuVendor: {{ $l.gpuVendor }}
+  hostIPC: {{ $l.hostIPC }}
+  hostNetwork: {{ $l.hostNetwork }}
+  logLevel: {{ $l.logLevel }}
+  serviceAccountName: {{ $l.serviceAccountName }}
+  {{- with $l.priorityClassName }}
+  priorityClassName: {{ . }}
+  {{- end }}
+  nodeSelector:
+    {{- toYaml $l.nodeSelector | nindent 4 }}
+  server:
+    port: {{ $l.server.port }}
+    httpPort: {{ $l.server.httpPort }}
+    # CRD default is 256, which the vLLM connector rejects for this model
+    # (needs a multiple of 784). Rendered explicitly so the guard above
+    # matches what actually lands.
+    chunkSize: {{ $l.server.chunkSize }}
+    hashAlgorithm: {{ $l.server.hashAlgorithm }}
+  # v0.5.5 serves /metrics on the http frontend (httpPort); the operator's
+  # --prometheus-port flag is inert in the engine. Point the operator's
+  # metrics Service + ServiceMonitor at the real listener; the platform
+  # Prometheus scrapes it via the namespace label (see monitoring-rbac.yaml).
+  prometheus:
+    enabled: {{ $l.prometheus.enabled }}
+    port: {{ $l.prometheus.port }}
+    serviceMonitor:
+      enabled: {{ $l.prometheus.serviceMonitor.enabled }}
+      interval: {{ $l.prometheus.serviceMonitor.interval }}
+  l1:
+    sizeGB: {{ $l.l1.sizeGB }}
+  # Top-level: it governs the pinned-RAM L1 tier.
+  eviction:
+    policy: {{ $l.eviction.policy }}
+    triggerWatermark: {{ $l.eviction.triggerWatermark }}
+    evictionRatio: {{ $l.eviction.evictionRatio }}
+  {{- if $l.l2.enabled }}
+  l2Backend:
+    storePolicy: {{ $l.l2.storePolicy }}
+    prefetchPolicy: {{ $l.l2.prefetchPolicy }}
+    prefetchMaxInFlight: {{ $l.l2.prefetchMaxInFlight }}
+    raw:
+      type: nixl_store_dynamic
+      config:
+        backend: POSIX
+        # NIXL backend params are strings.
+        backend_params:
+          file_path: {{ $l.l2.mountPath }}
+          use_direct_io: {{ $l.l2.directIO | toString | quote }}
+          max_capacity_gb: {{ $l.l2.maxCapacityGB | toString | quote }}
+          shard_dirs: {{ $l.l2.shardDirs | toString | quote }}
+        persist_enabled: {{ $l.l2.persist }}
+        eviction:
+          eviction_policy: {{ $l.l2.eviction.policy }}
+          trigger_watermark: {{ $l.l2.eviction.triggerWatermark }}
+          eviction_ratio: {{ $l.l2.eviction.evictionRatio }}
+  {{- end }}
+  {{- with $l.env }}
+  env:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if $l.l2.enabled }}
+  # Stable L2: pre-created local-static PVC (templates/local-storage.yaml),
+  # backed by the node-prep-managed vg1/llm-l2 LV on the L4 node. The
+  # local PV gives the engine pod its own node's volume, and the claim is
+  # not pod-owned, so cache data survives DaemonSet rolls.
+  volumes:
+    - name: l2
+      persistentVolumeClaim:
+        claimName: {{ .Values.storage.l2.pvcName }}
+  volumeMounts:
+    - name: l2
+      mountPath: {{ $l.l2.mountPath }}
+  {{- end }}
+{{- end }}

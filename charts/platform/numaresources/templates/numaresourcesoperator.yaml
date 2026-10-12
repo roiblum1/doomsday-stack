@@ -1,0 +1,13 @@
+{{- if .Values.numaResourcesOperator.enabled }}
+apiVersion: nodetopology.openshift.io/v1
+kind: NUMAResourcesOperator
+metadata:
+  name: {{ .Values.numaResourcesOperator.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    {{- include "nrop.labels" . | nindent 4 }}
+spec:
+  {{- toYaml .Values.numaResourcesOperator.spec | nindent 2 }}
+{{- end }}

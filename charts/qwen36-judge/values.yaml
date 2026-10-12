@@ -1,0 +1,261 @@
+# Qwen3.6-35B-A3B-FP8 judge on the L4 GPU node -- deployment values.
+#
+# Mission: an independent, always-warm judge model for the Claude Code
+# PreToolUse hook (verdicts: allow / ask / deny). Different model family
+# from GLM-5.3 so the judge is never the agent grading itself.
+#
+# Layout follows glm53-chart (the proven B200 deployment); every
+# deviation is justified in docs/RECIPE.md. Nothing cluster-specific is
+# hardcoded in the templates.
+
+namespace: llm-judge
+nameOverride: qwen36-judge
+
+# --- target node -------------------------------------------------------------
+nodes:
+  # Label the vLLM pods select on. The L4 server carries the standard
+  # GPU-operator label nvidia.com/gpu.product (verified present on the
+  # joined node).
+  gpuProduct: NVIDIA-L4
+
+# --- model + S3 source ---------------------------------------------------------
+model:
+  # vLLM served-model-name (the kserve base preset also serves
+  # publishers/llm-judge/models/judge alongside it). The judge hook sends
+  # this as the OpenAI "model" field.
+  name: judge
+  # DEVIATION from glm53-chart (which pre-pulls to a PVC): the L4 node
+  # has NO LVMS (a single NVMe -- LVMS needs two), so there is no PVC to
+  # pre-warm. Instead the KServe storage-initializer downloads the model
+  # straight from S3 into the pod's emptyDir at /mnt/models on every pod
+  # start (35 GB at the ~3 GB/s FlashGrid rates measured for glm53 =
+  # well under a minute; startup budget is 30 min anyway). Same pattern
+  # as the proven qwen-3-8-27b-fp8 / qwen3.5-35b-a3b L4 deployments.
+  #
+  # The original ask was s3://mce-site-b-bucket/Qwen3.6-35B-A3B-FP8, but
+  # the credentials handed over for that bucket are rejected
+  # (InvalidAccessKeyId) on every endpoint reachable from this cluster,
+  # while the bucket itself exists (403) on zone-a2/site-b-r1/site-a-r1/
+  # zone-b1/stage-zone-a2/zone-c1. The IDENTICAL model dir (57 files,
+  # 34.9 GB, config/tokenizer/safetensors verified complete) already
+  # lives in the shared llms bucket with working credentials. If valid
+  # mce-site-b-bucket keys ever arrive, switch this uri + the judge-s3
+  # secret (see docs/RECIPE.md "Getting the model in").
+  uri: s3://llms/Qwen/Qwen3.6-35B-A3B-FP8
+
+# S3 credentials. NEVER put real keys in values files -- default is an
+# out-of-band secret the chart's s3sa ServiceAccount links. The KServe
+# controller reads the linked secret and injects the creds into the
+# storage-initializer:
+#   - data keys AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY -> credentials
+#   - the serving.kserve.io/s3-endpoint ANNOTATION (must carry the
+#     http:// prefix so plain HTTP is used) -> AWS_ENDPOINT_URL.
+# *** REQUIRED OUT-OF-BAND SECRET (keys are the secret's KEY names):
+#   kubectl -n llm-judge create secret generic judge-s3 \
+#     --from-literal=AWS_ACCESS_KEY_ID=<key> \
+#     --from-literal=AWS_SECRET_ACCESS_KEY=<secret>
+#   kubectl -n llm-judge annotate secret judge-s3 \
+#     serving.kserve.io/s3-endpoint=http://host.example.internal
+# (zone-a1 is where the llms bucket's credentials are valid; site-a-r1
+# rejects them -- see docs/RECIPE.md "Getting the model in".)
+s3:
+  create: false
+  secretName: judge-s3
+  # Only used when create: true (test installs via --set-file etc.):
+  endpoint: http://host.example.internal
+  region: us-east-1
+  accessKeyId: ""
+  secretAccessKey: ""
+
+# --- service account / SCC --------------------------------------------------------
+serviceAccount:
+  name: s3sa
+
+scc:
+  # Cluster-scoped SecurityContextConstraints object name -- creating it
+  # requires cluster-admin.
+  name: qwen36-judge-model-serving
+  create: true
+
+# --- images ------------------------------------------------------------------------
+images:
+  # Plain vLLM (no LMCache -- see docs/RECIPE.md; nothing shares a KV cache
+  # with the judge, and vLLM's own prefix cache covers the repeated
+  # system prompt + policy). v0.30.0 is the newest plain vllm-openai
+  # build mirrored in artifactory and bundles flashinfer cubins
+  # (air-gap requirement). If the Qwen3.6 arch is missing at smoke-test
+  # time, pick a newer mirrored vllm-openai build -- see RECIPE.md.
+  vllm: registry-internal/vllm/vllm-openai:v0.30.0
+  # KServe storage-initializer mirror, pinned to the installed
+  # llmisvc-controller version (v0.21.0-rc1). The cluster's
+  # inferenceservice-config defaults to docker.io
+  # kserve/storage-initializer:latest and the IDMS does NOT mirror
+  # docker.io -- without this initContainer image override the pod dies
+  # in ImagePullBackOff. The controller merges the override: our
+  # image/resources win, its args/command win.
+  storageInitializer: registry-internal/kserve/kserve/storage-initializer:v0.21.0-rc1
+
+
+# --- gateways ---------------------------------------------------------------------
+# ONE shared Gateway for everything, same as glm53-chart: the VIP
+# 192.0.2.7. The AIGatewayRoute attaches to it (model-header rules)
+# AND the KServe router HTTPRoute attaches to it as well (path rules
+# /llm-judge/qwen36-judge/... and /publishers/llm-judge/...).
+gateway:
+  aiGateway:
+    name: envoy-ai-gateway
+    namespace: envoy-ai-gateway-system
+    listener: http
+
+# --- the LLMInferenceService -------------------------------------------------------
+llmisvc:
+  name: qwen36-judge
+
+  # NOTE: runtimeClassName / priorityClassName are deliberately NOT set
+  # and MUST stay unset: on the proven L4 (qwen-3-5-35b-a3b /
+  # qwen-3-8-27b-fp8) deployments the kserve preset merge only stays out
+  # of the way when they are omitted (it would otherwise add
+  # node-role.kubernetes.io/roce, which the L4 node does not carry).
+  # The pod nodeSelector below is what pins us to the L4 node.
+
+  schedulerName: default-scheduler
+  terminationGracePeriodSeconds: 300
+
+  # Parallelism via the CRD field: the base preset renders
+  # --tensor-parallel-size from spec.parallelism.tensor. Do NOT also pass
+  # --tensor-parallel-size in args (duplicate flag).
+  # TP2: the FP8 weights are ~35 GB and do not fit one 24 GB L4; two L4s
+  # leave ~6 GB/GPU for KV cache at 16384 ctx. L4s have no NVLink -- going
+  # wider than 2 only adds PCIe hops (see RECIPE.md).
+  parallelism:
+    tensor: 2
+
+  # Extra vLLM args. The kserve base preset evals
+  #   `vllm serve /mnt/models --served-model-name judge
+  #    publishers/llm-judge/models/judge --port 8000 ... "$@"`
+  # so every arg here must be ONE token (dotted key=value, no spaces) and
+  # JSON blobs need TWO levels of quoting:
+  #   1. YAML double quotes (a bare arg containing ": " parses as a map,
+  #      not a string -- caught by server-side dry-run)
+  #   2. single quotes around the JSON INSIDE the arg, because the preset
+  #      launcher evals `vllm serve ... "$@"` and a bare {"a":"b"} there
+  #      hits bash brace expansion (same trap as glm53-chart's
+  #      --kv-transfer-config).
+  args:
+    - --max-model-len=16384
+    # Qwen3.6 hybrid linear-attention (GDN/Mamba) layers need ONE state
+    # block per decode sequence. On 24 GB L4s the default max_num_seqs
+    # (256) exceeds available Mamba blocks (~175) -> crash at CUDA graph
+    # capture. 128 is far above judge concurrency (~1-3) and keeps the
+    # KV cache at ~130k tokens (~8 concurrent 16k requests).
+    - --max-num-seqs=128
+    - --reasoning-parser=qwen3
+    # Judge calls always send the same system prompt + policy first:
+    # prefix caching makes those tokens nearly free on every call.
+    - --enable-prefix-caching
+    # Gateway billing (envoy-ai-gateway): report cached_tokens so the CEL
+    # price charges the cached rate (without it every cached token is
+    # billed at the full input rate), and force usage into streamed chunks
+    # so the gateway can meter streaming answers.
+    - --enable-prompt-tokens-details
+    - --enable-force-include-usage
+    # Thinking OFF: the judge must answer in a fixed schema; reasoning
+    # tokens would burn the output budget and the latency budget.
+    - "--default-chat-template-kwargs='{\"enable_thinking\": false}'"
+    # Text-only judge: refuse any multimodal input paths.
+    - "--limit-mm-per-prompt='{\"image\":0,\"video\":0}'"
+    - --trust-remote-code
+
+  env:
+    HF_HUB_OFFLINE: "1"
+    TRANSFORMERS_OFFLINE: "1"
+    VLLM_ENGINE_READY_TIMEOUT_S: "1800"
+    # TP2 crosses GPUs inside ONE node over PCIe only: NCCL must not try
+    # RoCE/IB (no NVLink on L4, no multi-node here).
+    NCCL_IB_DISABLE: "1"
+
+  resources:
+    requests:
+      cpu: "16"
+      memory: 64Gi
+      nvidia.com/gpu: "2"
+    limits:
+      cpu: "32"
+      memory: 128Gi
+      nvidia.com/gpu: "2"
+
+  probes:
+    # Startup = S3 download (35 GB, under a minute on the measured
+    # FlashGrid rates) + weight load across 2x L4 + CUDA graph capture +
+    # torch.compile JIT: budget 30 min (matching the proven L4 charts),
+    # then tight liveness/readiness.
+    startup:
+      periodSeconds: 5
+      failureThreshold: 360
+      timeoutSeconds: 5
+    readiness:
+      periodSeconds: 10
+      failureThreshold: 60
+      timeoutSeconds: 5
+    liveness:
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 10
+
+  # --- autoscaling (WVA -> KEDA -> HPA) -------------------------------------
+  # DEFAULT OFF, flipped on with the day-2 upgrade below. A spec.scaling
+  # block is NOT inert without WVA/KEDA: the llmisvc-controller
+  # error-loops "ReconcileScalingError ... autoscaling-wva-controller-
+  # config.prometheus.url is required in inferenceservice-config when
+  # using KEDA" (verified live 2026-10-07 -- it still serves, but the
+  # reconcile is dirty). Enabling requires ALL of:
+  #   1. KEDA (Custom Metrics Autoscaler / kedacore chart 2.18.0)
+  #   2. WVA controller (oci://ghcr.io/llm-d/workload-variant-autoscaler
+  #      v0.7.0, ns wva-system) pointed at a Prometheus that scrapes
+  #      the judge pods -- user-workload monitoring is already enabled
+  #   3. inferenceservice-config: autoscaling-wva-controller-config
+  #      .prometheus.url set to that Prometheus (cluster-level config,
+  #      platform-managed -- see docs/RECIPE.md #6)
+  #   4. KEDA/WVA images mirrored into registry-internal (air-gap)
+  # Then: helm upgrade --install qwen36-judge . -n llm-judge \
+  #         --set llmisvc.scaling.enabled=true
+  # minReplicas MUST stay 1: a cold judge pod takes minutes to load
+  # weights, and during that window every hook call would time out and
+  # fall back to asking the human.
+  # maxReplicas 3 = 6 of 8 L4s, leaving 2 for the RAG embedder/reranker.
+  scaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    wva:
+      keda:
+        pollingInterval: 5
+        cooldownPeriod: 30
+
+# --- Envoy AI Gateway route -------------------------------------------------------
+aigatewayRoute:
+  enabled: true
+  name: qwen36-judge
+  headerName: x-ai-eg-model
+  # Long thinking-free generations still finish in seconds; 600s covers
+  # a 16k-token worst-case prompt with a cold cache.
+  requestTimeout: 600s
+
+# --- direct OpenAI backend (quota path) -----------------------------------------
+# Same pattern as glm53-chart's anthropicBackend, one protocol over: a
+# rule for the short model name backed by an AIServiceBackend so Envoy
+# AI Gateway QuotaPolicy -- what aigw-ui renders for per-tenant token
+# quotas -- can attach to it. QuotaPolicy targetRefs only accept
+# AIServiceBackend, never InferencePool, so a pool-only route can never
+# be quota-managed (aigw-ui listed judge as "no quota possible").
+#
+# While enabled, {"model": "judge"} on the gateway VIP routes DIRECTLY
+# to vLLM's OpenAI API (the kserve workload svc) and bypasses the EPP:
+# no queue-aware scheduling, kube-proxy round-robins the replicas (moot
+# at 1 replica / TP2). The publishers/... model name keeps the EPP path
+# and is NOT quota-capable. Disable to restore the single pool-only
+# rule (both names -> InferencePool, nothing quota-managed).
+openaiBackend:
+  enabled: true
+  name: qwen36-judge-openai        # AIServiceBackend (schema: OpenAI)
+  backendName: qwen36-judge-workload  # Envoy Gateway Backend (FQDN endpoint)

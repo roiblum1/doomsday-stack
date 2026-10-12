@@ -1,0 +1,94 @@
+# Static local PVs + pre-created PVCs for the LLMInferenceService.
+#
+# The hostPathBase/{models,cache} paths exist on EVERY node listed in
+# nodes.hostnames (created and kept mounted by the node-prep DaemonSet),
+# each node holding its own copy of the data. One `local` PV whose
+# nodeAffinity lists all nodes lets every pod mount its own node's copy
+# through ONE claim name -- the pattern the LLMInferenceService needs,
+# since the controller creates a single Deployment (one pod template, one
+# claimName) even with replicas > 1, and LVMS/topolvm PVCs cannot cross
+# nodes (RWO + volume node affinity).
+#
+# Pre-created with volumeName pinned: bound immediately, never pruned by
+# ReplicaSet churn (unlike generic ephemeral volumeClaimTemplates).
+#
+# NOTE: PVs are cluster-scoped and named exactly as the PVCs; on
+# `helm uninstall` they are retained (reclaimPolicy Retain) -- re-installing
+# rebinds them.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Values.storage.className }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Values.storage.models.pvcName }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.storage.models.pvSize }}
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.storage.className }}
+  local:
+    path: {{ .Values.nodePrep.hostPathBase }}/{{ .Values.storage.models.subdir }}
+  {{- include "glm53.pvNodeAffinity" . | nindent 2 }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.storage.models.pvcName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+spec:
+  storageClassName: {{ .Values.storage.className }}
+  volumeName: {{ .Values.storage.models.pvcName }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.storage.models.pvSize }}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Values.storage.cache.pvcName }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.storage.cache.pvSize }}
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.storage.className }}
+  local:
+    path: {{ .Values.nodePrep.hostPathBase }}/{{ .Values.storage.cache.subdir }}
+  {{- include "glm53.pvNodeAffinity" . | nindent 2 }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.storage.cache.pvcName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+spec:
+  storageClassName: {{ .Values.storage.className }}
+  volumeName: {{ .Values.storage.cache.pvcName }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.storage.cache.pvSize }}

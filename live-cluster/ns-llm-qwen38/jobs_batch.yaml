@@ -1,0 +1,129 @@
+apiVersion: v1
+items:
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:batch/Job:llm-qwen38/qwen38-pull-ocp-util-node-1
+    creationTimestamp: "2026-10-07T18:28:34Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-pull-ocp-util-node-1
+    namespace: llm-qwen38
+    resourceVersion: "51078417"
+    uid: 3aa23d91-1b64-4712-8f77-ee95abf04e2e
+  spec:
+    backoffLimit: 3
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    selector:
+      matchLabels:
+        batch.kubernetes.io/controller-uid: 3aa23d91-1b64-4712-8f77-ee95abf04e2e
+    suspend: false
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/instance: qwen38
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/name: qwen38
+          batch.kubernetes.io/controller-uid: 3aa23d91-1b64-4712-8f77-ee95abf04e2e
+          batch.kubernetes.io/job-name: qwen38-pull-ocp-util-node-1
+          controller-uid: 3aa23d91-1b64-4712-8f77-ee95abf04e2e
+          helm.sh/chart: qwen38-bundled-0.2.1
+          job-name: qwen38-pull-ocp-util-node-1
+      spec:
+        containers:
+        - command:
+          - /bin/sh
+          - -c
+          - |
+            set -euo pipefail
+            MODEL_DIR="/models/Qwen3.8-27B-FP8"
+            mkdir -p "${MODEL_DIR}"
+            if [ -f "${MODEL_DIR}/.download-complete" ]; then
+              echo "Model already present, skipping download"
+              exit 0
+            fi
+            START_TIME=$(date +%s)
+            /s5cmd --endpoint-url "${ENDPOINT}" cp \
+              --concurrency 64 \
+              --part-size 128 \
+              "s3://llms/Qwen/Qwen3.8-27B-FP8/*" "${MODEL_DIR}/"
+            touch "${MODEL_DIR}/.download-complete"
+            END_TIME=$(date +%s)
+            ELAPSED=$((END_TIME - START_TIME))
+            echo "Download completed in ${ELAPSED} seconds ($((${ELAPSED}/60))m $((${ELAPSED}%60))s)"
+          env:
+          - name: ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ENDPOINT_URL
+                name: qwen38-s3
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ACCESS_KEY_ID
+                name: qwen38-s3
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: AWS_SECRET_ACCESS_KEY
+                name: qwen38-s3
+          image: registry-internal/tools/s5cmd:v2.3.0
+          imagePullPolicy: IfNotPresent
+          name: pull
+          resources:
+            limits:
+              cpu: "24"
+              memory: 32Gi
+            requests:
+              cpu: "8"
+              memory: 16Gi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /models
+            name: models
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/hostname: ocp-util-node-1
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: s3sa
+        serviceAccountName: s3sa
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: qwen38-models
+  status:
+    completionTime: "2026-10-07T18:28:37Z"
+    conditions:
+    - lastProbeTime: "2026-10-07T18:28:37Z"
+      lastTransitionTime: "2026-10-07T18:28:37Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: SuccessCriteriaMet
+    - lastProbeTime: "2026-10-07T18:28:37Z"
+      lastTransitionTime: "2026-10-07T18:28:37Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: Complete
+    ready: 0
+    startTime: "2026-10-07T18:28:34Z"
+    succeeded: 1
+    terminating: 0
+    uncountedTerminatedPods: {}
+kind: List
+metadata:
+  resourceVersion: ""

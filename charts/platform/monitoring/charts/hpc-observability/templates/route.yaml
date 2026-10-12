@@ -1,0 +1,23 @@
+{{- if .Values.route.enabled }}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: {{ include "hpc-observability.fullname" . }}-fabric
+  namespace: hpc-observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+    prometheus.io/cluster_id: {{ .Values.clusterId | default .Values.global.clusterName }}
+  labels:
+    {{- include "hpc-observability.labels" . | nindent 4 }}
+    hpc.observability/mode: fabric
+spec:
+  port:
+    targetPort: fabric-metrics
+  tls:
+    termination: edge
+  to:
+    kind: Service
+    name: {{ include "hpc-observability.fullname" . }}-fabric
+    weight: 100
+  wildcardPolicy: None
+{{- end }}

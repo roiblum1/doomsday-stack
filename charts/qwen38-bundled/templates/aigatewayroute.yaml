@@ -1,0 +1,123 @@
+{{- if .Values.aigatewayRoute.enabled }}
+# Agent Router (Envoy AI Gateway) route on the shared gateway (VIP .145):
+# header-based model routing. The extproc derives x-ai-eg-model from the
+# request body's "model" field on every registered endpoint (both
+# /v1/chat/completions and /anthropic/v1/messages), so the SAME model
+# name selects the same rule regardless of client protocol.
+#
+# Rule map (first match wins, all Exact unless noted):
+#   Qwen3.8-27B-FP8                              -> native Anthropic backend
+#                                                (Claude Code path: thinking +
+#                                                count_tokens work, zero
+#                                                translation; ALSO the
+#                                                aigw-ui quota path --
+#                                                QuotaPolicy attaches to the
+#                                                AIServiceBackend)
+#   publishers/llm-qwen38/models/Qwen3.8-27B-FP8 -> InferencePool/EPP (OpenAI
+#                                                protocol; vLLM natively
+#                                                serves this model id, so no
+#                                                rewrite is needed)
+#   ^claude-.*$ (regex)                          -> native Anthropic backend +
+#                                                model rewrite (safety net for
+#                                                Claude Code clients without
+#                                                ANTHROPIC_MODEL remapping;
+#                                                without it they 404)
+#   anything else                               -> auto-generated route-not-found 404
+#
+# Constraints honored here:
+# - Only ONE InferencePool per rule; cannot mix with AIServiceBackend.
+# - modelNameOverride only applies to AIServiceBackend refs (ignored for
+#   InferencePool).
+# - Default request timeout 60s kills long reasoning -> raised here.
+# - Cross-namespace parentRef: the shared gateway's listener allows routes
+#   from all namespaces.
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIGatewayRoute
+metadata:
+  name: {{ .Values.aigatewayRoute.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen38.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.gateway.aiGateway.name }}
+      namespace: {{ .Values.gateway.aiGateway.namespace }}
+      sectionName: {{ .Values.gateway.aiGateway.listener }}
+  rules:
+    # --- Claude Code / Anthropic protocol: native passthrough -----------------
+    {{- if .Values.anthropicBackend.enabled }}
+    - name: anthropic-native
+      matches:
+        - headers:
+            - type: Exact
+              name: {{ .Values.aigatewayRoute.headerName }}
+              value: {{ .Values.model.name }}
+      backendRefs:
+        # group/kind omitted: defaults to AIServiceBackend
+        # (aigateway.envoyproxy.io) -- the CRD only accepts an explicit
+        # group for InferencePool refs.
+        # modelNameOverride is a no-op rewrite here (requests already send
+        # "Qwen3.8-27B-FP8"), but keeps QuotaPolicy perModelQuotas.modelName
+        # matching well-defined: the docs only apply per-model quotas when
+        # the name matches the override.
+        - name: {{ .Values.anthropicBackend.name }}
+          modelNameOverride: {{ .Values.model.name }}
+      timeouts:
+        request: {{ .Values.aigatewayRoute.requestTimeout }}
+    {{- else }}
+    # (anthropicBackend disabled: the short model name goes to the
+    # EPP/InferencePool as originally, nothing quota-managed.)
+    - name: openai-epp-short
+      matches:
+        - headers:
+            - type: Exact
+              name: {{ .Values.aigatewayRoute.headerName }}
+              value: {{ .Values.model.name }}
+      backendRefs:
+        - group: inference.networking.k8s.io
+          kind: InferencePool
+          name: {{ .Values.llmisvc.name }}-inference-pool
+      timeouts:
+        request: {{ .Values.aigatewayRoute.requestTimeout }}
+    {{- end }}
+    # --- OpenAI protocol via EPP/InferencePool --------------------------------
+    # While anthropicBackend is enabled the short name is taken by
+    # anthropic-native above, so only the publishers alias reaches this
+    # rule (OpenAI-format clients MUST use this name to keep the EPP
+    # path; the short name lands on the Anthropic backend with
+    # OpenAI<->Anthropic translation in between).
+    - name: openai-epp
+      matches:
+        - headers:
+            - type: Exact
+              name: {{ .Values.aigatewayRoute.headerName }}
+              value: publishers/{{ .Values.namespace }}/models/{{ .Values.model.name }}
+      backendRefs:
+        - group: inference.networking.k8s.io
+          kind: InferencePool
+          name: {{ .Values.llmisvc.name }}-inference-pool
+      timeouts:
+        request: {{ .Values.aigatewayRoute.requestTimeout }}
+    # --- Claude Code clients not remapping the model name ----------------------
+    {{- if and .Values.anthropicBackend.enabled .Values.aigatewayRoute.claudeAlias.enabled }}
+    - name: claude-alias
+      matches:
+        - headers:
+            - type: RegularExpression
+              name: {{ .Values.aigatewayRoute.headerName }}
+              value: {{ .Values.aigatewayRoute.claudeAlias.regex | quote }}
+      backendRefs:
+        # group/kind omitted: defaults to AIServiceBackend (see above)
+        - name: {{ .Values.anthropicBackend.name }}
+          modelNameOverride: {{ .Values.model.name }}
+      timeouts:
+        request: {{ .Values.aigatewayRoute.requestTimeout }}
+    {{- end }}
+  llmRequestCosts:
+    - {metadataKey: llm_input_token, type: InputToken}
+    - {metadataKey: llm_output_token, type: OutputToken}
+    - {metadataKey: llm_reasoning_token, type: ReasoningToken}
+    - {metadataKey: llm_total_token, type: TotalToken}
+{{- end }}

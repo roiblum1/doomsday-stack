@@ -1,0 +1,84 @@
+{{- /*
+  Per-node-group NicNodePolicy CRs for heterogeneous RoCE clusters.
+  When .Values.nicNodePolicies.enabled is true, ofedDriver and rdmaSharedDevicePlugin
+  are removed from NicClusterPolicy and rendered here instead, one CR per pool.
+  See agent-network-operator.md for design rules.
+*/}}
+{{- if and .Values.nicClusterPolicy.enabled .Values.nicNodePolicies.enabled }}
+{{- range $policy := .Values.nicNodePolicies.policies }}
+{{- $ofed := mergeOverwrite (deepCopy $.Values.ofedDriver) (deepCopy ($policy.ofedDriver | default (dict))) }}
+{{- $rdma := mergeOverwrite (deepCopy $.Values.rdmaSharedDevicePlugin) (deepCopy ($policy.rdmaSharedDevicePlugin | default (dict))) }}
+{{- $ifNames := $policy.rdmaSharedDevicePlugin.ifNames | default ($rdma.ifNames | default list) }}
+---
+apiVersion: mellanox.com/v1alpha1
+kind: NicNodePolicy
+metadata:
+  name: {{ $policy.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    {{- include "network.labels" $ | nindent 4 }}
+spec:
+  nodeSelector:
+    {{- toYaml $policy.nodeSelector | nindent 4 }}
+  ofedDriver:
+    {{- if $ofed.certConfigName }}
+    certConfig:
+      name: {{ $ofed.certConfigName }}
+    {{- end }}
+    env:
+      {{- range $ofed.env }}
+      - name: {{ .name }}
+        value: {{ .value | quote }}
+      {{- end }}
+    forcePrecompiled: {{ $ofed.forcePrecompiled }}
+    image: {{ $ofed.image }}
+    {{- if $ofed.imagePullSecrets }}
+    imagePullSecrets:
+      {{- range $ofed.imagePullSecrets }}
+      - {{ . }}
+      {{- end }}
+    {{- else }}
+    imagePullSecrets: []
+    {{- end }}
+    livenessProbe:
+      initialDelaySeconds: 30
+      periodSeconds: 30
+    readinessProbe:
+      initialDelaySeconds: {{ $ofed.readinessInitialDelaySeconds }}
+      periodSeconds: 30
+    repository: {{ $ofed.repository }}
+    startupProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 20
+    terminationGracePeriodSeconds: 300
+    upgradePolicy:
+      autoUpgrade: {{ $ofed.autoUpgrade }}
+      drain:
+        deleteEmptyDir: true
+        enable: true
+        force: {{ $ofed.drainForce }}
+        podSelector: ""
+        timeoutSeconds: 300
+      maxParallelUpgrades: {{ $ofed.maxParallelUpgrades }}
+      safeLoad: false
+    version: {{ $ofed.version }}
+  {{- if $rdma.enabled | default true }}
+  rdmaSharedDevicePlugin:
+    config: |
+      {{- include "network.rdmaConfig" (dict "resourceName" ($rdma.resourceName | default "roce_backend") "rdmaHcaMax" ($rdma.rdmaHcaMax | default 1) "selectors" ($rdma.selectors | default $.Values.rdmaSharedDevicePlugin.selectors) "ifNames" $ifNames) | nindent 6 }}
+    image: {{ $rdma.image }}
+    {{- if $rdma.imagePullSecrets }}
+    imagePullSecrets:
+      {{- range $rdma.imagePullSecrets }}
+      - {{ . }}
+      {{- end }}
+    {{- else }}
+    imagePullSecrets: []
+    {{- end }}
+    repository: {{ $rdma.repository }}
+    version: {{ $rdma.version }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,218 @@
+apiVersion: v1
+items:
+- apiVersion: aigateway.envoyproxy.io/v1alpha1
+  kind: QuotaPolicy
+  metadata:
+    creationTimestamp: "2026-10-11T22:46:24Z"
+    finalizers:
+    - aigateway.envoyproxy.io/finalizer
+    generation: 10
+    labels:
+      app.kubernetes.io/managed-by: aigw-ui
+    name: fleetbe-glm-5-3
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54881999"
+    uid: 5e651067-2152-4887-af10-e2a27e6edd2a
+  spec:
+    perModelQuotas:
+    - modelName: glm-5.3
+      quota:
+        bucketRules:
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-1\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+          shadowMode: true
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-2\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+          shadowMode: true
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-3\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+          shadowMode: true
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^svc-mgmt\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+          shadowMode: true
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-4\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+          shadowMode: true
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^svc-bench\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+          shadowMode: true
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-5\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+          shadowMode: true
+        costExpression: '((cached_input_tokens <= input_tokens ? input_tokens - cached_input_tokens
+          : input_tokens) * 11600u + (cached_input_tokens <= input_tokens ? cached_input_tokens
+          : 0u) * 1160u + output_tokens * 46300u) / 1000000u'
+        defaultBucket:
+          duration: 1h
+          limit: 4294967295
+        mode: Shared
+    serviceQuota:
+      quota:
+        duration: 1s
+        limit: 4294967295
+    targetRefs:
+    - group: aigateway.envoyproxy.io
+      kind: AIServiceBackend
+      name: fleetbe-glm-5-3
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-12T09:26:46Z"
+      message: QuotaPolicy reconciled successfully
+      reason: ReconciliationSucceeded
+      status: "True"
+      type: Accepted
+- apiVersion: aigateway.envoyproxy.io/v1alpha1
+  kind: QuotaPolicy
+  metadata:
+    creationTimestamp: "2026-10-11T22:41:59Z"
+    finalizers:
+    - aigateway.envoyproxy.io/finalizer
+    generation: 10
+    labels:
+      app.kubernetes.io/managed-by: aigw-ui
+    name: glm-5-3
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54881987"
+    uid: 0f20d79b-451b-4e45-8726-6a33f0b354e9
+  spec:
+    perModelQuotas:
+    - modelName: glm-5.3
+      quota:
+        bucketRules:
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-1\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-2\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-3\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^svc-mgmt\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-4\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^svc-bench\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-5\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 1000000
+        costExpression: '((cached_input_tokens <= input_tokens ? input_tokens - cached_input_tokens
+          : input_tokens) * 11600u + (cached_input_tokens <= input_tokens ? cached_input_tokens
+          : 0u) * 1160u + output_tokens * 46300u) / 1000000u'
+        defaultBucket:
+          duration: 1h
+          limit: 116000000
+        mode: Shared
+    serviceQuota:
+      quota:
+        duration: 1s
+        limit: 4294967295
+    targetRefs:
+    - group: aigateway.envoyproxy.io
+      kind: AIServiceBackend
+      name: fleet-glm-5-3
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-12T09:26:45Z"
+      message: QuotaPolicy reconciled successfully
+      reason: ReconciliationSucceeded
+      status: "True"
+      type: Accepted
+kind: List
+metadata:
+  resourceVersion: ""

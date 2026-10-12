@@ -1,0 +1,12 @@
+apiVersion: v2
+name: glm53-bundled
+description: >-
+  GLM-5.3 (FP8 MoE) on 2x B200 nodes as ONE KServe LLMInferenceService
+  (DP8 x EP8 per node), behind the llm-d router (EPP + InferencePool) and
+  an Envoy AI Gateway AIGatewayRoute. Includes node storage prep
+  (privileged ensure-mount DaemonSet), static local PVs, per-node model
+  pull jobs, the serving workload and an optional AIPerf benchmark job.
+type: application
+version: 0.1.0
+appVersion: "glm-5.3"
+kubeVersion: ">=1.29.0-0"

@@ -1,0 +1,9 @@
+name: nmstate-rdma
+projectNamespace: openshift-nmstate
+repourl: 'https://git.example.internal/popai/helm-charts/nmstate-rdma-chart.git'
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true

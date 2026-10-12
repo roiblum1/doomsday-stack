@@ -1,0 +1,22 @@
+name: gpu
+projectNamespace: nvidia-gpu-operator
+repourl: 'https://git.example.internal/popai/helm-charts/gpu-chart.git'
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true
+# The gpu-operator injects its own defaults into the ClusterPolicy after it
+# reconciles: migManager.config.default, vgpuDeviceManager.config.default, and
+# the entire kataManager block (artifactsDir). ArgoCD reads those operator-owned
+# fields as perpetual drift, so ignore exactly those jsonPointers. The chart
+# stays the source of truth for everything else (MIG/virt disabled, no drain).
+ignoreDifferences:
+  - group: nvidia.com
+    kind: ClusterPolicy
+    name: gpu-cluster-policy
+    jsonPointers:
+      - /spec/migManager/config
+      - /spec/vgpuDeviceManager/config
+      - /spec/kataManager

@@ -1,0 +1,55 @@
+apiVersion: v1
+items:
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-lmcache-deploy:rbac.authorization.k8s.io/Role:lmcache-operator-system/lmcache-operator-leader-election-role
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-06T21:24:15Z"
+    labels:
+      app.kubernetes.io/instance: lmcache
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: lmcache-operator
+      app.kubernetes.io/part-of: lmcache
+      app.kubernetes.io/version: v0.5.5
+      helm.sh/chart: lmcache-operator-openshift-0.1.0
+    name: lmcache-operator-leader-election-role
+    namespace: lmcache-operator-system
+    resourceVersion: "50263694"
+    uid: e5759a01-831f-4a75-bb06-0f3109b6c058
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+kind: List
+metadata:
+  resourceVersion: ""

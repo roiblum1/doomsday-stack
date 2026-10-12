@@ -1,0 +1,195 @@
+apiVersion: v1
+items:
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:rbac.authorization.k8s.io/RoleBinding:llm-qwen38/prometheus-k8s
+    creationTimestamp: "2026-10-07T14:22:12Z"
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: prometheus-k8s
+    namespace: llm-qwen38
+    resourceVersion: "51078400"
+    uid: bf5c5245-758a-4cdc-b974-c9bb3d0ac361
+  roleRef:
+    name: prometheus-k8s
+    namespace: llm-qwen38
+  subjects:
+  - kind: ServiceAccount
+    name: prometheus-k8s
+    namespace: openshift-monitoring
+  userNames:
+  - system:serviceaccount:openshift-monitoring:prometheus-k8s
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/sync-wave: "-1"
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:rbac.authorization.k8s.io/RoleBinding:llm-qwen38/qwen38-cache-use-qwen38-model-serving-scc
+    creationTimestamp: "2026-10-07T14:22:08Z"
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-cache-use-qwen38-model-serving-scc
+    namespace: llm-qwen38
+    resourceVersion: "51078344"
+    uid: dc6703d7-e70e-4810-8373-9d340585f402
+  roleRef:
+    name: use-qwen38-model-serving-scc
+    namespace: llm-qwen38
+  subjects:
+  - kind: ServiceAccount
+    name: qwen38-cache
+    namespace: llm-qwen38
+  userNames:
+  - system:serviceaccount:llm-qwen38:qwen38-cache
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    creationTimestamp: "2026-10-07T14:22:18Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen38-l4
+      app.kubernetes.io/part-of: llminferenceservice
+    name: qwen38-l4-epp-rb
+    namespace: llm-qwen38
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: qwen38-l4
+      uid: 4ad66e96-4bef-49a7-a56a-2f4df47b3806
+    resourceVersion: "50859611"
+    uid: 0ad2c0de-d8e5-4ead-a142-83079a0f5640
+  roleRef:
+    name: qwen38-l4-epp-role
+    namespace: llm-qwen38
+  subjects:
+  - kind: ServiceAccount
+    name: s3sa
+    namespace: llm-qwen38
+  userNames:
+  - system:serviceaccount:llm-qwen38:s3sa
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:rbac.authorization.k8s.io/RoleBinding:llm-qwen38/qwen38-node-prep-use-privileged-scc
+    creationTimestamp: "2026-10-07T14:22:12Z"
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-node-prep-use-privileged-scc
+    namespace: llm-qwen38
+    resourceVersion: "51078401"
+    uid: 4f58c082-d768-4061-9728-f95fbb418bf8
+  roleRef:
+    name: use-privileged-scc
+    namespace: llm-qwen38
+  subjects:
+  - kind: ServiceAccount
+    name: qwen38-node-prep
+    namespace: llm-qwen38
+  userNames:
+  - system:serviceaccount:llm-qwen38:qwen38-node-prep
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:rbac.authorization.k8s.io/RoleBinding:llm-qwen38/s3sa-use-qwen38-model-serving-scc
+    creationTimestamp: "2026-10-07T14:22:12Z"
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: s3sa-use-qwen38-model-serving-scc
+    namespace: llm-qwen38
+    resourceVersion: "51078398"
+    uid: c6d80ac7-425e-403b-b307-9d428661a866
+  roleRef:
+    name: use-qwen38-model-serving-scc
+    namespace: llm-qwen38
+  subjects:
+  - kind: ServiceAccount
+    name: s3sa
+    namespace: llm-qwen38
+  userNames:
+  - system:serviceaccount:llm-qwen38:s3sa
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows deploymentconfigs in this namespace to rollout
+        pods in this namespace.  It is auto-managed by a controller; remove subjects
+        to disable.
+    creationTimestamp: "2026-10-07T14:20:22Z"
+    name: system:deployers
+    namespace: llm-qwen38
+    resourceVersion: "50858364"
+    uid: e8e53c40-43fb-41d3-8e92-4177d9d654d6
+  roleRef:
+    name: system:deployer
+  subjects:
+  - kind: ServiceAccount
+    name: deployer
+    namespace: llm-qwen38
+  userNames:
+  - system:serviceaccount:llm-qwen38:deployer
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows builds in this namespace to push images to
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-10-07T14:20:22Z"
+    name: system:image-builders
+    namespace: llm-qwen38
+    resourceVersion: "50858362"
+    uid: e2af4e4e-9997-4d0a-b1b0-b7af7928d335
+  roleRef:
+    name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    name: builder
+    namespace: llm-qwen38
+  userNames:
+  - system:serviceaccount:llm-qwen38:builder
+- apiVersion: authorization.openshift.io/v1
+  groupNames:
+  - system:serviceaccounts:llm-qwen38
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows all pods in this namespace to pull images from
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-10-07T14:20:22Z"
+    name: system:image-pullers
+    namespace: llm-qwen38
+    resourceVersion: "50858363"
+    uid: ccc6d570-30be-4b1c-8b3f-202f33c83e32
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:serviceaccounts:llm-qwen38
+  userNames: null
+kind: List
+metadata:
+  resourceVersion: ""

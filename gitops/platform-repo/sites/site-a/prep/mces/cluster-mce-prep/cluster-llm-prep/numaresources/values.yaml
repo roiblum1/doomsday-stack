@@ -1,0 +1,12 @@
+# Per-cluster overrides for numaresources on cluster-gpu-test.
+# No cluster-specific overrides needed; chart defaults (operators/numaresources/values.yaml) apply.
+numaResourcesOperator:
+  enabled: true
+  name: numaresourcesoperator
+  spec:
+    logLevel: Normal
+    nodeGroups:
+      - config:
+          infoRefreshMode: PeriodicAndEvents
+          podsFingerprinting: Enabled
+        poolName: dell-xe9780-site-a-256c-2048gb-9tb-nodepool

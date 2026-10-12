@@ -1,0 +1,110 @@
+apiVersion: v1
+items:
+- apiVersion: aigateway.envoyproxy.io/v1alpha1
+  kind: QuotaPolicy
+  metadata:
+    annotations:
+      gateway.envoyproxy.io/aigw-ui-quota-revision: dc222c28b37e
+    creationTimestamp: "2026-10-12T09:26:46Z"
+    finalizers:
+    - aigateway.envoyproxy.io/finalizer
+    generation: 12
+    labels:
+      app.kubernetes.io/managed-by: aigw-ui
+    name: judge
+    namespace: llm-judge
+    resourceVersion: "55026530"
+    uid: dc5f6545-70b4-40af-9ed4-5290520ca2fb
+  spec:
+    perModelQuotas:
+    - modelName: judge
+      quota:
+        bucketRules:
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-1\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 500000
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-2\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 500000
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-3\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 500000
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^svc-mgmt\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 500000
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-4\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 500000
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^svc-bench\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 500000
+        - clientSelectors:
+          - headers:
+            - invert: false
+              name: x-aigw-client-id
+              type: RegularExpression
+              value: ^user-5\.[a-f0-9]+$
+          quota:
+            duration: 1d
+            limit: 500000
+        costExpression: '((cached_input_tokens <= input_tokens ? input_tokens - cached_input_tokens
+          : input_tokens) * 1200u + (cached_input_tokens <= input_tokens ? cached_input_tokens
+          : 0u) * 120u + output_tokens * 4800u) / 1000000u'
+        defaultBucket:
+          duration: 1d
+          limit: 1
+        mode: Shared
+    serviceQuota:
+      quota:
+        duration: 1s
+        limit: 4294967295
+    targetRefs:
+    - group: aigateway.envoyproxy.io
+      kind: AIServiceBackend
+      name: qwen36-judge-openai
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-12T13:27:35Z"
+      message: QuotaPolicy reconciled successfully
+      reason: ReconciliationSucceeded
+      status: "True"
+      type: Accepted
+kind: List
+metadata:
+  resourceVersion: ""

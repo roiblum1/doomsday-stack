@@ -1,0 +1,169 @@
+apiVersion: v1
+items:
+- apiVersion: aigateway.envoyproxy.io/v1beta1
+  kind: AIGatewayRoute
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:aigateway.envoyproxy.io/AIGatewayRoute:llm-glm53/glm53
+      gateway.envoyproxy.io/aigw-ui-quota-revision: cca332cbb289
+    creationTimestamp: "2026-09-29T16:53:10Z"
+    finalizers:
+    - aigateway.envoyproxy.io/finalizer
+    generation: 4
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53
+    namespace: llm-glm53
+    resourceVersion: "54508641"
+    uid: b8776fe2-a0c6-4179-930c-7a9afd9b1781
+  spec:
+    llmRequestCosts:
+    - metadataKey: llm_input_token
+      type: InputToken
+    - metadataKey: llm_output_token
+      type: OutputToken
+    - metadataKey: llm_reasoning_token
+      type: ReasoningToken
+    - metadataKey: llm_total_token
+      type: TotalToken
+    parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: envoy-ai-gateway
+      namespace: envoy-ai-gateway-system
+      sectionName: http
+    rules:
+    - backendRefs:
+      - modelNameOverride: glm-5.3
+        name: glm53-anthropic
+        priority: 0
+        weight: 1
+      matches:
+      - headers:
+        - name: x-ai-eg-model
+          type: RegularExpression
+          value: ^claude-.*$
+      modelsOwnedBy: Envoy AI Gateway
+      name: claude-alias
+      timeouts:
+        request: 3600s
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-11T22:46:19Z"
+      message: AI Gateway Route reconciled successfully
+      reason: ReconciliationSucceeded
+      status: "True"
+      type: Accepted
+- apiVersion: aigateway.envoyproxy.io/v1beta1
+  kind: AIGatewayRoute
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-anthropic-alias:aigateway.envoyproxy.io/AIGatewayRoute:llm-glm53/glm53-anthropic-alias
+    creationTimestamp: "2026-10-12T10:30:13Z"
+    finalizers:
+    - aigateway.envoyproxy.io/finalizer
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: glm53-anthropic-alias
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53-anthropic-alias
+      helm.sh/chart: glm53-anthropic-alias-0.1.0
+    name: glm53-anthropic-alias
+    namespace: llm-glm53
+    resourceVersion: "54919593"
+    uid: 851022ac-98fc-4f3b-a459-9fb056f34155
+  spec:
+    llmRequestCosts:
+    - metadataKey: llm_input_token
+      type: InputToken
+    - metadataKey: llm_output_token
+      type: OutputToken
+    - metadataKey: llm_reasoning_token
+      type: ReasoningToken
+    - metadataKey: llm_total_token
+      type: TotalToken
+    parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: envoy-ai-gateway
+      namespace: envoy-ai-gateway-system
+      sectionName: http
+    rules:
+    - backendRefs:
+      - modelNameOverride: glm-5.3
+        name: glm53-anthropic
+        priority: 0
+        weight: 1
+      matches:
+      - headers:
+        - name: x-ai-eg-model
+          type: RegularExpression
+          value: ^glm-5\.3$
+        - name: anthropic-version
+          type: RegularExpression
+          value: .+
+      modelsOwnedBy: Envoy AI Gateway
+      name: anthropic-fleet-alias
+      timeouts:
+        request: 3600s
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-12T10:30:13Z"
+      message: AI Gateway Route reconciled successfully
+      reason: ReconciliationSucceeded
+      status: "True"
+      type: Accepted
+- apiVersion: aigateway.envoyproxy.io/v1beta1
+  kind: AIGatewayRoute
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:aigateway.envoyproxy.io/AIGatewayRoute:llm-glm53/glm53-peer
+    creationTimestamp: "2026-10-11T22:21:18Z"
+    finalizers:
+    - aigateway.envoyproxy.io/finalizer
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-peer
+    namespace: llm-glm53
+    resourceVersion: "54508642"
+    uid: 553bd3eb-cfc3-4250-90d1-8d044c73ab4b
+  spec:
+    parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: envoy-ai-gateway
+      namespace: envoy-ai-gateway-system
+      sectionName: peers
+    rules:
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: glm53-b200-inference-pool
+        priority: 0
+        weight: 1
+      matches:
+      - headers:
+        - name: x-ai-eg-model
+          type: Exact
+          value: glm-5.3
+      modelsOwnedBy: llm-glm53
+      name: serve
+      timeouts:
+        request: 3600s
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-11T22:46:19Z"
+      message: AI Gateway Route reconciled successfully
+      reason: ReconciliationSucceeded
+      status: "True"
+      type: Accepted
+kind: List
+metadata:
+  resourceVersion: ""

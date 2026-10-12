@@ -1,0 +1,89 @@
+apiVersion: v1
+items:
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-lmcache-deploy:rbac.authorization.k8s.io/RoleBinding:lmcache-operator-system/lmcache-operator-leader-election-rolebinding
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-06T21:24:16Z"
+    labels:
+      app.kubernetes.io/instance: lmcache
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: lmcache-operator
+      app.kubernetes.io/part-of: lmcache
+      app.kubernetes.io/version: v0.5.5
+      helm.sh/chart: lmcache-operator-openshift-0.1.0
+    name: lmcache-operator-leader-election-rolebinding
+    namespace: lmcache-operator-system
+    resourceVersion: "50263705"
+    uid: 256e37c4-7fe4-41ec-9010-675a32d85e08
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: lmcache-operator-leader-election-role
+  subjects:
+  - kind: ServiceAccount
+    name: lmcache-operator-controller-manager
+    namespace: lmcache-operator-system
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows deploymentconfigs in this namespace to rollout
+        pods in this namespace.  It is auto-managed by a controller; remove subjects
+        to disable.
+    creationTimestamp: "2026-10-06T21:23:45Z"
+    name: system:deployers
+    namespace: lmcache-operator-system
+    resourceVersion: "50263128"
+    uid: 78af7010-68c7-497d-a6a7-0a4d12f086dc
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:deployer
+  subjects:
+  - kind: ServiceAccount
+    name: deployer
+    namespace: lmcache-operator-system
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows builds in this namespace to push images to
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-10-06T21:23:45Z"
+    name: system:image-builders
+    namespace: lmcache-operator-system
+    resourceVersion: "50263131"
+    uid: 92976d12-232c-42cc-9152-e584cf3ea161
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    name: builder
+    namespace: lmcache-operator-system
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows all pods in this namespace to pull images from
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-10-06T21:23:45Z"
+    name: system:image-pullers
+    namespace: lmcache-operator-system
+    resourceVersion: "50263127"
+    uid: 7e2f2bbb-201f-48a3-b8b4-d96f2e44d4c2
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:image-puller
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:serviceaccounts:lmcache-operator-system
+kind: List
+metadata:
+  resourceVersion: ""

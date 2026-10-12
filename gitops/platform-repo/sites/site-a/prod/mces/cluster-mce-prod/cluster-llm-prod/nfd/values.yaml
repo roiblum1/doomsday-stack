@@ -1,0 +1,2 @@
+# Per-cluster overrides for nfd on cluster-gpu-test.
+# No cluster-specific overrides needed; chart defaults (operators/nfd/values.yaml) apply.

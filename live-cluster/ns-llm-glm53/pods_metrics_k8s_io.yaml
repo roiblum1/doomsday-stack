@@ -1,0 +1,153 @@
+apiVersion: v1
+items:
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: main
+    usage:
+      cpu: 25477444674n
+      memory: 41382116Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:54:35Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-workload
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+      kserve.io/component: workload
+      llm-d.ai/role: both
+      pod-template-hash: 584766dc64
+    name: glm53-b200-kserve-584766dc64-lz4lm
+    namespace: llm-glm53
+  timestamp: "2026-10-12T13:54:22Z"
+  window: 16.439s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: main
+    usage:
+      cpu: 6019422233n
+      memory: 8572828Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:54:35Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-workload
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+      kserve.io/component: workload
+      llm-d.ai/role: both
+      pod-template-hash: 8668c8774c
+    name: glm53-b200-kserve-8668c8774c-9vkm9
+    namespace: llm-glm53
+  timestamp: "2026-10-12T13:54:15Z"
+  window: 13.502s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: main
+    usage:
+      cpu: 1172457n
+      memory: 65268Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:54:35Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+      pod-template-hash: 7f9bf959d9
+    name: glm53-b200-kserve-router-scheduler-7f9bf959d9-g88cg
+    namespace: llm-glm53
+  timestamp: "2026-10-12T13:54:18Z"
+  window: 11.858s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: lmcache
+    usage:
+      cpu: 3358007n
+      memory: 1053888100Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:54:35Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      controller-revision-hash: 647bdf7595
+      pod-template-generation: "12"
+    name: glm53-cache-5dl2l
+    namespace: llm-glm53
+  timestamp: "2026-10-12T13:54:21Z"
+  window: 17.184s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: lmcache
+    usage:
+      cpu: 3791612n
+      memory: 1053867812Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:54:35Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      controller-revision-hash: 647bdf7595
+      pod-template-generation: "12"
+    name: glm53-cache-p5thj
+    namespace: llm-glm53
+  timestamp: "2026-10-12T13:54:23Z"
+  window: 19.267s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: cubin-src
+    usage:
+      cpu: "0"
+      memory: 804Ki
+  - name: node-prep
+    usage:
+      cpu: 94952173n
+      memory: 39980Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:54:35Z"
+    labels:
+      app: glm53-node-prep
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      controller-revision-hash: 7b44857f6d
+      helm.sh/chart: glm53-bundled-0.1.0
+      pod-template-generation: "11"
+    name: glm53-node-prep-6f4lv
+    namespace: llm-glm53
+  timestamp: "2026-10-12T13:54:17Z"
+  window: 15.066s
+- apiVersion: metrics.k8s.io/v1beta1
+  containers:
+  - name: cubin-src
+    usage:
+      cpu: "0"
+      memory: 804Ki
+  - name: node-prep
+    usage:
+      cpu: "0"
+      memory: 70276Ki
+  kind: PodMetrics
+  metadata:
+    creationTimestamp: "2026-10-12T13:54:35Z"
+    labels:
+      app: glm53-node-prep
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      controller-revision-hash: 7b44857f6d
+      helm.sh/chart: glm53-bundled-0.1.0
+      pod-template-generation: "11"
+    name: glm53-node-prep-zsqcm
+    namespace: llm-glm53
+  timestamp: "2026-10-12T13:54:17Z"
+  window: 25.275s
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,39 @@
+# NUMA Resources operator (NROP). The operator runs namespaced (openshift-numaresources)
+# but its CR — NUMAResourcesOperator — is CLUSTER-SCOPED (group nodetopology.openshift.io),
+# so the CR template carries no namespace. No instance exists on the live cluster yet; this
+# chart renders one targeting the worker MachineConfigPool.
+namespace:
+  name: openshift-numaresources
+  create: true
+  labels: {}
+
+operatorGroup:
+  name: openshift-numaresources
+  targetNamespaces:
+    - openshift-numaresources
+
+subscription:
+  name: numaresources-operator
+  namespace: openshift-numaresources
+  channel: "4.22"
+  source: generic-cs
+  sourceNamespace: openshift-marketplace
+  startingCSV: numaresources-operator.v4.22.1
+  installPlanApproval: Automatic
+
+# NUMAResourcesOperator instance (cluster-scoped). Runs the Resource Topology Exporter
+# (RTE) daemonset on nodes selected by the MachineConfigPoolSelector.
+numaResourcesOperator:
+  enabled: true
+  name: numaresourcesoperator
+  spec:
+    logLevel: Normal
+    nodeGroups:
+      # Target the worker pool. Override the selector per cluster if you have dedicated
+      # NUMA-tuned pools (e.g. a GPU/RoCE worker pool).
+      - machineConfigPoolSelector:
+          matchLabels:
+            pools.operator.machineconfiguration.openshift.io/worker: ""
+        config:
+          podsFingerprinting: Enabled
+          infoRefreshMode: PeriodicAndEvents

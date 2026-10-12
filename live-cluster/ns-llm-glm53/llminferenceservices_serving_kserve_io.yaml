@@ -1,0 +1,366 @@
+apiVersion: v1
+items:
+- apiVersion: serving.kserve.io/v1alpha2
+  kind: LLMInferenceService
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:serving.kserve.io/LLMInferenceService:llm-glm53/glm53-b200
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T15:26:54Z"
+    finalizers:
+    - serving.kserve.io/llmisvc-finalizer
+    generation: 50
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-b200
+    namespace: llm-glm53
+    resourceVersion: "55041594"
+    uid: 6acd4f43-424b-47ee-b53e-1ba129ceeadb
+  spec:
+    kvCacheOffloading:
+      cpu: 64Gi
+      evictionPolicy: lru
+    model:
+      name: glm-5.3
+      uri: pvc://glm53-models/GLM-5.3-Flash-NVFP4
+    replicas: 2
+    rolloutStrategy:
+      maxSurge: 0
+      maxUnavailable: 1
+    router:
+      gateway:
+        refs:
+        - name: envoy-ai-gateway
+          namespace: envoy-ai-gateway-system
+          sectionName: http
+      route: {}
+      scheduler:
+        config:
+          inline:
+            apiVersion: llm-d.ai/v1alpha1
+            kind: EndpointPickerConfig
+            plugins:
+            - type: single-profile-handler
+            - type: approx-prefix-cache-producer
+            - type: inflight-load-producer
+            - type: prefix-cache-scorer
+            - type: active-request-scorer
+            - type: token-load-scorer
+            - type: max-score-picker
+            schedulingProfiles:
+            - name: default
+              plugins:
+              - pluginRef: active-request-scorer
+                weight: 3
+              - pluginRef: token-load-scorer
+                weight: 1
+              - pluginRef: prefix-cache-scorer
+                weight: 3
+              - pluginRef: max-score-picker
+        pool:
+          spec:
+            appProtocol: http
+            endpointPickerRef:
+              failureMode: FailOpen
+              group: ""
+              kind: Service
+              name: glm53-b200-epp-service
+              port:
+                number: 9002
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: glm53-b200
+                app.kubernetes.io/part-of: llminferenceservice
+                kserve.io/component: workload
+            targetPorts:
+            - number: 8000
+            - number: 8001
+            - number: 8002
+            - number: 8003
+            - number: 8004
+            - number: 8005
+            - number: 8006
+            - number: 8007
+        template:
+          containers: []
+          serviceAccountName: s3sa
+    template:
+      containers:
+      - args:
+        - --data-parallel-size=8
+        - --data-parallel-size-local=8
+        - --data-parallel-multi-port-external-lb
+        - --data-parallel-supervisor-port=8208
+        - --enable-expert-parallel
+        - --all2all-backend=allgather_reducescatter
+        - --kv-cache-dtype=fp8
+        - --gpu-memory-utilization=0.85
+        - --max-model-len=262144
+        - --max-num-seqs=512
+        - --max-num-batched-tokens=32768
+        - --enable-prefix-caching
+        - --enable-chunked-prefill
+        - --load-format=auto
+        - --per-request-spec-decode-metrics=summary
+        - --kv-cache-metrics
+        - --enable-prompt-tokens-details
+        - --enable-force-include-usage
+        - --speculative-config.method=mtp
+        - --speculative-config.num_speculative_tokens=3
+        - --reasoning-parser=glm45
+        - --tool-call-parser=glm47
+        - --enable-auto-tool-choice
+        - --trust-remote-code
+        - --kv-transfer-config
+        - '''{"kv_connector":"LMCacheMPConnector","kv_connector_extra_config":{"lmcache.mp.host":"tcp://glm53-cache.llm-glm53.svc.cluster.local","lmcache.mp.isolated_ipc":true,"lmcache.mp.port":"5555"},"kv_connector_module_path":"lmcache.integration.vllm.lmcache_mp_connector","kv_role":"kv_both"}'''
+        env:
+        - name: DG_JIT_CACHE_DIR
+          value: /cache/deep_gemm
+        - name: FLASHINFER_WORKSPACE_BASE
+          value: /cache/flashinfer
+        - name: HF_HOME
+          value: /cache/hf
+        - name: HF_HUB_OFFLINE
+          value: "1"
+        - name: NCCL_IB_DISABLE
+          value: "1"
+        - name: NCCL_P2P_LEVEL
+          value: NVL
+        - name: NVSHMEM_IB_ENABLE_IBGDA
+          value: "0"
+        - name: NVSHMEM_REMOTE_TRANSPORT
+          value: none
+        - name: OMP_NUM_THREADS
+          value: "16"
+        - name: TORCHINDUCTOR_CACHE_DIR
+          value: /cache/inductor
+        - name: TORCHINDUCTOR_FX_GRAPH_CACHE
+          value: "1"
+        - name: TRANSFORMERS_OFFLINE
+          value: "1"
+        - name: TRITON_CACHE_DIR
+          value: /cache/triton
+        - name: VLLM_CACHE_ROOT
+          value: /cache/vllm
+        - name: VLLM_ENGINE_READY_TIMEOUT_S
+          value: "3600"
+        - name: VLLM_USE_DEEP_GEMM
+          value: "1"
+        - name: PYTHONHASHSEED
+          value: "0"
+        - name: VLLM_DEEP_GEMM_WARMUP
+          value: skip
+        - name: VLLM_USE_V1
+          value: "1"
+        image: registry-internal/vllm-openai@sha256:464346c43ec233f5ddee4eab563107289b442dc6174594efcc1f0762a6e5b882
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /health
+            port: 8208
+            scheme: HTTP
+          periodSeconds: 30
+          timeoutSeconds: 5
+        name: main
+        readinessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /readyz
+            port: 8208
+            scheme: HTTP
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: "192"
+            hugepages-1Gi: 16Gi
+            memory: 2000Gi
+            nvidia.com/gpu: "8"
+          requests:
+            cpu: "96"
+            hugepages-1Gi: 16Gi
+            memory: 512Gi
+            nvidia.com/gpu: "8"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+            - IPC_LOCK
+          runAsNonRoot: false
+        startupProbe:
+          failureThreshold: 180
+          httpGet:
+            path: /health
+            port: 8208
+            scheme: HTTP
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - mountPath: /cache
+          name: compile-cache
+        - mountPath: /dev/hugepages
+          name: hugepages
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-B200
+      runtimeClassName: performance-gpu-hpc-performanceprofile-extras-b200
+      schedulerName: default-scheduler
+      serviceAccountName: s3sa
+      terminationGracePeriodSeconds: 300
+      volumes:
+      - emptyDir:
+          medium: Memory
+          sizeLimit: 600Gi
+        name: dshm
+      - emptyDir:
+          medium: HugePages
+          sizeLimit: 16Gi
+        name: hugepages
+      - name: compile-cache
+        persistentVolumeClaim:
+          claimName: glm53-cache
+  status:
+    addresses:
+    - models:
+      - name: publishers/llm-glm53/models/glm-5.3
+      name: gateway-external-model-routing
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: http://192.0.2.7/
+    - models:
+      - name: publishers/llm-glm53/models/glm-5.3
+      - name: glm-5.3
+      name: gateway-external
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: http://192.0.2.7/llm-glm53/glm53-b200
+    - models:
+      - name: publishers/llm-glm53/models/glm-5.3
+      - name: glm-5.3
+      name: gateway-external
+      origin:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      url: http://192.0.2.7/publishers/llm-glm53/models/glm-5.3
+    annotations:
+      serving.kserve.io/config-llm-decode-template: kserve-config-llm-decode-template
+      serving.kserve.io/config-llm-decode-worker-data-parallel: kserve-config-llm-decode-worker-data-parallel
+      serving.kserve.io/config-llm-prefill-template: kserve-config-llm-prefill-template
+      serving.kserve.io/config-llm-prefill-worker-data-parallel: kserve-config-llm-prefill-worker-data-parallel
+      serving.kserve.io/config-llm-router-route: kserve-config-llm-router-route
+      serving.kserve.io/config-llm-scheduler: kserve-config-llm-scheduler
+      serving.kserve.io/config-llm-scheduler-eppconfig-default: kserve-config-llm-scheduler-eppconfig-default
+      serving.kserve.io/config-llm-scheduler-eppconfig-default-pd: kserve-config-llm-scheduler-eppconfig-default-pd
+      serving.kserve.io/config-llm-scheduler-latency-predictor: kserve-config-llm-scheduler-latency-predictor
+      serving.kserve.io/config-llm-template: kserve-config-llm-template
+      serving.kserve.io/config-llm-tokenizer: kserve-config-llm-tokenizer
+      serving.kserve.io/config-llm-tracing: kserve-config-llm-tracing
+      serving.kserve.io/config-llm-worker-data-parallel: kserve-config-llm-worker-data-parallel
+    appliedConfigs:
+    - name: kserve-config-llm-scheduler
+      namespace: kserve
+      source: Preset
+    - name: kserve-config-llm-router-route
+      namespace: kserve
+      source: Preset
+    - name: kserve-config-llm-template
+      namespace: kserve
+      source: Preset
+    conditions:
+    - lastTransitionTime: "2026-10-12T13:46:24Z"
+      severity: Info
+      status: "True"
+      type: GatewaysReady
+    - lastTransitionTime: "2026-10-11T22:39:03Z"
+      message: 'The following HTTPRoutes are not ready: [llm-glm53/glm53-b200-kserve-route:
+        Accepted=True (reason "Accepted", message "Route is accepted")]'
+      reason: HTTPRoutesNotReady
+      severity: Info
+      status: "False"
+      type: HTTPRoutesReady
+    - lastTransitionTime: "2026-10-07T16:46:44Z"
+      severity: Info
+      status: "True"
+      type: InferencePoolReady
+    - lastTransitionTime: "2026-10-12T13:43:16Z"
+      message: Deployment does not have minimum availability.
+      reason: MinimumReplicasUnavailable
+      severity: Info
+      status: "False"
+      type: MainWorkloadReady
+    - lastTransitionTime: "2026-10-04T11:20:27Z"
+      status: "True"
+      type: PresetsCombined
+    - lastTransitionTime: "2026-10-12T13:46:24Z"
+      message: 'The following HTTPRoutes are not ready: [llm-glm53/glm53-b200-kserve-route:
+        Accepted=True (reason "Accepted", message "Route is accepted")]'
+      reason: HTTPRoutesNotReady
+      status: "False"
+      type: Ready
+    - lastTransitionTime: "2026-10-12T13:46:24Z"
+      message: 'The following HTTPRoutes are not ready: [llm-glm53/glm53-b200-kserve-route:
+        Accepted=True (reason "Accepted", message "Route is accepted")]'
+      reason: HTTPRoutesNotReady
+      status: "False"
+      type: RouterReady
+    - lastTransitionTime: "2026-10-11T21:28:04Z"
+      severity: Info
+      status: "True"
+      type: SchedulerWorkloadReady
+    - lastTransitionTime: "2026-10-12T13:43:16Z"
+      message: Deployment does not have minimum availability.
+      reason: MinimumReplicasUnavailable
+      status: "False"
+      type: WorkloadsReady
+    observedGeneration: 50
+    router:
+      gateways:
+      - group: gateway.networking.k8s.io
+        httpRoutes:
+        - group: gateway.networking.k8s.io
+          kind: HTTPRoute
+          name: glm53-b200-kserve-route
+          namespace: llm-glm53
+        kind: Gateway
+        listeners:
+        - http
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+      scheduler:
+        inferencePool:
+          group: inference.networking.k8s.io
+          kind: InferencePool
+          name: glm53-b200-inference-pool
+        service:
+          group: ""
+          kind: Service
+          name: glm53-b200-epp-service
+    url: http://192.0.2.7/llm-glm53/glm53-b200
+    workloads:
+      primary:
+        apiGroup: apps
+        kind: Deployment
+        name: glm53-b200-kserve
+        readyReplicas: 0
+      scheduler:
+        apiGroup: apps
+        kind: Deployment
+        name: glm53-b200-kserve-router-scheduler
+        readyReplicas: 1
+      service:
+        kind: Service
+        name: glm53-b200-kserve-workload-svc
+kind: List
+metadata:
+  resourceVersion: ""

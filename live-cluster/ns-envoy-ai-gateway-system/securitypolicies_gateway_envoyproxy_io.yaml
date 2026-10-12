@@ -1,0 +1,56 @@
+apiVersion: v1
+items:
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: SecurityPolicy
+  metadata:
+    creationTimestamp: "2026-10-11T07:57:32Z"
+    generation: 3
+    labels:
+      app.kubernetes.io/managed-by: aigw-ui
+    name: aigw-ui-api-key-auth
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54501698"
+    uid: 6b0209d1-efc0-40ee-a13c-07a44ddc0e95
+  spec:
+    apiKeyAuth:
+      credentialRefs:
+      - group: ""
+        kind: Secret
+        name: aigw-ui-api-keys
+      extractFrom:
+      - headers:
+        - Authorization
+        - x-api-key
+      forwardClientIDHeader: x-aigw-client-id
+      sanitize: true
+    targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: envoy-ai-gateway
+      sectionName: http
+  status:
+    ancestors:
+    - ancestorRef:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+        sectionName: http
+      conditions:
+      - lastTransitionTime: "2026-10-11T22:34:48Z"
+        message: Policy has been accepted.
+        observedGeneration: 3
+        reason: Accepted
+        status: "True"
+        type: Accepted
+      - lastTransitionTime: "2026-10-11T22:34:48Z"
+        message: 'This policy is being overridden by other securityPolicies for these
+          routes: [llm-glm53/glm53-b200-kserve-route]'
+        observedGeneration: 3
+        reason: Overridden
+        status: "True"
+        type: Overridden
+      controllerName: gateway.envoyproxy.io/gatewayclass-controller
+kind: List
+metadata:
+  resourceVersion: ""

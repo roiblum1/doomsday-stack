@@ -1,0 +1,91 @@
+apiVersion: v1
+items:
+- apiVersion: aigateway.envoyproxy.io/v1beta1
+  kind: AIGatewayRoute
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:aigateway.envoyproxy.io/AIGatewayRoute:llm-qwen38/qwen38
+      gateway.envoyproxy.io/aigw-ui-quota-revision: dc222c28b37e
+    creationTimestamp: "2026-10-07T18:06:29Z"
+    finalizers:
+    - aigateway.envoyproxy.io/finalizer
+    generation: 2
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38
+    namespace: llm-qwen38
+    resourceVersion: "55027627"
+    uid: dce5be37-75c7-4532-a51e-04105e4ebe71
+  spec:
+    llmRequestCosts:
+    - metadataKey: llm_input_token
+      type: InputToken
+    - metadataKey: llm_output_token
+      type: OutputToken
+    - metadataKey: llm_reasoning_token
+      type: ReasoningToken
+    - metadataKey: llm_total_token
+      type: TotalToken
+    parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: envoy-ai-gateway
+      namespace: envoy-ai-gateway-system
+      sectionName: http
+    rules:
+    - backendRefs:
+      - modelNameOverride: Qwen3.8-27B-FP8
+        name: qwen38-anthropic
+        priority: 0
+        weight: 1
+      matches:
+      - headers:
+        - name: x-ai-eg-model
+          type: Exact
+          value: Qwen3.8-27B-FP8
+      modelsOwnedBy: Envoy AI Gateway
+      name: anthropic-native
+      timeouts:
+        request: 900s
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: qwen38-l4-inference-pool
+        priority: 0
+        weight: 1
+      matches:
+      - headers:
+        - name: x-ai-eg-model
+          type: Exact
+          value: publishers/llm-qwen38/models/Qwen3.8-27B-FP8
+      modelsOwnedBy: Envoy AI Gateway
+      name: openai-epp
+      timeouts:
+        request: 900s
+    - backendRefs:
+      - modelNameOverride: Qwen3.8-27B-FP8
+        name: qwen38-anthropic
+        priority: 0
+        weight: 1
+      matches:
+      - headers:
+        - name: x-ai-eg-model
+          type: RegularExpression
+          value: ^claude-.*$
+      modelsOwnedBy: Envoy AI Gateway
+      name: claude-alias
+      timeouts:
+        request: 900s
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-12T13:29:28Z"
+      message: AI Gateway Route reconciled successfully
+      reason: ReconciliationSucceeded
+      status: "True"
+      type: Accepted
+kind: List
+metadata:
+  resourceVersion: ""

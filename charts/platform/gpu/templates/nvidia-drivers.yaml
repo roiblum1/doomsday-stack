@@ -1,0 +1,19 @@
+{{- if .Values.nvidiaDrivers.enabled }}
+{{- $defaults := .Values.nvidiaDrivers.defaults }}
+{{- range $drv := .Values.nvidiaDrivers.drivers }}
+{{- /* Merge per-driver spec overrides onto the shared defaults (deep). */}}
+{{- $spec := mergeOverwrite (deepCopy $defaults) (deepCopy $drv.spec) }}
+---
+apiVersion: nvidia.com/v1alpha1
+kind: NVIDIADriver
+metadata:
+  name: {{ $drv.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    {{- include "gpu.labels" $ | nindent 4 }}
+spec:
+  {{- toYaml $spec | nindent 2 }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,23 @@
+{{- $files := .Files.Glob "files/dashboards/*.json" -}}
+{{- if $files }}
+# One ConfigMap per dashboard: a single combined ConfigMap exceeds the API
+# server's 262144-byte metadata.annotations limit (kubectl/oc apply embed the
+# full object in kubectl.kubernetes.io/last-applied-configuration), which
+# makes the apply fail. The Deployment mounts all of them into
+# /var/lib/grafana/dashboards via a projected volume.
+{{- range $path, $_ := $files }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-{{ base $path | trimSuffix ".json" }}
+  namespace: openshift-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    app: grafana
+data:
+  {{ base $path }}: |-
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}
+{{- end }}

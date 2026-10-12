@@ -1,0 +1,26 @@
+apiVersion: v1
+items:
+- apiVersion: cert-manager.io/v1
+  kind: Issuer
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-kserve-deploy:cert-manager.io/Issuer:kserve/selfsigned-issuer
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T15:01:10Z"
+    generation: 1
+    name: selfsigned-issuer
+    namespace: kserve
+    resourceVersion: "593957"
+    uid: fb0ee751-f991-4b53-bf58-62856fec94ad
+  spec:
+    selfSigned: {}
+  status:
+    conditions:
+    - lastTransitionTime: "2026-09-29T15:01:10Z"
+      observedGeneration: 1
+      reason: IsReady
+      status: "True"
+      type: Ready
+kind: List
+metadata:
+  resourceVersion: ""

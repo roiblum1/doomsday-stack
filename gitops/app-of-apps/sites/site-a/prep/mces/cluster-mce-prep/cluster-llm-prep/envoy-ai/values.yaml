@@ -1,0 +1,35 @@
+# Site layer for envoy-ai on cluster-llm-prep.
+#
+# v1.2.0 chart migration (kserve-dissconnected): quota.redis.* became
+# rateLimit.redis.*. The Redis password and CA live only in the live Secret
+# envoy-ai-quota-redis-client (envoy-gateway-system; keys password, ca.crt --
+# the same values the chart baked into this file before 2026-10-11) and are
+# referenced via rateLimit.redis.existingSecret, so no secret material sits
+# in git. Because the chart no longer renders the Secret, Argo CD saw it as
+# an orphan (prune candidate); the live Secret carries
+# argocd.argoproj.io/compare-options=IgnoreExtraneous and
+# argocd.argoproj.io/sync-options=Prune=false so no sync can prune it. If it
+# is ever lost, recreate it from the envoy-ai-chart git history (pre
+# 2026-10-11 values) or the hub redis credentials. The chart's dataplane SCC
+# (dropped during the migration) is back:
+# the live data-plane pods are still assigned it and the controller needs
+# `use` on it to patch extproc-config-hash. The service stays a LoadBalancer
+# with client source IPs preserved.
+gateway:
+  envoyProxy:
+    # 3 data-plane replicas: the chart default is 1, but the LoadBalancer
+    # with externalTrafficPolicy: Local only routes to nodes running an
+    # Envoy pod -- with one replica only a single node serves the gateway.
+    replicas: 3
+    service:
+      externalTrafficPolicy: Local
+      type: LoadBalancer
+openshift:
+  securityContextConstraints:
+    dataplaneSCC:
+      enabled: true
+rateLimit:
+  redis:
+    tls: true
+    url: host.example.internal:443
+    existingSecret: envoy-ai-quota-redis-client

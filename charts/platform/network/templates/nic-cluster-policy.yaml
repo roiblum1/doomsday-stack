@@ -1,0 +1,132 @@
+{{- if .Values.nicClusterPolicy.enabled }}
+apiVersion: mellanox.com/v1alpha1
+kind: NicClusterPolicy
+metadata:
+  name: {{ .Values.nicClusterPolicy.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    {{- include "network.labels" . | nindent 4 }}
+spec:
+  {{- if eq (default "roce" .Values.fabric) "roce" }}
+  {{- with .Values.nicClusterPolicy.nodeAffinity }}
+  nodeAffinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.nicClusterPolicy.tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  {{- if not .Values.nicNodePolicies.enabled }}
+  ofedDriver:
+    {{- if .Values.ofedDriver.certConfigName }}
+    certConfig:
+      name: {{ .Values.ofedDriver.certConfigName }}
+    {{- end }}
+    env:
+      {{- range .Values.ofedDriver.env }}
+      - name: {{ .name }}
+        value: {{ .value | quote }}
+      {{- end }}
+    forcePrecompiled: {{ .Values.ofedDriver.forcePrecompiled }}
+    image: {{ .Values.ofedDriver.image }}
+    {{- if .Values.ofedDriver.imagePullSecrets }}
+    imagePullSecrets:
+      {{- range .Values.ofedDriver.imagePullSecrets }}
+      - {{ . }}
+      {{- end }}
+    {{- else }}
+    imagePullSecrets: []
+    {{- end }}
+    livenessProbe:
+      initialDelaySeconds: 30
+      periodSeconds: 30
+    readinessProbe:
+      initialDelaySeconds: {{ .Values.ofedDriver.readinessInitialDelaySeconds }}
+      periodSeconds: 30
+    repository: {{ .Values.ofedDriver.repository }}
+    startupProbe:
+      initialDelaySeconds: 10
+      periodSeconds: 20
+    terminationGracePeriodSeconds: 300
+    upgradePolicy:
+      autoUpgrade: {{ .Values.ofedDriver.autoUpgrade }}
+      drain:
+        deleteEmptyDir: true
+        enable: true
+        force: {{ .Values.ofedDriver.drainForce }}
+        podSelector: ""
+        timeoutSeconds: 300
+      maxParallelUpgrades: {{ .Values.ofedDriver.maxParallelUpgrades }}
+      safeLoad: false
+    version: {{ .Values.ofedDriver.version }}
+  {{- end }}
+  {{- if .Values.nicConfigurationOperator.enabled }}
+  nicConfigurationOperator:
+    configurationDaemon:
+      containerResources:
+        - limits:
+            memory: 5Gi
+          name: nic-configuration-daemon
+          requests:
+            cpu: 100m
+            memory: 512Mi
+      image: {{ .Values.nicConfigurationOperator.daemonImage }}
+      {{- if .Values.nicConfigurationOperator.daemonImagePullSecrets }}
+      imagePullSecrets:
+        {{- range .Values.nicConfigurationOperator.daemonImagePullSecrets }}
+        - {{ . }}
+        {{- end }}
+      {{- else }}
+      imagePullSecrets: []
+      {{- end }}
+      repository: {{ .Values.nicConfigurationOperator.daemonRepository }}
+      version: {{ .Values.nicConfigurationOperator.daemonVersion }}
+    logLevel: info
+    operator:
+      image: {{ .Values.nicConfigurationOperator.operatorImage }}
+      {{- if .Values.nicConfigurationOperator.operatorImagePullSecrets }}
+      imagePullSecrets:
+        {{- range .Values.nicConfigurationOperator.operatorImagePullSecrets }}
+        - {{ . }}
+        {{- end }}
+      {{- else }}
+      imagePullSecrets: []
+      {{- end }}
+      repository: {{ .Values.nicConfigurationOperator.operatorRepository }}
+      version: {{ .Values.nicConfigurationOperator.operatorVersion }}
+  {{- end }}
+  {{- if .Values.nvIpam.enabled }}
+  nvIpam:
+    enableWebhook: {{ .Values.nvIpam.enableWebhook }}
+    image: {{ .Values.nvIpam.image }}
+    {{- if .Values.nvIpam.imagePullSecrets }}
+    imagePullSecrets:
+      {{- range .Values.nvIpam.imagePullSecrets }}
+      - {{ . }}
+      {{- end }}
+    {{- else }}
+    imagePullSecrets: []
+    {{- end }}
+    repository: {{ .Values.nvIpam.repository }}
+    version: {{ .Values.nvIpam.version }}
+  {{- end }}
+  {{- if and .Values.rdmaSharedDevicePlugin.enabled (not .Values.nicNodePolicies.enabled) }}
+  rdmaSharedDevicePlugin:
+    config: |
+      {{- include "network.rdmaConfig" (dict "resourceName" .Values.rdmaSharedDevicePlugin.resourceName "rdmaHcaMax" .Values.rdmaSharedDevicePlugin.rdmaHcaMax "selectors" .Values.rdmaSharedDevicePlugin.selectors "ifNames" .Values.rdmaSharedDevicePlugin.ifNames) | nindent 6 }}
+    image: {{ .Values.rdmaSharedDevicePlugin.image }}
+    {{- if .Values.rdmaSharedDevicePlugin.imagePullSecrets }}
+    imagePullSecrets:
+      {{- range .Values.rdmaSharedDevicePlugin.imagePullSecrets }}
+      - {{ . }}
+      {{- end }}
+    {{- else }}
+    imagePullSecrets: []
+    {{- end }}
+    repository: {{ .Values.rdmaSharedDevicePlugin.repository }}
+    version: {{ .Values.rdmaSharedDevicePlugin.version }}
+  {{- end }}
+{{- end }}

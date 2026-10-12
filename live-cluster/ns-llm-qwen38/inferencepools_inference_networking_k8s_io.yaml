@@ -1,0 +1,63 @@
+apiVersion: v1
+items:
+- apiVersion: inference.networking.k8s.io/v1
+  kind: InferencePool
+  metadata:
+    creationTimestamp: "2026-10-07T14:22:18Z"
+    generation: 2
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen38-l4
+      app.kubernetes.io/part-of: llminferenceservice
+    name: qwen38-l4-inference-pool
+    namespace: llm-qwen38
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: qwen38-l4
+      uid: 4ad66e96-4bef-49a7-a56a-2f4df47b3806
+    resourceVersion: "54438764"
+    uid: 907f5234-29a1-486d-8350-829c154a7cd2
+  spec:
+    appProtocol: http
+    endpointPickerRef:
+      failureMode: FailOpen
+      group: ""
+      kind: Service
+      name: qwen38-l4-epp-service
+      port:
+        number: 9002
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: qwen38-l4
+        app.kubernetes.io/part-of: llminferenceservice
+        kserve.io/component: workload
+    targetPorts:
+    - number: 8000
+  status:
+    parents:
+    - conditions:
+      - lastTransitionTime: "2026-10-11T20:48:47Z"
+        message: 'InferencePool has been Accepted by controller ai-gateway-controller:
+          InferencePool reconciled successfully'
+        observedGeneration: 2
+        reason: Accepted
+        status: "True"
+        type: Accepted
+      - lastTransitionTime: "2026-10-11T20:48:47Z"
+        message: 'Reference resolution by controller ai-gateway-controller: All references
+          resolved successfully'
+        observedGeneration: 2
+        reason: ResolvedRefs
+        status: "True"
+        type: ResolvedRefs
+      parentRef:
+        group: gateway.networking.k8s.io
+        kind: Gateway
+        name: envoy-ai-gateway
+        namespace: envoy-ai-gateway-system
+kind: List
+metadata:
+  resourceVersion: ""

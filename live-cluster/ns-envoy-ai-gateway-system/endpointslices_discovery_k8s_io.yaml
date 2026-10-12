@@ -1,0 +1,63 @@
+apiVersion: v1
+items:
+- addressType: IPv4
+  apiVersion: discovery.k8s.io/v1
+  endpoints:
+  - addresses:
+    - 192.0.2.102
+    conditions:
+      ready: true
+      serving: true
+      terminating: false
+    nodeName: ocp-util-node-1
+    targetRef:
+      kind: Pod
+      name: ai-gateway-controller-796f5f5467-7fv5c
+      namespace: envoy-ai-gateway-system
+      uid: 4a752a3d-d0c8-4b47-b75f-e0a4154ec05d
+  kind: EndpointSlice
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-11T20:48:33Z"
+    creationTimestamp: "2026-09-29T13:12:41Z"
+    generateName: ai-gateway-controller-
+    generation: 37
+    labels:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: ai-gateway
+      app.kubernetes.io/version: v1.2.0
+      endpointslice.kubernetes.io/managed-by: endpointslice-controller.k8s.io
+      helm.sh/chart: ai-gateway-v1.2.0
+      kubernetes.io/service-name: ai-gateway-controller
+    name: ai-gateway-controller-vdq68
+    namespace: envoy-ai-gateway-system
+    ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Service
+      name: ai-gateway-controller
+      uid: b2461fbf-4002-458f-b3e5-8c2cef22dcda
+    resourceVersion: "54438626"
+    uid: ece5069b-5b9e-499b-8ac3-947bb22ef62b
+  ports:
+  - appProtocol: http
+    name: http-metrics
+    port: 8080
+    protocol: TCP
+  - appProtocol: http
+    name: mutating-webhook
+    port: 9443
+    protocol: TCP
+  - appProtocol: grpc
+    name: grpc
+    port: 1063
+    protocol: TCP
+  - appProtocol: grpc
+    name: ratelimit-xds
+    port: 18002
+    protocol: TCP
+kind: List
+metadata:
+  resourceVersion: ""

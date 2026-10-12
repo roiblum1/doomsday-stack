@@ -1,0 +1,162 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "hpc-observability.fullname" . }}-fabric
+  namespace: hpc-observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    {{- include "hpc-observability.labels" . | nindent 4 }}
+    hpc.observability/mode: fabric
+spec:
+  selector:
+    matchLabels:
+      {{- include "hpc-observability.selectorLabels" . | nindent 6 }}
+      hpc.observability/mode: fabric
+  revisionHistoryLimit: 10
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        {{- include "hpc-observability.labels" . | nindent 8 }}
+        hpc.observability/mode: fabric
+    spec:
+      serviceAccount: {{ include "hpc-observability.fullname" . }}
+      serviceAccountName: {{ include "hpc-observability.fullname" . }}
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      {{- with .Values.daemonset.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.daemonset.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: fabric-exporter
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /usr/local/bin/hpc-observability-exporter
+          env:
+            - name: HPC_EXPORTER_MODE
+              value: fabric
+            - name: HPC_EXPORTER_ADDR
+              value: "0.0.0.0"
+            - name: HPC_EXPORTER_PORT
+              value: {{ .Values.fabric.port | quote }}
+            - name: HPC_FABRIC_POLL_INTERVAL
+              value: {{ .Values.fabric.env.pollInterval | quote }}
+            - name: HPC_ENABLE_RDMA
+              value: {{ .Values.fabric.env.enableRdma | quote }}
+            - name: HPC_ENABLE_ETHTOOL
+              value: {{ .Values.fabric.env.enableEthtool | quote }}
+            - name: HPC_ENABLE_GPU
+              value: {{ .Values.fabric.env.enableGpu | quote }}
+            - name: HPC_ENABLE_PCIE
+              value: {{ .Values.fabric.env.enablePcie | quote }}
+            - name: HOST_ROOT
+              value: {{ .Values.fabric.env.hostRoot | quote }}
+            - name: NVIDIA_SMI_PATH
+              value: {{ .Values.fabric.env.nvidiaSmiPath | quote }}
+            - name: NVIDIA_LD_LIBRARY_PATH
+              value: {{ .Values.fabric.env.nvidiaLdLibraryPath | quote }}
+            - name: HPC_LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: HPC_CLUSTER_ID
+              value: {{ .Values.clusterId | default .Values.global.clusterName | quote }}
+          ports:
+            - containerPort: {{ .Values.fabric.port }}
+              name: fabric-metrics
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /health
+              port: fabric-metrics
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            successThreshold: 1
+            timeoutSeconds: 5
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: fabric-metrics
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          startupProbe:
+            failureThreshold: 6
+            httpGet:
+              path: /health
+              port: fabric-metrics
+              scheme: HTTP
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 3
+          {{- with .Values.fabric.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: true
+            capabilities:
+              add:
+                - NET_ADMIN
+                - SYS_ADMIN
+            privileged: true
+            readOnlyRootFilesystem: true
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /sys
+              name: sys
+            - mountPath: /host
+              name: host-root
+            - mountPath: /dev
+              name: dev
+            - mountPath: /lib/modules
+              name: lib-modules
+              readOnly: true
+            - mountPath: /tmp
+              name: tmp
+      volumes:
+        - hostPath:
+            path: /sys
+            type: Directory
+          name: sys
+        - hostPath:
+            path: /
+            type: Directory
+          name: host-root
+        - hostPath:
+            path: /dev
+            type: Directory
+          name: dev
+        - hostPath:
+            path: /lib/modules
+            type: Directory
+          name: lib-modules
+        - emptyDir: {}
+          name: tmp

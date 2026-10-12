@@ -1,0 +1,3 @@
+# Site layer for qwen38 on cluster-llm-prep (this file's existence is
+# what the operators ApplicationSet's git-directory generator matches).
+# All deployment values come from the chart defaults.

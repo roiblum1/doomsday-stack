@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: rdma-exporter
+  namespace: rdma-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    {{- include "rdma-exporter.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "rdma-exporter.selectorLabels" . | nindent 6 }}
+  revisionHistoryLimit: 10
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        {{- include "rdma-exporter.labels" . | nindent 8 }}
+    spec:
+      serviceAccount: rdma-exporter
+      serviceAccountName: rdma-exporter
+      # No imagePullSecrets: OpenShift auto-injects the internal-registry dockercfg
+      # into the service account (matches the live DaemonSet).
+      hostIPC: true
+      hostNetwork: true
+      hostPID: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      {{- with .Values.daemonset.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.daemonset.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: rdma-exporter
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - python3
+            - /opt/rdma-exporter/rdma_exporter.py
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: CLUSTER_NAME
+              value: {{ .Values.env.clusterName | default .Values.global.clusterName | quote }}
+          envFrom:
+            - configMapRef:
+                name: rdma-exporter-env
+          ports:
+            - containerPort: {{ .Values.env.rdmaExporterPort | int }}
+              name: metrics
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.env.rdmaExporterPort | int }}
+              scheme: HTTP
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.env.rdmaExporterPort | int }}
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          {{- with .Values.daemonset.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /opt/rdma-exporter
+              name: script
+              readOnly: true
+            - mountPath: /sys
+              name: sys
+            - mountPath: /host
+              name: host-root
+            - mountPath: /dev
+              name: dev
+            - mountPath: /lib/modules
+              name: lib-modules
+              readOnly: true
+      volumes:
+        - name: script
+          configMap:
+            defaultMode: 493
+            name: rdma-exporter-script
+        - hostPath:
+            path: /sys
+            type: Directory
+          name: sys
+        - hostPath:
+            path: /
+            type: Directory
+          name: host-root
+        - hostPath:
+            path: /dev
+            type: Directory
+          name: dev
+        - hostPath:
+            path: /lib/modules
+            type: Directory
+          name: lib-modules

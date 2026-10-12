@@ -1,0 +1,462 @@
+# ---------------------------------------------------------------------------
+# envoy-ai-gateway-openshift
+#
+# ONE Argo CD Application points at this directory. Order inside it:
+#
+#   wave -10  CRDs, from crds/  (aigateway.envoyproxy.io)
+#   wave  -5  SCC RoleBinding
+#   wave   0  AI Gateway controller, webhook Certificate, EnvoyProxy
+#   wave   1  GatewayClass
+#   wave   2  Gateway
+#   wave   3  OpenShift Route
+#
+# Needs, from the envoy-gateway-openshift Application: Envoy Gateway running
+# and its gateway.envoyproxy.io CRDs (EnvoyProxy). Needs cert-manager.
+#
+# `openshift:`, `argocd:` and `gateway:` are added by this wrapper chart.
+# `ai-gateway:` is passed straight through to the upstream `ai-gateway-helm`
+# v1.2.0 subchart.
+# ---------------------------------------------------------------------------
+
+openshift:
+  securityContextConstraints:
+    # The AI Gateway controller runs as UID 65532, which OpenShift's default
+    # restricted-v2 SCC rejects (MustRunAsRange). See the equivalent comment in
+    # the envoy-gateway-openshift chart for the full reasoning.
+    #
+    # This binding covers the controller in THIS namespace. The ext_proc
+    # sidecar that the mutating webhook injects runs inside the Envoy
+    # data-plane pods in the Envoy Gateway namespace, and is covered by the
+    # binding that the envoy-gateway-openshift chart creates there.
+    enabled: true
+    name: nonroot-v2
+    bindNamespaceServiceAccounts: true
+    extraServiceAccounts: []
+
+# ---------------------------------------------------------------------------
+# Argo CD
+#
+# Only sync waves, and only for the resources THIS wrapper chart adds -- the
+# upstream subchart's resources cannot be annotated without forking its
+# templates, and do not need to be: they all belong in wave 0. The CRDs in
+# crds/ carry wave -10 as a static annotation, because Helm never templates
+# crds/.
+#
+# Helm ignores these annotations completely, so a plain `helm install` behaves
+# exactly as before. Under Argo CD the numbers are relative, not absolute; only
+# their order matters. See README, "Deploying with Argo CD", for the table.
+# ---------------------------------------------------------------------------
+argocd:
+  syncWave:
+    # Before anything that schedules a pod, so the controller passes SCC
+    # admission on its first attempt rather than after a ReplicaSet backoff.
+    # Unlike the other charts here this is NOT a Helm hook, because the
+    # upstream ai-gateway chart has no hooks of its own to be ordered against;
+    # an ordinary resource in an earlier wave is the better Argo CD shape,
+    # since hook resources are deleted and recreated on every sync.
+    sccRoleBinding: "-5"
+
+    # Wave 0 alongside the upstream controller Deployment: the GatewayClass
+    # references it via parametersRef, and Envoy Gateway reads it when it
+    # programs the Gateway.
+    envoyProxy: "0"
+
+    # After wave 0 is healthy, i.e. after the AI Gateway controller is Ready.
+    gatewayClass: "1"
+
+    # THIS IS WHY THE MANUAL `oc rollout restart deployment/envoy-gateway`
+    # STEP DISAPPEARS UNDER ARGO CD.
+    #
+    # Envoy Gateway dials the AI Gateway extension server lazily -- the
+    # connection is made the first time an xDS translation hook is needed,
+    # which is the first time it programs a Gateway. With Helm the Gateway and
+    # the controller are applied in the same pass, so Envoy Gateway can reach
+    # that point before the extension server exists and the restart is what
+    # makes it retry. Here the Gateway is not created until wave 1 is healthy,
+    # so the extension server is already up the first time Envoy Gateway needs
+    # it. See README, "Deploying with Argo CD".
+    gateway: "2"
+
+    # With the Gateway it targets. A policy whose target does not exist yet is
+    # only reported as not accepted, so this is for legibility.
+    clientTrafficPolicy: "2"
+    # With the controller: it only needs the controller's Service to exist.
+    rateLimit: "0"
+
+    # Last: it targets the Service Envoy Gateway creates in response to the
+    # Gateway. Creating it earlier is harmless -- an OpenShift Route may point
+    # at a Service that does not exist yet, it just answers 503 -- so this is
+    # ordering for legibility, not correctness.
+    route: "3"
+
+# ---------------------------------------------------------------------------
+# Gateway wiring
+#
+# Optional. Set enabled=false to install only the AI Gateway control plane and
+# bring your own GatewayClass/Gateway.
+# ---------------------------------------------------------------------------
+gateway:
+  enabled: true
+
+  # Cluster-scoped. Additive: it does not touch any existing GatewayClass.
+  gatewayClass:
+    create: true
+    name: envoy-ai-gateway
+    controllerName: gateway.envoyproxy.io/gatewayclass-controller
+
+  name: envoy-ai-gateway
+  # Namespace for the Gateway itself. Empty means the release namespace.
+  namespace: ""
+
+  # Namespace where Envoy Gateway runs. Envoy Gateway materialises the Envoy
+  # data-plane Deployment, Service and ServiceAccount here, not next to the
+  # Gateway.
+  envoyGatewayNamespace: envoy-gateway-system
+
+  listener:
+    name: http
+    # Gateway API listener port, i.e. the port on the generated Service.
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        # OVERRIDE of this wrapper's own former default (`Same`), and REQUIRED
+        # with KServe (CLAUDE.md invariant 12). The llmisvc controller creates
+        # one HTTPRoute per LLMInferenceService in the MODEL's namespace, with
+        # this Gateway as parentRef; `Same` rejects every one of them as
+        # NotAllowedByListeners. `All` is what KServe's own dependency
+        # installer uses. To enumerate model namespaces instead, the whole
+        # allowedRoutes block is passed through verbatim:
+        #
+        #   allowedRoutes:
+        #     namespaces:
+        #       from: Selector
+        #       selector:
+        #         matchLabels:
+        #           kserve.io/inference: "true"
+        from: All
+
+  # This cluster's name as registered in aigw-ui. Sent back in the response
+  # header x-llm-served-by on the peer listener, and written into the client
+  # certificate this gateway shows to other sites. Needed with peers.enabled.
+  site: ""
+
+  # ---- A second listener, for requests other sites forward here ----------
+  # Part of an aigw-ui fleet: a client enters at any site, that site checks
+  # the key and the budget, and forwards the request to the site that serves
+  # the model, over mutual TLS. Model charts attach their serving route here
+  # (model-chart peer.enabled) and nothing a client can reach is on it.
+  peers:
+    enabled: false
+    name: peers
+    port: 8443
+    # Server name every site's certificate carries: peers.llm.<domain>. The
+    # same on all sites; aigw-ui sends it (FLEET_PEER_SNI or FLEET_DOMAIN).
+    serverName: ""
+    # DO NOT REMOVE: only namespaces with this label may attach a route.
+    allowedNamespaceLabels:
+      aigw-ui.io/serving: "true"
+    # The fleet CA signs every site's certificates. Its key pair has to be
+    # the same Secret on every cluster (ACM policy or similar).
+    issuer:
+      # ClusterIssuer: model charts can then issue client certificates for
+      # their own benchmark jobs. The CA Secret is read from cert-manager's
+      # own namespace. Issuer: the Secret is read from the Gateway namespace.
+      kind: ClusterIssuer
+      name: llm-peer-issuer
+      create: true
+      caSecret: llm-fleet-ca
+    # The fleet CA certificate (PEM), published as ConfigMap `caConfigMap`
+    # with the key ca.crt. The listener checks client certificates against
+    # it and aigw-ui's entry routes check the other sites' certificates.
+    # Empty: the ConfigMap is not rendered and has to exist.
+    caBundle: ""
+    caConfigMap: llm-peer-ca
+    serverSecret: llm-peer-server
+    clientSecret: llm-peer-client
+    # Renewed 30 days before the end. An expired certificate takes the site
+    # out of every model without an error anywhere.
+    duration: 2160h
+    renewBefore: 720h
+
+  # GET <path> on the client listener answers 200 without a key. For the
+  # health monitor of a global load balancer.
+  health:
+    enabled: false
+    path: /healthz/gateway
+
+  # How much of a request Envoy may buffer on a client connection.
+  #
+  # ADDED by this wrapper, and needed for real prompts. Envoy Gateway's default
+  # is 32 KiB, and the AI Gateway has to buffer the whole request body to read
+  # the model name from it. Measured on this stack: a chat request of 35 KB got
+  # `413 Payload Too Large`, one of 29 KB passed. An agent's request with a
+  # long conversation is often several hundred KB.
+  #
+  # The values are upstream's own, from its "basic usage" example: 50Mi for
+  # the buffer, and the two HTTP/2 windows at Envoy's defaults, which Envoy
+  # Gateway otherwise lowers and which cap a request body the same way.
+  # The policy targets the whole Gateway. A listener that needs its own
+  # ClientTrafficPolicy (client certificates on a peer listener, say) must
+  # carry these settings too: a policy on a listener replaces this one there.
+  clientTrafficPolicy:
+    create: true
+    name: client-buffer-limit
+    bufferLimit: 50Mi
+    # DO NOT REMOVE any entry: a client must not set these. The gateway and
+    # the scheduler set them after the key is checked.
+    removeRequestHeaders:
+      - x-aigw-client-id
+      - x-llm-d-inference-objective
+      - x-llm-d-inference-fairness-id
+      - x-gateway-inference-objective
+      - x-gateway-inference-fairness-id
+      - x-gateway-destination-endpoint
+      - x-gateway-destination-endpoint-subset
+      - x-llm-d-model-name-rewrite
+      - x-gateway-model-name-rewrite
+      - x-site-pin
+    # A streamed answer may be silent for a long time while the model thinks.
+    idleTimeout: 3600s
+    http2:
+      initialStreamWindowSize: 16Mi
+      initialConnectionWindowSize: 24Mi
+
+  # EnvoyProxy tunes the data plane that Envoy Gateway generates for this
+  # Gateway.
+  envoyProxy:
+    create: true
+    replicas: 1
+
+    # Data-plane Envoy image. Envoy Gateway's compiled-in default points at
+    # docker.io; in disconnected / mirrored registries a digest-pinned mirror
+    # reference is required because ImageTagMirrorSet does not redirect digest
+    # references. The CR-level image overrides any controller default.
+    image: registry-internal/kserve/envoyproxy/envoy:distroless-v1.39.1@sha256:eb2c01c13125d1629637cb4e4cce7207009fb7cc2c8027f9742758549d15b6f4
+
+    # Rendered only with 2 or more replicas: with one, it would block every
+    # node drain.
+    pdb:
+      minAvailable: 1
+    # How long a proxy pod that is being stopped keeps its open streams. A
+    # restart cuts every answer that entered here, wherever it is served.
+    # Empty keeps Envoy Gateway's default (60s).
+    shutdown:
+      drainTimeout: ""
+      minDrainDuration: ""
+    # One JSON line per request with what is needed to follow a request from
+    # the site a client entered to the site that served it. Off keeps Envoy
+    # Gateway's default log.
+    accessLog:
+      enabled: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 1024Mi
+
+    service:
+      # Fixed name for the Service that Envoy Gateway generates for this
+      # Gateway. Without this, Envoy Gateway names it
+      # `envoy-<48-char-hash>` (derived from the Gateway's namespace/name),
+      # which cannot be referenced from a template -- so the Route would have
+      # nothing stable to point at.
+      name: envoy-ai-gateway
+
+      # ClusterIP + an OpenShift Route, or LoadBalancer.
+      #
+      # This test cluster reports platform "None" with no MetalLB, so a
+      # LoadBalancer Service would stay Pending forever and the Gateway would
+      # never report an address. On a cluster that HAS a load-balancer
+      # provider, use values-loadbalancer.yaml instead of editing this.
+      type: ClusterIP
+
+      # Only emitted when non-empty, so the defaults stay schema-valid.
+      annotations: {}
+      loadBalancerIP: ""
+      loadBalancerClass: ""
+      loadBalancerSourceRanges: []
+      # "Local" preserves the client source IP but only routes to nodes running
+      # an Envoy pod. "Cluster" (the Kubernetes default) spreads traffic but
+      # SNATs the source IP.
+      externalTrafficPolicy: ""
+      # null leaves it to Kubernetes; false suppresses NodePort allocation for
+      # LoadBalancer Services on providers that do not need them.
+      allocateLoadBalancerNodePorts: null
+
+  # OpenShift Route. Independent of the service type above -- you can front a
+  # LoadBalancer Service with a Route too, though it is usually redundant.
+  # values-loadbalancer.yaml turns this off.
+  route:
+    create: true
+    name: envoy-ai-gateway
+    host: ""
+
+    # Which Service port the Route targets. A Route's targetPort must name the
+    # Service port, or give the pods' target port -- NOT the Service port
+    # number. Pointing it at 80 yields a 503 from the router even though the
+    # Service itself answers on 80.
+    #
+    # Left empty, this is derived as Envoy Gateway names its listener ports:
+    # lower("<PROTOCOL>-<port>"), e.g. HTTP/80 -> "http-80"
+    # (internal/gatewayapi.irListenerPortName). Set it explicitly if that
+    # convention ever changes.
+    #
+    # The numeric alternative is the Envoy container port: Envoy Gateway shifts
+    # listener ports below 1024 by +10000, so 80 is served on 10080.
+    targetPort: ""
+
+    annotations: {}
+    tls:
+      enabled: true
+      termination: edge
+      insecureEdgeTerminationPolicy: Redirect
+
+# ---------------------------------------------------------------------------
+# The rate limit service that enforces QuotaPolicy, and its Redis.
+#
+# The upstream chart only tells the controller where this service is
+# (`ai-gateway.controller.quotaRateLimitServiceAddr`); it does not deploy
+# it. Without it no quota is counted or enforced. It runs in the Envoy
+# Gateway namespace, under the name the controller looks for by default,
+# and takes its limits from the controller's xDS port 18002.
+#
+# Every site of a fleet has to use the SAME Redis, and so does aigw-ui,
+# which reads the counters from it.
+# ---------------------------------------------------------------------------
+rateLimit:
+  # Without this service a QuotaPolicy is accepted and never enforced.
+  enabled: true
+  name: envoy-ai-gateway-ratelimit
+  image: docker.io/envoyproxy/ratelimit:0482748e
+  replicas: 1
+  logLevel: info
+  resources: {}
+  redis:
+    # host:port. Required unless existingSecret is set. The default is only a
+    # name that lets the chart render with no overrides: this repo deploys no
+    # Redis. Point it at the Redis all sites and aigw-ui share. While it is
+    # unreachable the rate limit pod does not become ready and quotas are
+    # not enforced.
+    url: "redis.envoy-gateway-system.svc.cluster.local:6379"
+    # Password, if Redis asks for one.
+    auth: ""
+    tls: false
+    # PEM of the CA that signed Redis's certificate, when `tls: true` and the
+    # certificate is not from a CA the image already trusts (an OpenShift
+    # Route with TLS passthrough fronts Redis with a self-signed one, say).
+    # Rendered into the Secret below as `ca.crt`, mounted read-only at
+    # /etc/envoy-ai-gateway-ratelimit-redis and pointed at by REDIS_TLS_CACERT.
+    # Without it the client verifies against the system CA pool and the
+    # connection to such a Redis fails. Cannot be combined with
+    # existingSecret: a Secret the chart does not render cannot carry a key
+    # the chart adds.
+    caCert: ""
+    # A Secret in the Envoy Gateway namespace with REDIS_URL and, if needed,
+    # REDIS_AUTH. Use it under Argo CD to keep the password out of git.
+    existingSecret: ""
+
+# ---------------------------------------------------------------------------
+# Upstream ai-gateway-helm values
+#
+# This chart overrides TWO upstream values (controller.mutatingWebhook.
+# certManager.enable and controller.mcp.sessionEncryption.seed) and ADDS one:
+# controller.mutatingWebhook.namespaceSelector. Everything else below is
+# upstream's own default, repeated only so the knobs you are most likely to
+# reach for are visible without extracting the subchart -- deleting any of them
+# changes nothing.
+#
+# Verified: `controller.image.repository` already defaults to
+# docker.io/envoyproxy/ai-gateway-controller upstream and `tag: ""` resolves to
+# the chart appVersion, so pinning either produced byte-identical output. The
+# earlier explicit pins were removed once measured.
+# ---------------------------------------------------------------------------
+ai-gateway:
+  controller:
+    image:
+      repository: docker.io/envoyproxy/ai-gateway-controller
+      tag: ""          # "" -> chart appVersion -> v1.2.0
+    replicaCount: 1
+    logLevel: info
+
+    mutatingWebhook:
+      # ADDED (absent upstream).
+      #
+      # This MutatingWebhookConfiguration is cluster-scoped, matches pod CREATE
+      # and has failurePolicy: Fail. Upstream's objectSelector (below, at its
+      # default) already narrows it to envoy-gateway-managed pods, so an outage
+      # of the AI Gateway controller blocks only Envoy data-plane pods.
+      #
+      # namespaceSelector narrows it further to the namespace this stack owns,
+      # which is what keeps a cluster-scoped Fail-policy webhook from being a
+      # shared-cluster risk at all. Remove it if you enable Envoy Gateway's
+      # gatewayNamespaceMode, which places Envoy pods in arbitrary application
+      # namespaces.
+      namespaceSelector:
+        matchExpressions:
+          - key: kubernetes.io/metadata.name
+            operator: In
+            values:
+              - envoy-gateway-system
+
+      # Upstream default, restated for context next to the addition above.
+      objectSelector:
+        matchLabels:
+          app.kubernetes.io/managed-by: envoy-gateway
+
+      certManager:
+        # OVERRIDE (upstream: false). REQUIRED under Argo CD.
+        #
+        # By default upstream mints the webhook certificate inside the
+        # template: `lookup` the existing Secret, else genCA/genSignedCert.
+        # `lookup` needs a live cluster connection; Argo CD renders in the
+        # repo-server, which has none, so it returns nil on EVERY render and a
+        # new CA and key are generated each time. Measured: two consecutive
+        # renders differ, only in that Secret. Under Argo CD that means an
+        # Application that is permanently OutOfSync and, with selfHeal, a
+        # webhook keypair rotated on every sync.
+        #
+        # cert-manager issues the same self-signed certificate from a real
+        # controller instead, so the render is deterministic (the Secret
+        # disappears, a Certificate and a selfSigned Issuer replace it).
+        # cert-manager is already a hard prerequisite of this stack for
+        # KServe's webhook, so this adds no new dependency.
+        enable: true
+        # Upstream defaults, restated so the objects this creates are visible:
+        # both live in the release namespace and write into the Secret the
+        # controller Deployment already mounts.
+        issuerName: self-signed-issuer-for-mutating-webhook
+        certificateName: self-signed-cert-for-mutating-webhook
+
+    mcp:
+      sessionEncryption:
+        # OVERRIDE (upstream since v1.2.0: "", a random seed per install).
+        # REQUIRED under Argo CD, for the same reason as certManager above.
+        #
+        # With an empty seed upstream `lookup`s the Secret it made earlier and
+        # generates 64 random characters when there is none. Argo CD renders
+        # without a cluster, so `lookup` finds nothing on EVERY render.
+        # Measured: two consecutive renders of v1.2.0 differ in exactly this
+        # Secret. That is an Application that is permanently OutOfSync, and a
+        # seed that changes on every sync.
+        #
+        # This is the value every release up to v1.1.0 used, so an upgrade
+        # changes nothing. It is public, so it protects nothing: it is safe
+        # here only because this stack serves no MCPRoute. BEFORE creating an
+        # MCPRoute, create a Secret with a random `seed` key in this namespace
+        # and name it in `existingSecret`, which makes upstream skip its own.
+        seed: default-insecure-seed
+        existingSecret: ""
+
+  extProc:
+    image:
+      repository: docker.io/envoyproxy/ai-gateway-extproc
+      tag: ""          # "" -> chart appVersion -> v1.2.0
+    logLevel: info
+
+  # Upstream default. Must match where Envoy Gateway actually runs;
+  # templates/_validate.tpl fails the render if it disagrees with
+  # gateway.envoyGatewayNamespace above.
+  envoyGateway:
+    namespace: envoy-gateway-system

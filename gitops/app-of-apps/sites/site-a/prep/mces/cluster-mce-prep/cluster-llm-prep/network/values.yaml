@@ -1,0 +1,143 @@
+# Per-cluster overrides for network on cluster-gpu-test.
+#
+# RoCE is now active for the H200 RoCE node pool only. The cluster still hosts 4 standalone B300
+# GPU nodes that must NOT receive the NVIDIA Network Operator operands; therefore the
+# NicClusterPolicy nodeAffinity/tolerations are pinned to node-role.kubernetes.io/h200-roce
+# instead of the generic "roce" role used by the chart default.
+#
+# Image SHAs below are taken from the installed nvidia-network-operator.v26.4.1 CSV
+# (alm-examples / relatedImages), so they match the operator's own defaults.
+#
+# The chart now supports multiple RoCE node pools via .Values.nicConfigurationTemplates. For
+# this cluster only the h200-roce pool is defined; adding a future b200-roce pool only requires
+# adding another list entry and expanding nicClusterPolicy.nodeAffinity to match b200-roce.
+
+# Keep RoCE fabric (inherits from operators/network/values.yaml; repeated here for clarity).
+fabric: roce
+
+# --- NicClusterPolicy node scoping ---
+# Scope NCO daemon and NV IPAM (which stay in the singleton NicClusterPolicy) to every
+# node that is configured for RoCE driver. This label is applied to all RoCE pools
+# (h200-roce, future b200-roce) and is absent from standalone B300 GPU nodes.
+# No tolerations are needed because the H200 nodes are not tainted; the label selector
+# is sufficient to keep these pods off the B300 standalone GPU nodes.
+nicClusterPolicy:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: nvidia.com/driver-config
+              operator: In
+              values:
+                - roce
+  tolerations: []
+
+# --- OFED driver ---
+# Same OFED version is intended to be used across all RoCE pools in this cluster.
+ofedDriver:
+  repository: registry-internal/operators/nvidia-network-operator/nvidia-network-operator
+  image: doca-driver
+  version: doca3.4.1-26.04-192.0.2.1-5
+  autoUpgrade: false
+  drainForce: false
+  readinessInitialDelaySeconds: 11
+  env:
+    - name: UNLOAD_STORAGE_MODULES
+      value: "true"
+    - name: RESTORE_DRIVER_ON_POD_TERMINATION
+      value: "true"
+  maxParallelUpgrades: 1
+
+# --- NIC Configuration Operator ---
+# SHAs taken from the nvidia-network-operator.v26.4.1 CSV (alm-examples / relatedImages).
+nicConfigurationOperator:
+  daemonRepository: registry-internal/operators/nvidia/mellanox
+  daemonVersion: sha256:ff80af3402473fba6251f36f924ddc50341f954980bfba919cae70925e644318
+  operatorRepository: registry-internal/operators/nvidia/mellanox
+  operatorVersion: sha256:b5e9733a01ba6031ecbf71024a98ad02b9052d11a10d3df62daf75135a07ba9b
+
+# --- NV IPAM ---
+nvIpam:
+  repository: registry-internal/operators/nvidia/mellanox
+  version: sha256:88db2fa65846d68d9c4ec996de0ecf4839b79e02e5643eb9ad3354d448cb2757
+
+# --- RDMA Shared Device Plugin ---
+# Defaults used by every NicNodePolicy below. Per-policy ifNames are defined in
+# nicNodePolicies.policies. A future b200-roce pool just adds another policy entry.
+rdmaSharedDevicePlugin:
+  repository: registry-internal/operators/nvidia/mellanox
+  version: sha256:464970d3197fe982b779c48cce74d90f7563ede5daef834bf169db39ee4541c7
+  resourceName: roce_backend
+  rdmaHcaMax: 63
+  selectors:
+    # Base whitelist for all RoCE-capable Mellanox Ethernet NICs.
+    # Add future deviceIDs here so new node pools only need a NicNodePolicy entry.
+    # 1023=ConnectX-8, 1021=ConnectX-7, 101f=ConnectX-6 Lx, 101d=ConnectX-6 Dx, 101b=ConnectX-6
+    vendors: ["15b3"]
+    deviceIDs: ["1023", "1021", "101f", "101d", "101b"]
+    linkTypes: ["ether"]
+
+# --- NicNodePolicies (per RoCE node group) ---
+# ofedDriver and rdmaSharedDevicePlugin move out of NicClusterPolicy into these CRs
+# so each pool can use its own fabric ifNames. Cluster-wide components stay in NCP.
+# Note: the guide recommends a single nvidia.com/nic-group label, but this cluster
+# already uses distinct node-role labels per pool (h200-roce / b200-roce), so we use
+# those for the NNP nodeSelector.
+nicNodePolicies:
+  enabled: true
+  policies:
+    - name: h200-cx6
+      nodeSelector:
+        node-role.kubernetes.io/h200-roce: ""
+      rdmaSharedDevicePlugin:
+        ifNames:
+          - ens32f0np0
+          - ens33f0np0
+          - ens34f0np0
+          - ens35f0np0
+          - ens36f0np0
+          - ens37f0np0
+          - ens38f0np0
+          - ens39f0np0
+
+# --- NIC Configuration Templates (per RoCE pool) ---
+# Each pool gets its own template with a distinct nodeSelector. Add a b200-roce entry here
+# when those nodes arrive.
+nicConfigurationTemplates:
+  - name: h200-roce
+    nicType: "101d"
+    pciAddresses:
+      - 0000:9c:00.0
+      - 0000:bc:00.0
+      - 0000:cc:00.0
+      - 0000:dc:00.0
+      - 0000:5e:00.0
+      - 0000:4d:00.0
+      - 0000:1a:00.0
+      - 0000:3c:00.0
+    nodeSelector:
+      node-role.kubernetes.io/h200-roce: ""
+    resetToDefault: false
+    linkType: Ethernet
+    numVfs: 0
+    gpuDirectOptimized:
+      enabled: true
+      env: Baremetal
+    pciPerformanceOptimized:
+      enabled: true
+      maxAccOutRead: 44
+      maxReadRequest: 4096
+    roceOptimized:
+      enabled: true
+      qos:
+        pfc: "0,0,0,1,0,0,0,0"
+        trust: dscp
+        tos: 106
+
+# --- Maintenance Operator Config ---
+maintenanceOperatorConfig:
+  enabled: true
+  logLevel: debug
+  maxNodeMaintenanceTimeSeconds: 25350
+  maxParallelOperations: 1
+  maxUnavailable: 1

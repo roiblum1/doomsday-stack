@@ -1,0 +1,184 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: "2026-10-07T14:22:09Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: qwen38-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+    name: qwen38-cache
+    namespace: llm-qwen38
+    ownerReferences:
+    - apiVersion: lmcache.lmcache.ai/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: LMCacheEngine
+      name: qwen38-cache
+      uid: 42d51c69-528c-4bdd-9b7b-651fbf109c90
+    resourceVersion: "50859384"
+    uid: c02d614c-dad4-47fb-9f56-7dd63822fb48
+  spec:
+    clusterIP: 192.0.2.99
+    clusterIPs:
+    - 192.0.2.99
+    internalTrafficPolicy: Local
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: server
+      port: 5555
+      protocol: TCP
+      targetPort: 5555
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app.kubernetes.io/instance: qwen38-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: "2026-10-07T14:22:09Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: qwen38-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+    name: qwen38-cache-metrics
+    namespace: llm-qwen38
+    ownerReferences:
+    - apiVersion: lmcache.lmcache.ai/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: LMCacheEngine
+      name: qwen38-cache
+      uid: 42d51c69-528c-4bdd-9b7b-651fbf109c90
+    resourceVersion: "50859385"
+    uid: 8a5a6026-a76c-4020-9e92-a866b26801dd
+  spec:
+    clusterIP: None
+    clusterIPs:
+    - None
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: metrics
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app.kubernetes.io/instance: qwen38-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: "2026-10-07T14:22:18Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen38-l4
+      app.kubernetes.io/part-of: llminferenceservice
+    name: qwen38-l4-epp-service
+    namespace: llm-qwen38
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: qwen38-l4
+      uid: 4ad66e96-4bef-49a7-a56a-2f4df47b3806
+    resourceVersion: "50859617"
+    uid: 59050d4d-51bd-44b1-8e68-b28084cc1e33
+  spec:
+    clusterIP: 192.0.2.100
+    clusterIPs:
+    - 192.0.2.100
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: grpc
+      port: 9002
+      protocol: TCP
+      targetPort: grpc
+    - name: grpc-health
+      port: 9003
+      protocol: TCP
+      targetPort: grpc-health
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: metrics
+    - name: zmq
+      port: 5557
+      protocol: TCP
+      targetPort: zmq
+    selector:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen38-l4
+      app.kubernetes.io/part-of: llminferenceservice
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: "2026-10-07T14:22:17Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-workload
+      app.kubernetes.io/name: qwen38-l4
+      app.kubernetes.io/part-of: llminferenceservice
+    name: qwen38-l4-kserve-workload-svc
+    namespace: llm-qwen38
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: qwen38-l4
+      uid: 4ad66e96-4bef-49a7-a56a-2f4df47b3806
+    resourceVersion: "50859591"
+    uid: 85cb00bc-3ee9-4cc6-805d-7cdd0c11fbf9
+  spec:
+    clusterIP: 192.0.2.101
+    clusterIPs:
+    - 192.0.2.101
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - appProtocol: http
+      name: http
+      port: 8000
+      protocol: TCP
+      targetPort: 8000
+    selector:
+      app.kubernetes.io/name: qwen38-l4
+      app.kubernetes.io/part-of: llminferenceservice
+      kserve.io/component: workload
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+kind: List
+metadata:
+  resourceVersion: ""

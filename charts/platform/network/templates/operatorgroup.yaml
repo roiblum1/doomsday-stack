@@ -1,0 +1,30 @@
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: {{ .Values.operatorGroup.name }}
+  namespace: {{ include "network.namespace" . }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    {{- include "network.labels" . | nindent 4 }}
+spec:
+  targetNamespaces:
+    {{- toYaml .Values.operatorGroup.targetNamespaces | nindent 4 }}
+{{- if .Values.maintenanceSubscription.enabled }}
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: {{ .Values.maintenanceOperatorGroup.name }}
+  namespace: {{ .Values.maintenanceNamespace.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    {{- include "network.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.maintenanceOperatorGroup.targetNamespaces }}
+  targetNamespaces:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- /* empty targetNamespaces = AllNamespaces (cluster-wide); omit the field entirely */}}
+{{- end }}

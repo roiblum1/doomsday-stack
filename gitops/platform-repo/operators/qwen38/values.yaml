@@ -1,0 +1,3 @@
+# Values for the qwen38 chart. The chart's own values.yaml carries the
+# full deployment defaults (single L4 node); site-level overrides would
+# land here.

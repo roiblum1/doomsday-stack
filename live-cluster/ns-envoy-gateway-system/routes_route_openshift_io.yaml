@@ -1,0 +1,47 @@
+apiVersion: v1
+items:
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    annotations:
+      argocd.argoproj.io/sync-wave: "3"
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-ai-deploy:route.openshift.io/Route:envoy-gateway-system/envoy-ai-gateway
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+      openshift.io/host.generated: "true"
+    creationTimestamp: "2026-10-11T16:37:22Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: envoy-ai-gateway-openshift
+      app.kubernetes.io/part-of: envoy-ai-gateway
+      helm.sh/chart: envoy-ai-gateway-openshift-0.1.0
+    name: envoy-ai-gateway
+    namespace: envoy-gateway-system
+    resourceVersion: "54290127"
+    uid: e5df12b5-4299-42c5-9d15-c92a9a050064
+  spec:
+    host: host.example.internal
+    port:
+      targetPort: http-80
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    to:
+      kind: Service
+      name: envoy-ai-gateway
+      weight: 100
+    wildcardPolicy: None
+  status:
+    ingress:
+    - conditions:
+      - lastTransitionTime: "2026-10-11T16:37:22Z"
+        status: "True"
+        type: Admitted
+      host: host.example.internal
+      routerCanonicalHostname: host.example.internal
+      routerName: default
+      wildcardPolicy: None
+kind: List
+metadata:
+  resourceVersion: ""

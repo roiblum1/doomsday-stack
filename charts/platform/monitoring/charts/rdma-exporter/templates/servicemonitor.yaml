@@ -1,0 +1,43 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rdma-exporter
+  namespace: rdma-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    {{- include "rdma-exporter.labels" . | nindent 4 }}
+spec:
+  endpoints:
+    - interval: {{ .Values.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+      path: /metrics
+      port: metrics
+      metricRelabelings:
+        - action: replace
+          sourceLabels:
+            - exported_node
+          targetLabel: node
+        - action: labeldrop
+          regex: exported_node
+        - action: labeldrop
+          regex: exported_environment
+        - action: labeldrop
+          regex: instance
+        - action: labeldrop
+          regex: pod
+      relabelings:
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_pod_node_name
+          targetLabel: node
+        - action: replace
+          replacement: {{ .Values.env.clusterName | default .Values.global.clusterName }}
+          targetLabel: environment
+  jobLabel: rdma-exporter
+  namespaceSelector:
+    matchNames:
+      - rdma-monitoring
+  selector:
+    matchLabels:
+      {{- include "rdma-exporter.selectorLabels" . | nindent 6 }}

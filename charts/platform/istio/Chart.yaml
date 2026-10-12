@@ -1,0 +1,6 @@
+apiVersion: v2
+name: istio
+description: OpenShift Service Mesh 3 (Sail) operator (standalone) — Subscription + Istio + IstioCNI Sail CRs, v3.4.1 / Istio v1.30.3
+type: application
+version: 3.4.1
+appVersion: "3.4.1"

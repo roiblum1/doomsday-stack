@@ -1,0 +1,40 @@
+{{- /*
+InfiniBand mode: one NodeNetworkConfigurationPolicy per NIC in .Values.infiniband.nicList,
+applied cluster-wide to the rail nodes (role label). Brings the IB HCA up with the fabric
+MTU and datagram mode — NO IP: NCCL runs over native IB verbs and the workload's NCCL_IB_HCA
+selects the HCAs. nicList is identical across (identical) nodes, so one policy per NIC covers all.
+Schema: nmstate.io InfiniBand interface (type: infiniband).
+*/}}
+{{- if eq .Values.mode "infiniband" }}
+{{- range $nic := .Values.infiniband.nicList }}
+---
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: rdma-ib-{{ $nic }}
+  labels:
+    {{- include "nmstate-rdma.labels" $ | nindent 4 }}
+spec:
+  {{- if $.Values.infiniband.nodeSelector }}
+  # Explicit selector (e.g. IB-only clusters where EVERY worker is a rail node:
+  #   nodeSelector: {node-role.kubernetes.io/worker: ""}) — no RDMA role label needed.
+  nodeSelector:
+    {{- toYaml $.Values.infiniband.nodeSelector | nindent 4 }}
+  {{- else }}
+  nodeSelector:
+    node-role.kubernetes.io/{{ $.Values.roleLabel }}: ""
+  {{- end }}
+  desiredState:
+    interfaces:
+      - name: {{ $nic }}
+        type: infiniband
+        state: up
+        mtu: {{ $.Values.infiniband.mtu }}
+        infiniband:
+          pkey: {{ $.Values.infiniband.pkey }}
+          mode: {{ $.Values.infiniband.ibMode }}
+{{- end }}
+{{- end }}

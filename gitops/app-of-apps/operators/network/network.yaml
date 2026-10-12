@@ -1,0 +1,9 @@
+name: network
+projectNamespace: nvidia-network-operator
+repourl: 'https://git.example.internal/popai/helm-charts/network-chart.git'
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true

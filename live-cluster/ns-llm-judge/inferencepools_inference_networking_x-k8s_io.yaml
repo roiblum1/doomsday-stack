@@ -1,0 +1,49 @@
+apiVersion: v1
+items:
+- apiVersion: inference.networking.x-k8s.io/v1alpha2
+  kind: InferencePool
+  metadata:
+    creationTimestamp: "2026-10-07T16:13:47Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen36-judge
+      app.kubernetes.io/part-of: llminferenceservice
+    name: qwen36-judge-inference-pool
+    namespace: llm-judge
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: qwen36-judge
+      uid: 3d24a4ee-260e-4bfe-8427-1839eb41b068
+    resourceVersion: "50925606"
+    uid: 8bcd19ec-f67f-4421-8189-1229dfb678a4
+  spec:
+    extensionRef:
+      failureMode: FailOpen
+      group: ""
+      kind: Service
+      name: qwen36-judge-epp-service
+      portNumber: 9002
+    selector:
+      app.kubernetes.io/name: qwen36-judge
+      app.kubernetes.io/part-of: llminferenceservice
+      kserve.io/component: workload
+    targetPortNumber: 8000
+  status:
+    parent:
+    - conditions:
+      - lastTransitionTime: "1970-01-01T00:00:00Z"
+        message: Waiting for controller
+        reason: Pending
+        status: Unknown
+        type: Accepted
+      parentRef:
+        group: gateway.networking.k8s.io
+        kind: Status
+        name: default
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,78 @@
+# NMState operator + RDMA NNCP policies.
+#
+# The NMState CR spec mirrors the LIVE 4.22 cluster (post uninstall+reinstall fix):
+# metricsConfiguration.bindAddress :8089 avoids the kube-rbac-proxy :8443 port collision
+# we hit during the in-place upgrade. Keep it.
+namespace:
+  name: openshift-nmstate
+  create: true
+  labels: {}
+
+operatorGroup:
+  name: openshift-nmstate
+  targetNamespaces:
+    - openshift-nmstate
+
+subscription:
+  name: kubernetes-nmstate-operator
+  namespace: openshift-nmstate
+  channel: stable
+  source: generic-cs
+  sourceNamespace: openshift-marketplace
+  startingCSV: kubernetes-nmstate-operator.4.22.0-202608050531
+  installPlanApproval: Automatic
+
+# NMState instance — matches live cluster.
+nmstate:
+  enabled: true
+  name: nmstate
+  spec:
+    logLevel: info
+    metricsConfiguration:
+      bindAddress: :8089
+    probeConfiguration:
+      dns:
+        host: example.internal
+
+# ---------------------------------------------------------------------------
+# RDMA NodeNetworkConfigurationPolicies. Carried from the basepod-day2 nncp-rdma
+# subchart. mode MUST be set to "roce" or "infiniband" before any NNCP renders —
+# leaving it empty is intentional (safe default: nothing applies until configured
+# per-cluster via mces/<mce>/<cluster>/nmstate-rdma/values.yaml).
+# ---------------------------------------------------------------------------
+# This chart is RoCE-only: the NNCP policies target RoCE nodes exclusively.
+#   - RoCE mode: one NNCP per (node, NIC), nodeSelector by hostname (the RoCE rail nodes).
+#   - InfiniBand mode: one NNCP per NIC, nodeSelector by the roce role label below.
+# The NMState operator itself is cluster-scoped (it reconciles NNCPs cluster-wide), but its
+# handler pods only act on nodes matched by an NNCP — so non-RoCE nodes are untouched.
+mode: ""                # "roce" | "infiniband" | "" (disabled)
+roleLabel: roce         # IB-mode nodeSelector role — RoCE nodes carry node-role.kubernetes.io/roce
+nmstateProbeHost: ""    # overrides nmstate.spec.probeConfiguration.dns.host if set
+
+# InfiniBand mode: one NNCP per NIC in nicList, applied to the rail nodes. No IP —
+# NCCL runs over native IB verbs; NCCL_IB_HCA selects HCAs.
+infiniband:
+  mtu: 2044
+  ibMode: datagram
+  pkey: 0xffff
+  nicList: []           # e.g. ["ibp24s0", "ibp64s0"] (IPoIB netdev names) — override per-cluster
+  # nodeSelector overrides the default node-role.kubernetes.io/<roleLabel> selector.
+  # IB-only clusters (every worker is IB): use {node-role.kubernetes.io/worker: ""} —
+  # no RDMA role label needed (matches NVIDIA DGX basepod topology).
+  nodeSelector: {}
+  # nodeSelector:
+  #   node-role.kubernetes.io/worker: ""
+
+# RoCE mode: one NNCP per (node, NIC), nodeSelector by hostname. Each rail NIC has a
+# unique host IP (/31 point-to-point, gateway = leaf-side peer). One route per NIC
+# keeps host routing deterministic -> NCCL_CROSS_NIC=0 holds.
+roce:
+  mtu: 9000
+  nodes: []             # override per-cluster with node/NIC/IP/route fabric plan
+  # nodes:
+  #   - name: cluster-hypershift-h200
+  #     nics:
+  #       - name: ens32f0np0
+  #         ip: 192.0.2.4/31
+  #         gateway: 192.0.2.5
+  #         routes: ["192.0.2.6/8"]

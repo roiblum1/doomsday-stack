@@ -1,0 +1,90 @@
+{{- if .Values.directBackend.enabled }}
+# Direct backend for the shared Envoy AI Gateway: the short model name's
+# rule targets this AIServiceBackend so Envoy AI Gateway QuotaPolicy --
+# what aigw-ui renders for per-tenant token quotas -- can attach to it
+# (QuotaPolicy targetRefs only accept AIServiceBackend, never
+# InferencePool). schema Anthropic = Claude Code /anthropic/v1/messages
+# protocol passthrough (vLLM >= v0.25 serves the Messages API natively:
+# thinking blocks and count_tokens survive); schema OpenAI =
+# /v1/chat/completions passthrough.
+#
+# style ranks (DP multi-port external LB): a chart-owned Service exposes
+# the DP rank API-server ports (the kserve-owned workload svc only
+# carries port 8000 = rank 0; kube-proxy has no ClusterIP:8001+ without
+# the ports declared -- this Service is additive, kserve ignores it) and
+# the Envoy Gateway Backend carries one FQDN endpoint per rank port.
+# NOTE: this path bypasses the EPP (round-robin across the rank-port
+# endpoints instead of EPP scheduling). That is fine for Anthropic
+# traffic: llm-d-router cannot parse Anthropic bodies, so its scorers are
+# blind on it anyway. OpenAI-protocol traffic keeps the EPP path via the
+# publishers/... model name.
+#
+# style workload-svc (internal DP LB / TP): ONE FQDN endpoint -- the
+# kserve-owned workload service (not chart-owned; same naming convention
+# the route's InferencePool ref relies on). kube-proxy load-balances the
+# replicas; moot at 1 replica.
+{{- if eq .Values.directBackend.style "ranks" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.directBackend.ranksService.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "genericmodel.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ .Values.llmisvc.name }}
+    app.kubernetes.io/part-of: llminferenceservice
+    kserve.io/component: workload
+  ports:
+{{- range $i := until (int .Values.directBackend.ranksService.portCount) }}
+    - name: rank-{{ $i }}
+      port: {{ add $.Values.directBackend.ranksService.firstPort $i }}
+      targetPort: {{ add $.Values.directBackend.ranksService.firstPort $i }}
+      appProtocol: http
+{{- end }}
+---
+{{- end }}
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: {{ .Values.directBackend.backendName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "genericmodel.labels" . | nindent 4 }}
+spec:
+  endpoints:
+{{- if eq .Values.directBackend.style "ranks" }}
+{{- range $i := until (int .Values.directBackend.ranksService.portCount) }}
+    - fqdn:
+        hostname: {{ $.Values.directBackend.ranksService.name }}.{{ $.Values.namespace }}.svc.cluster.local
+        port: {{ add $.Values.directBackend.ranksService.firstPort $i }}
+{{- end }}
+{{- else }}
+    - fqdn:
+        # KServe's workload service for the LLMInferenceService (not
+        # chart-owned; same naming convention the route's InferencePool
+        # ref relies on).
+        hostname: {{ include "genericmodel.workloadServiceName" . }}.{{ .Values.namespace }}.svc.cluster.local
+        port: {{ .Values.directBackend.workloadService.port }}
+{{- end }}
+---
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: {{ .Values.directBackend.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "genericmodel.labels" . | nindent 4 }}
+spec:
+  # schema.name => protocol passthrough at the exact backend path (vLLM
+  # serves /v1/messages and /v1/chat/completions at those paths, so no
+  # prefix rewrite is needed).
+  schema:
+    name: {{ .Values.directBackend.schema }}
+  backendRef:
+    group: gateway.envoyproxy.io
+    kind: Backend
+    name: {{ .Values.directBackend.backendName }}
+{{- end }}

@@ -1,0 +1,17 @@
+{{- if .Values.maintenanceOperatorConfig.enabled }}
+apiVersion: maintenance.nvidia.com/v1alpha1
+kind: MaintenanceOperatorConfig
+metadata:
+  name: {{ .Values.maintenanceOperatorConfig.name }}
+  namespace: {{ .Values.maintenanceOperatorConfig.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    {{- include "network.labels" . | nindent 4 }}
+spec:
+  logLevel: {{ .Values.maintenanceOperatorConfig.logLevel }}
+  maxNodeMaintenanceTimeSeconds: {{ .Values.maintenanceOperatorConfig.maxNodeMaintenanceTimeSeconds }}
+  maxParallelOperations: {{ .Values.maintenanceOperatorConfig.maxParallelOperations }}
+  maxUnavailable: {{ .Values.maintenanceOperatorConfig.maxUnavailable }}
+{{- end }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: gpu
+description: NVIDIA GPU operator (standalone) + clock-lock DaemonSet — Namespace + OperatorGroup + Subscription + ClusterPolicy + clock-lock, 26.3.3-aligned
+type: application
+version: 26.3.3
+appVersion: "26.3.3"

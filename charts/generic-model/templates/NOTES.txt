@@ -1,0 +1,30 @@
+{{ .Chart.Name }}-{{ .Chart.Version }} deployed model "{{ .Values.model.name }}" to namespace "{{ .Values.namespace }}" (LLMInferenceService {{ .Values.llmisvc.name }}).
+
+{{- if .Values.model.subPath }}
+
+Model storage: PVC {{ .Values.storage.models.pvcName }} (local-static, node-prep LVs + idempotent pull jobs pre-pull to every node). Prerequisite: secret "{{ .Values.s3.secretName }}" must exist with the s3.keys.* key names (see values.yaml).
+{{- else }}
+
+Model storage: no PVC -- the storage-initializer init container downloads the model from {{ .Values.model.uri }} into the pod at every (re)start. Prerequisite: secret "{{ .Values.s3.secretName }}" must exist with keys AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY and the serving.kserve.io/s3-endpoint annotation (see values.yaml).
+{{- end }}
+
+Check bring-up:
+  oc -n {{ .Values.namespace }} get llmisvc {{ .Values.llmisvc.name }}                       # WaitingForGateway->Ready (the gateway "not accepted" status on the shared InferencePool is cosmetic -- traffic flows)
+  oc -n {{ .Values.namespace }} get pods -w{{ if not .Values.model.subPath }}                                                   # storage-initializer -> main: 0/1 -> 1/1
+  oc -n {{ .Values.namespace }} logs deploy/{{ .Values.llmisvc.name }}-predictor -c storage-initializer   # download progress{{ end }}
+
+Smoke test once Ready (in-cluster, via the shared gateway -> {{ if .Values.directBackend.enabled }}direct backend{{ else }}EPP{{ end }} -> vLLM):
+  curl http://envoy-ai-gateway.envoy-ai-gateway-system.svc/v1/chat/completions \
+    -H 'content-type: application/json' \
+    -H '{{ .Values.aigatewayRoute.headerName }}: {{ .Values.model.name }}' \
+    -d '{"model":"{{ .Values.model.name }}","messages":[{"role":"user","content":"Reply with the single word: ready"}],"max_tokens":8}'
+
+External: same request against http://192.0.2.7 (the shared gateway VIP).
+
+{{- if and .Values.directBackend.enabled (eq .Values.directBackend.schema "Anthropic") }}
+
+Claude Code wiring: ANTHROPIC_BASE_URL=http://192.0.2.7/anthropic, ANTHROPIC_MODEL={{ .Values.model.name }} (or ANTHROPIC_DEFAULT_{SONNET,OPUS,HAIKU}_MODEL). OpenAI-protocol tooling should send model {{ include "genericmodel.openaiModel" . }} to keep the EPP path.
+{{- else }}
+
+OpenAI-protocol clients: send model {{ .Values.model.name }} or {{ include "genericmodel.openaiModel" . }} (both keep the EPP path).
+{{- end }}

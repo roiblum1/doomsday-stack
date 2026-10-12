@@ -1,0 +1,505 @@
+# Qwen3.8-27B-FP8 on the L4 node -- full deployment bundle values.
+#
+# Defaults reproduce the deployment in namespace llm-qwen38 on the site-a A
+# cluster (single L4 node: 8x NVIDIA L4, 2 of which are taken by the
+# qwen36-judge workload -> 6 free GPUs here). Everything cluster-specific
+# is a value; nothing is hardcoded in the templates.
+
+namespace: llm-qwen38
+nameOverride: qwen38
+
+# --- target nodes ---------------------------------------------------------
+nodes:
+  # Label the node-prep DaemonSet selects on; the vLLM and engine pods
+  # select on it too.
+  gpuProduct: NVIDIA-L4
+  # The static local PVs' nodeAffinity lists ALL of these hostnames; every
+  # node must have the model at the SAME host path (node-prep + pull jobs
+  # below guarantee that).
+  hostnames:
+    - ocp-util-node-1
+
+# --- node storage (manual LVs, no MCO/MachineConfig available) -----------
+nodePrep:
+  enabled: true
+  # MUST stay v0.30.0 (or any image bundling the flashinfer_cubin dist
+  # package): besides LVM work, node-prep seeds flashinfer's trtllm-gen
+  # cubins FROM THIS IMAGE into the cache LV (idempotent). The lmcache
+  # vllm-openai:v0.5.5 image ships plain flashinfer 0.6.18 without cubins
+  # and would fetch them from edge.urm.nvidia.com at runtime -- unreachable
+  # air-gapped. v0.30.0's flashinfer 0.6.18.post1 bundles the same cubins.
+  image: registry-internal/vllm/vllm-openai:v0.30.0
+  imagePullPolicy: IfNotPresent
+  # Blank data disks the chart turns into the volume group when the VG does
+  # not exist yet (fresh node: the L4 R760xa ships /dev/sda blank, boot is
+  # sdb). pvcreate REFUSES devices with filesystem/partition signatures, so
+  # this can never silently clobber an in-use disk.
+  devices:
+    - /dev/sda
+  # LVM volume group (created from devices above if missing).
+  vg: vg1
+  # LVs are mounted here (same path on every node in nodes.hostnames).
+  hostPathBase: /var/mnt/llm
+  loopIntervalSeconds: 60
+  resources:
+    requests: {cpu: "1", memory: 512Mi}
+    limits: {cpu: "2", memory: 1Gi}
+
+# --- static local PVs + pre-created PVCs ------------------------------------
+storage:
+  # Own class (cluster-scoped, like the SCC): the chart never shares an
+  # ArgoCD-managed object with another chart's app.
+  className: qwen38-local-static
+  # The pre-created claim names. model.uri and the pull jobs derive from
+  # these -- change here, not in the templates.
+  models:
+    pvcName: qwen38-models
+    lvName: llm-models
+    lvSize: 200G           # LV created by node-prep (LVM suffix); model is 28.8G
+    pvSize: 200Gi          # PV/PVC capacity
+    subdir: models          # under nodePrep.hostPathBase
+  cache:
+    pvcName: qwen38-cache
+    lvName: llm-cache
+    lvSize: 150G
+    pvSize: 150Gi
+    subdir: cache
+  # Stable L2 disk tier for the LMCache engine: local-static PVC the engine
+  # CR mounts; node-prep creates and keeps mounted the backing LV. Unlike
+  # generic-ephemeral volumeClaimTemplates, data survives engine pod
+  # recreation (spec changes, node drains).
+  l2:
+    pvcName: qwen38-cache-l2
+    lvName: llm-l2
+    lvSize: 1000G
+    pvSize: 1000Gi
+    subdir: lmcache-l2
+
+# --- model + S3 source -----------------------------------------------------
+model:
+  # vLLM served-model-name (what OpenAI clients send as "model").
+  name: Qwen3.8-27B-FP8
+  # Subdirectory inside the models PVC / S3 bucket.
+  subPath: Qwen3.8-27B-FP8
+  s3:
+    path: llms/Qwen/Qwen3.8-27B-FP8   # s3://<this>/*
+
+# S3 credentials. NEVER put real keys in values files -- default is to
+# reference a pre-existing secret (created out-of-band). Set create: true
+# only for testing, with keys passed via --set-file / external secrets.
+s3:
+  create: false
+  secretName: qwen38-s3
+  keys:
+    accessKeyId: AWS_ACCESS_KEY_ID
+    secretAccessKey: AWS_SECRET_ACCESS_KEY
+    endpoint: AWS_ENDPOINT_URL
+    region: AWS_DEFAULT_REGION
+  # Only used when create: true:
+  endpoint: ""
+  region: us-east-1
+  accessKeyId: ""
+  secretAccessKey: ""
+
+# --- service accounts / SCC ------------------------------------------------
+serviceAccount:
+  name: s3sa
+
+scc:
+  # Cluster-scoped SecurityContextConstraints object name.
+  name: qwen38-model-serving
+  create: true
+
+# --- images -----------------------------------------------------------------
+images:
+  # LMCache-enabled vLLM build (lmcache 0.5.5 + vllm 0.29.0), mirrored to
+  # the site's lmcache repo. Must stay in lockstep with lmcache.image
+  # below: the engine and the vLLM connector speak a private ZMQ/CUDA-IPC
+  # protocol, so BOTH sides must run the same LMCache build.
+  # vLLM 0.29.0 supports the model arch Qwen3_5ForConditionalGeneration
+  # (verified in the image's model registry). The reference deployment's
+  # mooncake-based image (vllm-openai:v0.27.1-ibdiag-1) is NOT usable
+  # here: it has no LMCache.
+  vllm: registry-internal/lmcache/lmcache/vllm-openai:v0.5.5
+  s5cmd: registry-internal/tools/s5cmd:v2.3.0
+
+# --- per-node model pull jobs ------------------------------------------------
+pullJobs:
+  enabled: true
+  concurrency: 64
+  partSize: 128
+  resources:
+    requests: {cpu: "8", memory: 16Gi}
+    limits: {cpu: "24", memory: 32Gi}
+
+# --- gateways -----------------------------------------------------------------
+# ONE Gateway for everything: the shared Envoy AI Gateway (VIP
+# 192.0.2.7). The KServe router HTTPRoute attaches to it (path-based
+# rules: /llm-qwen38/qwen38-l4/...). There is NO per-model Gateway and no
+# second VIP; qwen38 coexists with glm53's AIGatewayRoute on the same
+# listener (longer-prefix KServe paths never shadow the extproc rules).
+gateway:
+  aiGateway:
+    name: envoy-ai-gateway
+    namespace: envoy-ai-gateway-system
+    listener: http
+
+# --- the LLMInferenceService ---------------------------------------------------
+llmisvc:
+  name: qwen38-l4
+  replicas: 1                  # one pod on the single L4 node
+  runtimeClassName: performance-gpu-hpc-performanceprofile-extras-l4
+  schedulerName: default-scheduler
+  terminationGracePeriodSeconds: 300
+  rolloutStrategy:
+    maxSurge: 0                # no free GPUs for a surge pod -> deadlock
+    maxUnavailable: 1
+  # --- EPP (router scheduler) config -------------------------------------------
+  # Rendered verbatim by the kserve controller into the EPP deployment's
+  # --config-text (EndpointPickerConfig). Same plugin profile as glm53
+  # (verified on this cluster's llm-d-router): EPP-INTERNAL counting via
+  # inflight-load-producer (active-request-scorer counts requests the EPP
+  # itself dispatched, immune to the engine-label duplication problem DP
+  # causes on vLLM /metrics), plus approx-prefix-cache-producer wired into
+  # prefix-cache-scorer so prefix-aware routing actually scores.
+  scheduler:
+    # Complete pool spec: the controller copies it verbatim into the
+    # InferencePool. Internal DP LB exposes ONE endpoint (pod:8000 --
+    # vLLM's single API server load-balances the 3 DP ranks itself);
+    # external multi-port LB is MoE-gated in vLLM 0.29 (see the args
+    # comment). Must match what the controller would generate (see the
+    # live InferencePool).
+    pool:
+      spec:
+        appProtocol: http
+        endpointPickerRef:
+          failureMode: FailOpen
+          group: ""
+          kind: Service
+          name: qwen38-l4-epp-service
+          port:
+            number: 9002
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: qwen38-l4
+            app.kubernetes.io/part-of: llminferenceservice
+            kserve.io/component: workload
+        targetPorts:
+          - number: 8000
+    config:
+      inline:
+        apiVersion: llm-d.ai/v1alpha1
+        kind: EndpointPickerConfig
+        plugins:
+          - type: single-profile-handler
+          - type: approx-prefix-cache-producer
+          - type: inflight-load-producer
+          - type: prefix-cache-scorer
+          - type: active-request-scorer
+          - type: token-load-scorer
+          - type: max-score-picker
+        schedulingProfiles:
+          - name: default
+            plugins:
+              - pluginRef: active-request-scorer
+                weight: 3
+              - pluginRef: token-load-scorer
+                weight: 1
+              - pluginRef: prefix-cache-scorer
+                weight: 1
+              - pluginRef: max-score-picker
+  # Merged on the base preset kserve-config-llm-template which runs
+  # `vllm serve /mnt/models ... "$@"` (bash eval) -> single tokens only.
+  # The --kv-transfer-config pair pointing at the LMCache engine is
+  # appended by the template (lmcache.enabled) -- do NOT add it here.
+  # --- parallelism: TP2 x DP3 = 6 GPUs ---
+  # TP2: 24 attention heads AND 4 KV heads both divide by 2 (TP must
+  # divide BOTH; TP3/TP6 would break the 4 KV heads). DP3 uses vLLM's
+  # INTERNAL load balancer (one API server on :8000 balancing 3 DP
+  # ranks): vLLM 0.29 gates external/multi-port LB on model_config.is_moe,
+  # which is False for Qwen3_5ForConditionalGeneration (the multimodal
+  # arch), so --data-parallel-multi-port-external-lb /
+  # --data-parallel-supervisor-port / --data-parallel-size-local are all
+  # unusable here (verified: APIServer_DP ranks die on "Non-MoE models do
+  # not support external data parallel mode"). The reference deployment
+  # ran the same internal-LB shape (plain --data-parallel-size). Probes
+  # hit the API server on 8000; the InferencePool exposes one endpoint
+  # (pod:8000) and vLLM's dplb spreads requests over the ranks.
+  args:
+    # --- Parallel shape: TP4/DP1 (was TP2/DP3) for single-stream decode ---
+    # L4 decode is weights-bandwidth-bound (~300GB/s GDDR6, 72W power cap,
+    # measured 17.4 tok/s at 91.6% of the TP2 ceiling). TP4 halves the
+    # per-GPU weight shard (~7.4GiB) -> ~1.6-1.9x single-stream decode and
+    # ~2x prefill. TP shape validity (vLLM 0.29 qwen3_next.py:284-296):
+    # 24 attn heads %4==0, 4 KV heads %4==0, GDN in_proj 2048%4==0,
+    # conv_dim 10240%4==0. TP3/TP6 are INVALID for this arch; TP1 OOMs
+    # (28.75GiB checkpoint > 22GiB usable). Concurrency drops 96 -> 32
+    # seqs (live load: 1 running / 0 waiting). Valid TP set on 6 L4s:
+    # {2,4}; TP4/DP1 is the only shape faster than TP2.
+    - --tensor-parallel-size=4
+    - --data-parallel-size=1
+    # --- memory / KV (glm53-proven recipe; only sizes differ for L4) ---
+    # Model max is 262144; 65536 kept for behavior parity. At TP4 the
+    # per-GPU KV pool grows to ~11GiB (~7x): 65,536-len sequences fit
+    # with ~19x concurrency headroom; raise max-model-len later if long
+    # contexts are needed (262144 native fits: ~2.15GiB/GPU/seq).
+    # KV math: 16 full-attn layers (of 64; the other 48 are
+    # linear_attention with O(1) state) x 4 KV heads x 256 head_dim x 2
+    # (K+V) x 1B (fp8_e4m3, like glm53 -- same image, same LMCache
+    # engine, proven pattern there) = 32KiB/token.
+    - --max-model-len=65536
+    # Same KV dtype discipline as glm53 (fp8_e4m3): halves KV memory AND
+    # the LMCache L1/L2 footprint per token (glm53 runs fp8 KV through
+    # the identical lmcache/vllm-openai:v0.5.5 stack).
+    - --kv-cache-dtype=fp8_e4m3
+    # KV headroom beyond this comes from the LMCache engine's L1/L2 tiers.
+    - --gpu-memory-utilization=0.90
+    - --max-num-seqs=32            # single DP rank -> 32 per pod
+    # Chunked-prefill budget per engine step. vLLM default 8192; the L4's
+    # 24GiB leaves less activation headroom than B200, but vLLM's profile
+    # run sizes the KV pool to fit. Drop to 4096 if init OOMs.
+    - --max-num-batched-tokens=8192
+    # glm53 observability parity: KV cache hit metrics on /metrics.
+    - --kv-cache-metrics
+    - --enable-prefix-caching
+    # Gateway billing (envoy-ai-gateway): report cached prompt tokens so the
+    # CEL price can charge the cached rate, and force usage into streamed
+    # chunks so the gateway can meter streaming answers.
+    - --enable-prompt-tokens-details
+    - --enable-force-include-usage
+    - --enable-chunked-prefill
+    # --- MTP speculative decoding (glm53 runs mtp k=5 on B200) ---
+    # The checkpoint ships MTP weights (mtp.* shards ~477MB, 
+    # text_config.mtp_num_hidden_layers=1). Rejection sampling verifies
+    # every accepted token against the target distribution: outputs are
+    # identical to non-spec decode; thinking stays enabled and the qwen3
+    # reasoning parser is unaffected (it runs after verification).
+    # Config dry-run validated in-pod against vLLM 0.29 with every other
+    # arg here unchanged (incl. LMCache kv_both). FORMAT: the engine
+    # entrypoint re-parses args through a shell, so a JSON value gets its
+    # quotes eaten and split on spaces (verified: crash on chart 0.2.4).
+    # Use glm53's proven dot-notation instead (same image, mtp k=5 live).
+    # num_speculative_tokens is REQUIRED: mtp_num_hidden_layers sits under
+    # text_config so the top-level n_predict detection misses it (that
+    # was the old 'spec decode aborts' finding). k=2 conservative; glm53
+    # runs k=5 on B200.
+    - --speculative-config.method=mtp
+    - --speculative-config.num_speculative_tokens=2
+    # Spec-decode acceptance metrics (valid now that speculative-config
+    # exists): spec decode acceptance rate per request on /metrics.
+    - --per-request-spec-decode-metrics=summary
+    # --- Qwen3.8 recipe (from the reference deployment) ---
+    - --reasoning-parser=qwen3
+    - --tool-call-parser=qwen3_xml
+    - --enable-auto-tool-choice
+    - --trust-remote-code
+  env:
+    HF_HUB_OFFLINE: "1"
+    TRANSFORMERS_OFFLINE: "1"
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    # PCIe L4 node (no NVLink, no RoCE) -- plain NCCL P2P.
+    NCCL_IB_DISABLE: "1"
+    OMP_NUM_THREADS: "16"
+    # persistent JIT caches on the cache PVC
+    VLLM_CACHE_ROOT: /cache/vllm
+    TRITON_CACHE_DIR: /cache/triton
+    FLASHINFER_WORKSPACE_BASE: /cache/flashinfer
+    TORCHINDUCTOR_CACHE_DIR: /cache/inductor
+    TORCHINDUCTOR_FX_GRAPH_CACHE: "1"
+    HF_HOME: /cache/hf
+  resources:
+    requests:
+      cpu: "48"
+      memory: 64Gi
+      nvidia.com/gpu: "4"
+    limits:
+      cpu: "96"
+      memory: 128Gi
+      nvidia.com/gpu: "4"
+  volumes:
+    # /dev/shm: NCCL psm windows plus the LMCacheMPConnector's local
+    # buffers. Memory-backed emptyDir: tmpfs, only consumes what is written.
+    dshmSize: 8Gi
+  probes:
+    startup:
+      periodSeconds: 10
+      failureThreshold: 180     # cold boot: 28.8G model load + JIT + graph capture
+      timeoutSeconds: 5
+    readiness:
+      periodSeconds: 10
+      failureThreshold: 5
+      timeoutSeconds: 5
+    liveness:
+      periodSeconds: 30
+      failureThreshold: 5
+      timeoutSeconds: 5
+
+# --- LMCache (node-local KV cache: RAM L1 + disk L2) --------------------------
+# Replaces the reference deployment's MooncakeStoreConnector: one LMCache
+# engine per node holds a pinned-RAM L1 plus an LVMS-backed L2, shared by
+# all DP ranks on the node and surviving vLLM pod restarts.
+#
+# The operator/CRDs come from the day2 `lmcache` app (lmcache-chart.git);
+# this block deploys the engine CR HERE because the engine image must match
+# images.vllm (same LMCache build on both sides of the ZMQ/CUDA-IPC
+# protocol) and the vLLM pods' --kv-transfer-config (see templates/
+# llmisvc.yaml) points at the engine's node-local Service.
+lmcache:
+  enabled: true
+  # All remaining keys mirror the upstream lmcache-engine chart (shipped in
+  # the operator package) 1:1, so its docs and guards apply here too.
+  name: qwen38-cache            # = CR + Service name + <name>-metrics job
+  image:
+    # Keep tag-for-tag with images.vllm above (both sides of the protocol
+    # must run the same LMCache build). Pull policy IfNotPresent: the
+    # ~8.7GB image is already mirrored and node-cached.
+    repository: registry-internal/lmcache/lmcache/vllm-openai
+    tag: v0.5.5
+    pullPolicy: IfNotPresent
+  serviceAccountName: qwen38-cache
+  # Driver-level CUDA IPC: no hostIPC, no shared /dev/shm between engine and
+  # vLLM. Requires that the vLLM pods do NOT use
+  # PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (the recipe doesn't) or
+  # sleep mode (not used).
+  isolatedIPC: true
+  # Try unprivileged first: the engine relies on NVIDIA_VISIBLE_DEVICES=all
+  # (image env) and the model-serving SCC's RunAsAny for its root UID. If
+  # nvidia-smi inside the engine shows no GPUs, set true (needs the
+  # `privileged` SCC, which the RoleBinding below does NOT grant).
+  privileged: false
+  # Pinned explicitly so the live CR matches git byte-for-byte; these are
+  # the defaults the operator's CRD would inject anyway (ArgoCD normalizes
+  # them in diffs, but explicit > implicit).
+  gpuVendor: nvidia
+  hostIPC: false
+  hostNetwork: false
+  logLevel: INFO
+  nodeSelector:
+    # Same node as the vLLM pod (nodes.gpuProduct above pins that).
+    nvidia.com/gpu.product: NVIDIA-L4
+  # Keeps the kubelet from evicting the cache before ordinary workloads under
+  # node memory pressure. openshift-user-critical ships with OpenShift.
+  priorityClassName: openshift-user-critical
+  server:
+    port: 5555                 # ZMQ, what vLLM connects to
+    httpPort: 8080             # health/HTTP frontend
+    # Qwen3_5 is a hybrid linear/full-attention model: the block alignment
+    # the connector demands depends on the engine parallel shape. TP2/no-spec
+    # = 784; TP4+MTP spec decode = 1600 ("chunk size 1568 must be a multiple
+    # of 1600 (the vLLM block size scaled by decode_context_parallel_size)"
+    # -- connector init abort, chart 0.2.5). 1600 = 1 block; only whole
+    # chunks are cached. Changing this invalidates existing L2 chunk keys
+    # (harmless: dead entries repopulate).
+    chunkSize: 1600
+    # ZMQ worker threads. Keep >= the DP ranks per node (3).
+    maxWorkers: 8
+    hashAlgorithm: blake3
+  # Pinned host RAM per node. The engine pod gets request = sizeGB+5 Gi and
+  # limit = 1.5x that, so 200 -> 205Gi request / 307Gi limit. Node budget
+  # (measured 2026-10-07): allocatable ~439Gi; existing requests ~68.6Gi
+  # (qwen36-judge 64Gi + daemons) + vLLM 64Gi + engine 205Gi = ~338Gi ->
+  # ~100Gi margin for system daemons and page cache. At the model's
+  # 64KiB/token KV, 200Gi holds ~3.3M tokens (~50k full-length contexts).
+  l1:
+    sizeGB: 200
+  # Top-level (it governs the L1 tier).
+  eviction:
+    policy: LRU
+    triggerWatermark: 0.8
+    evictionRatio: 0.2
+  # Disk tier: stable local-static PVC (storage.l2.pvcName) backed by a
+  # node-prep-managed LV (vg1/llm-l2, mounted at
+  # nodePrep.hostPathBase/storage.l2.subdir). The engine DaemonSet mounts
+  # it via the local PV, and the claim is not pod-owned, so cache data
+  # SURVIVES pod recreation (spec changes, node drains) -- only
+  # chart-driven LV deletion removes it.
+  l2:
+    enabled: true
+    mountPath: /mnt/lmcache-l2
+    # Cap enforced by the adapter, in GiB. Keep below storage.l2.pvSize (the
+    # template refuses values >= pvSize) for filesystem overhead.
+    maxCapacityGB: 900
+    directIO: false
+    # Spread files over hashed subdirectories. Choose once: flipping later
+    # orphans existing files.
+    shardDirs: true
+    persist: true
+    eviction:
+      policy: LRU
+      triggerWatermark: 0.9
+      evictionRatio: 0.1
+    storePolicy: default
+    prefetchPolicy: default
+    prefetchMaxInFlight: 8
+  # The engine runs as root (upstream image) under the model-serving SCC;
+  # these keep Python/numba from writing to unwritable paths.
+  env:
+    - name: HOME
+      value: /tmp
+    - name: NUMBA_CACHE_DIR
+      value: /tmp/numba
+  prometheus:
+    enabled: true
+    # v0.5.5's engine serves /metrics on the http frontend (8080) -- the
+    # operator passes --prometheus-port through but the engine ignores it.
+    # Point the operator-generated metrics Service (and thus the UWM
+    # ServiceMonitor) at the real listener, or Prometheus scrapes nothing.
+    port: 8080
+    serviceMonitor:
+      # Scraped by the platform Prometheus (openshift-monitoring k8s) via
+      # the openshift.io/cluster-monitoring namespace label -- UWM is off on
+      # this cluster. See templates/monitoring-rbac.yaml for the RBAC the
+      # platform Prometheus additionally needs in this namespace.
+      enabled: true
+      interval: 30s
+    rules:
+      # PrometheusRule (engine down / no targets / L2 headroom / eviction
+      # pressure / cache-bypass). Evaluated by the platform Prometheus
+      # like the ServiceMonitor: the namespace carries the
+      # openshift.io/cluster-monitoring=true label (templates/namespace.yaml).
+      # Firing alerts land in the platform Alertmanager + the OCP console
+      # (Alerting -> user-defined); the SHARED lmcache-observability Grafana
+      # dashboard (monitoring-chart) covers this engine too: select
+      # namespace llm-qwen38 / job qwen38-cache-metrics.
+      enabled: true
+
+# --- Envoy AI Gateway route -------------------------------------------------------
+aigatewayRoute:
+  enabled: true
+  name: qwen38
+  headerName: x-ai-eg-model
+  # 65k-token contexts on L4 GPUs: prefill of a worst-case prompt alone can
+  # run minutes (LMCache offloads KV, not compute).
+  requestTimeout: 900s
+  # Claude Code clients that did not remap the model name send claude-*
+  # model ids; this rule routes them to the Anthropic backend with the
+  # model rewritten to model.name (without it they get the route-not-found
+  # 404). Same safety net as glm53.
+  claudeAlias:
+    enabled: true
+    regex: '^claude-.*$'
+
+# --- native Anthropic backend (Claude Code + quota path) -------------------------
+# Same pattern as glm53-chart's anthropicBackend: a rule for the short
+# model name backed by an Anthropic-schema AIServiceBackend so Envoy AI
+# Gateway QuotaPolicy -- what aigw-ui renders for per-tenant token quotas
+# -- can attach to it (QuotaPolicy targetRefs only accept
+# AIServiceBackend, never InferencePool). vLLM (>= v0.25) serves the
+# Anthropic Messages API natively at /v1/messages (thinking blocks and
+# count_tokens included -- verified live), so this is a protocol
+# PASSTHROUGH: no extproc translation, nothing dropped.
+#
+# While enabled, {"model": "Qwen3.8-27B-FP8"} on the gateway's native
+# Anthropic endpoint (POST /anthropic/v1/messages, what Claude Code uses
+# via ANTHROPIC_BASE_URL=http://VIP/anthropic) routes DIRECTLY to vLLM's
+# Messages API (the kserve workload svc) and bypasses the EPP (moot at 1
+# replica; vLLM's internal DP load balancer still spreads the 3 DP
+# ranks). OpenAI-protocol clients keep the EPP path by sending the
+# publishers/... model name; sending the short name on
+# /v1/chat/completions gets the OpenAI<->Anthropic extproc translation
+# (slower; the aigw-ui quota counters still work). The claudeAlias rule
+# below also rewrites claude-* client model ids to the short name.
+anthropicBackend:
+  enabled: true
+  name: qwen38-anthropic            # AIServiceBackend (schema: Anthropic)
+  backendName: qwen38-anthropic-workload   # Envoy Gateway Backend (FQDN endpoint)

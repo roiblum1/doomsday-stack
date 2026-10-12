@@ -1,0 +1,6 @@
+apiVersion: v2
+name: lws
+description: Leader Worker Set operator (standalone) — Namespace + OperatorGroup + Subscription + LeaderWorkerSetOperator CR, 4.22-aligned
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

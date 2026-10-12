@@ -1,0 +1,104 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:/PersistentVolumeClaim:llm-qwen38/qwen38-cache
+      pv.kubernetes.io/bind-completed: "yes"
+    creationTimestamp: "2026-10-07T14:22:11Z"
+    finalizers:
+    - kubernetes.io/pvc-protection
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-cache
+    namespace: llm-qwen38
+    resourceVersion: "51078392"
+    uid: 6b8ffc29-4caf-4e2f-b9e9-e16ed5810628
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 150Gi
+    storageClassName: qwen38-local-static
+    volumeMode: Filesystem
+    volumeName: qwen38-cache
+  status:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 150Gi
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:/PersistentVolumeClaim:llm-qwen38/qwen38-cache-l2
+      pv.kubernetes.io/bind-completed: "yes"
+    creationTimestamp: "2026-10-07T14:22:11Z"
+    finalizers:
+    - kubernetes.io/pvc-protection
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-cache-l2
+    namespace: llm-qwen38
+    resourceVersion: "51078391"
+    uid: 01795883-ee02-48ca-afaf-26fb6f49476f
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1000Gi
+    storageClassName: qwen38-local-static
+    volumeMode: Filesystem
+    volumeName: qwen38-cache-l2
+  status:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 1000Gi
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:/PersistentVolumeClaim:llm-qwen38/qwen38-models
+      pv.kubernetes.io/bind-completed: "yes"
+    creationTimestamp: "2026-10-07T14:22:11Z"
+    finalizers:
+    - kubernetes.io/pvc-protection
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-models
+    namespace: llm-qwen38
+    resourceVersion: "51078390"
+    uid: 0e1cef6a-2f1b-4512-987c-7b9e256f69e2
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 200Gi
+    storageClassName: qwen38-local-static
+    volumeMode: Filesystem
+    volumeName: qwen38-models
+  status:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 200Gi
+    phase: Bound
+kind: List
+metadata:
+  resourceVersion: ""

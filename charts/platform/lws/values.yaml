@@ -1,0 +1,27 @@
+namespace:
+  name: openshift-lws-operator
+  create: true
+  labels: {}
+
+operatorGroup:
+  name: openshift-lws-operator
+  targetNamespaces:
+    - openshift-lws-operator
+
+subscription:
+  name: leader-worker-set
+  namespace: openshift-lws-operator
+  channel: stable-v1.0
+  source: cs-operator-index-4-22
+  sourceNamespace: openshift-marketplace
+  startingCSV: leader-worker-set.v1.0.0
+  installPlanApproval: Automatic
+
+# LeaderWorkerSetOperator instance — matches the live cluster CR (name: cluster).
+leaderWorkerSetOperator:
+  enabled: true
+  name: cluster
+  spec:
+    logLevel: Normal
+    managementState: Managed
+    operatorLogLevel: Normal

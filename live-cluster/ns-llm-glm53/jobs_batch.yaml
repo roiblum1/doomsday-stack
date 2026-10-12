@@ -1,0 +1,1134 @@
+apiVersion: v1
+items:
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    creationTimestamp: "2026-10-12T13:33:06Z"
+    generation: 1
+    labels:
+      batch.kubernetes.io/controller-uid: 6373242d-dbba-47f9-9678-2f229013e166
+      batch.kubernetes.io/job-name: glm53-flash-bucket-repair
+      controller-uid: 6373242d-dbba-47f9-9678-2f229013e166
+      job-name: glm53-flash-bucket-repair
+    name: glm53-flash-bucket-repair
+    namespace: llm-glm53
+    resourceVersion: "55030091"
+    uid: 6373242d-dbba-47f9-9678-2f229013e166
+  spec:
+    backoffLimit: 1
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    selector:
+      matchLabels:
+        batch.kubernetes.io/controller-uid: 6373242d-dbba-47f9-9678-2f229013e166
+    suspend: false
+    template:
+      metadata:
+        labels:
+          batch.kubernetes.io/controller-uid: 6373242d-dbba-47f9-9678-2f229013e166
+          batch.kubernetes.io/job-name: glm53-flash-bucket-repair
+          controller-uid: 6373242d-dbba-47f9-9678-2f229013e166
+          job-name: glm53-flash-bucket-repair
+      spec:
+        containers:
+        - args:
+          - |-
+            set -euo pipefail
+            cd /work
+            echo "--- pulling delta from prod S3"
+            AWS_ACCESS_KEY_ID=$PROD_KEY AWS_SECRET_ACCESS_KEY=$PROD_SECRET /s5cmd --endpoint-url "$PROD_ENDPOINT" cp --concurrency 16 "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/model_mtp.safetensors" .
+            AWS_ACCESS_KEY_ID=$PROD_KEY AWS_SECRET_ACCESS_KEY=$PROD_SECRET /s5cmd --endpoint-url "$PROD_ENDPOINT" cp "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/model.safetensors.index.json" .
+            AWS_ACCESS_KEY_ID=$PROD_KEY AWS_SECRET_ACCESS_KEY=$PROD_SECRET /s5cmd --endpoint-url "$PROD_ENDPOINT" cp "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/model_mtp.safetensors.index.json" .
+            ls -la
+            echo "--- uploading to our bucket"
+            AWS_ACCESS_KEY_ID=$OUR_KEY AWS_SECRET_ACCESS_KEY=$OUR_SECRET /s5cmd --endpoint-url "$OUR_ENDPOINT" cp model_mtp.safetensors "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/model_mtp.safetensors"
+            AWS_ACCESS_KEY_ID=$OUR_KEY AWS_SECRET_ACCESS_KEY=$OUR_SECRET /s5cmd --endpoint-url "$OUR_ENDPOINT" cp model.safetensors.index.json "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/model.safetensors.index.json"
+            AWS_ACCESS_KEY_ID=$OUR_KEY AWS_SECRET_ACCESS_KEY=$OUR_SECRET /s5cmd --endpoint-url "$OUR_ENDPOINT" cp model_mtp.safetensors.index.json "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/model_mtp.safetensors.index.json"
+            echo "--- verifying our bucket now"
+            AWS_ACCESS_KEY_ID=$OUR_KEY AWS_SECRET_ACCESS_KEY=$OUR_SECRET /s5cmd --endpoint-url "$OUR_ENDPOINT" ls "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/" | grep -iE "model_mtp|index.json"
+            echo BUCKET-REPAIR-DONE
+          command:
+          - /bin/sh
+          - -c
+          env:
+          - name: PROD_ENDPOINT
+            value: http://host.example.internal
+          - name: PROD_KEY
+            value: REDACTED-ENV
+          - name: PROD_SECRET
+            value: REDACTED-ENV
+          - name: OUR_ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ENDPOINT_URL
+                name: glm53-s3
+          - name: OUR_KEY
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ACCESS_KEY_ID
+                name: glm53-s3
+          - name: OUR_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: AWS_SECRET_ACCESS_KEY
+                name: glm53-s3
+          image: registry-internal/tools/s5cmd:v2.3.0
+          imagePullPolicy: IfNotPresent
+          name: repair
+          resources:
+            limits:
+              cpu: "8"
+              memory: 8Gi
+            requests:
+              cpu: "4"
+              memory: 4Gi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /work
+            name: work
+        dnsPolicy: ClusterFirst
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: s3sa
+        serviceAccountName: s3sa
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - emptyDir:
+            sizeLimit: 12Gi
+          name: work
+  status:
+    completionTime: "2026-10-12T13:33:31Z"
+    conditions:
+    - lastProbeTime: "2026-10-12T13:33:31Z"
+      lastTransitionTime: "2026-10-12T13:33:31Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: SuccessCriteriaMet
+    - lastProbeTime: "2026-10-12T13:33:31Z"
+      lastTransitionTime: "2026-10-12T13:33:31Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: Complete
+    ready: 0
+    startTime: "2026-10-12T13:33:06Z"
+    succeeded: 1
+    terminating: 0
+    uncountedTerminatedPods: {}
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    creationTimestamp: "2026-10-12T13:16:33Z"
+    generation: 1
+    labels:
+      batch.kubernetes.io/controller-uid: c2af6e15-bb30-4ad2-8a52-04800c1c2ad0
+      batch.kubernetes.io/job-name: glm53-flash-cfg-check
+      controller-uid: c2af6e15-bb30-4ad2-8a52-04800c1c2ad0
+      job-name: glm53-flash-cfg-check
+    name: glm53-flash-cfg-check
+    namespace: llm-glm53
+    resourceVersion: "55019930"
+    uid: c2af6e15-bb30-4ad2-8a52-04800c1c2ad0
+  spec:
+    backoffLimit: 1
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    selector:
+      matchLabels:
+        batch.kubernetes.io/controller-uid: c2af6e15-bb30-4ad2-8a52-04800c1c2ad0
+    suspend: false
+    template:
+      metadata:
+        labels:
+          batch.kubernetes.io/controller-uid: c2af6e15-bb30-4ad2-8a52-04800c1c2ad0
+          batch.kubernetes.io/job-name: glm53-flash-cfg-check
+          controller-uid: c2af6e15-bb30-4ad2-8a52-04800c1c2ad0
+          job-name: glm53-flash-cfg-check
+      spec:
+        containers:
+        - args:
+          - /s5cmd --endpoint-url "$ENDPOINT" cat "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/config.json"
+          command:
+          - /bin/sh
+          - -c
+          env:
+          - name: ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ENDPOINT_URL
+                name: glm53-s3
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ACCESS_KEY_ID
+                name: glm53-s3
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: AWS_SECRET_ACCESS_KEY
+                name: glm53-s3
+          image: registry-internal/tools/s5cmd:v2.3.0
+          imagePullPolicy: IfNotPresent
+          name: check
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: s3sa
+        serviceAccountName: s3sa
+        terminationGracePeriodSeconds: 30
+  status:
+    completionTime: "2026-10-12T13:16:37Z"
+    conditions:
+    - lastProbeTime: "2026-10-12T13:16:37Z"
+      lastTransitionTime: "2026-10-12T13:16:37Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: SuccessCriteriaMet
+    - lastProbeTime: "2026-10-12T13:16:37Z"
+      lastTransitionTime: "2026-10-12T13:16:37Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: Complete
+    ready: 0
+    startTime: "2026-10-12T13:16:33Z"
+    succeeded: 1
+    terminating: 0
+    uncountedTerminatedPods: {}
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    creationTimestamp: "2026-10-12T13:32:47Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/name: glm53
+      batch.kubernetes.io/controller-uid: f139db3d-d101-47fe-a8de-ee719327dc54
+      batch.kubernetes.io/job-name: glm53-flash-mtpfix-node-1
+      controller-uid: f139db3d-d101-47fe-a8de-ee719327dc54
+      job-name: glm53-flash-mtpfix-node-1
+    name: glm53-flash-mtpfix-node-1
+    namespace: llm-glm53
+    resourceVersion: "55029763"
+    uid: f139db3d-d101-47fe-a8de-ee719327dc54
+  spec:
+    backoffLimit: 1
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    selector:
+      matchLabels:
+        batch.kubernetes.io/controller-uid: f139db3d-d101-47fe-a8de-ee719327dc54
+    suspend: false
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/name: glm53
+          batch.kubernetes.io/controller-uid: f139db3d-d101-47fe-a8de-ee719327dc54
+          batch.kubernetes.io/job-name: glm53-flash-mtpfix-node-1
+          controller-uid: f139db3d-d101-47fe-a8de-ee719327dc54
+          job-name: glm53-flash-mtpfix-node-1
+      spec:
+        containers:
+        - args:
+          - |-
+            set -euo pipefail
+            MODEL_DIR="/models/GLM-5.3-Flash-NVFP4"
+            cd "${MODEL_DIR}"
+            echo "--- fetching delta from prod S3"
+            /s5cmd --endpoint-url "${ENDPOINT}" cp --concurrency 16 "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/model_mtp.safetensors" .
+            /s5cmd --endpoint-url "${ENDPOINT}" cp "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/model.safetensors.index.json" .
+            /s5cmd --endpoint-url "${ENDPOINT}" cp "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/model_mtp.safetensors.index.json" .
+            echo "--- verify-index against new main index"
+            MISSING=$(grep -oE "\"[^\"]+\.safetensors\"" model.safetensors.index.json | tr -d "\"" | sort -u | while read -r f; do [ -f "$f" ] || echo "$f"; done)
+            if [ -n "${MISSING}" ]; then echo "MISSING SHARDS:"; echo "${MISSING}" | head -40; exit 1; fi
+            REFS=$(grep -oE "\"[^\"]+\.safetensors\"" model.safetensors.index.json | tr -d "\"" | sort -u | wc -l)
+            echo "verify-index: all ${REFS} referenced shards present"
+            touch .download-complete
+            echo DONE
+          command:
+          - /bin/sh
+          - -c
+          env:
+          - name: ENDPOINT
+            value: http://host.example.internal
+          - name: AWS_ACCESS_KEY_ID
+            value: REDACTED-ENV
+          - name: AWS_SECRET_ACCESS_KEY
+            value: REDACTED-ENV
+          image: registry-internal/tools/s5cmd:v2.3.0
+          imagePullPolicy: IfNotPresent
+          name: fix
+          resources:
+            limits:
+              cpu: "8"
+              memory: 16Gi
+            requests:
+              cpu: "4"
+              memory: 8Gi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /models
+            name: models
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/hostname: gpu-node-x
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: s3sa
+        serviceAccountName: s3sa
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: glm53-models
+  status:
+    completionTime: "2026-10-12T13:33:00Z"
+    conditions:
+    - lastProbeTime: "2026-10-12T13:33:00Z"
+      lastTransitionTime: "2026-10-12T13:33:00Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: SuccessCriteriaMet
+    - lastProbeTime: "2026-10-12T13:33:00Z"
+      lastTransitionTime: "2026-10-12T13:33:00Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: Complete
+    ready: 0
+    startTime: "2026-10-12T13:32:47Z"
+    succeeded: 1
+    terminating: 0
+    uncountedTerminatedPods: {}
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    creationTimestamp: "2026-10-12T13:32:47Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/name: glm53
+      batch.kubernetes.io/controller-uid: cd1d0ec9-a3b5-4ea5-a7e1-dd5f2bc9420b
+      batch.kubernetes.io/job-name: glm53-flash-mtpfix-node-2
+      controller-uid: cd1d0ec9-a3b5-4ea5-a7e1-dd5f2bc9420b
+      job-name: glm53-flash-mtpfix-node-2
+    name: glm53-flash-mtpfix-node-2
+    namespace: llm-glm53
+    resourceVersion: "55029738"
+    uid: cd1d0ec9-a3b5-4ea5-a7e1-dd5f2bc9420b
+  spec:
+    backoffLimit: 1
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    selector:
+      matchLabels:
+        batch.kubernetes.io/controller-uid: cd1d0ec9-a3b5-4ea5-a7e1-dd5f2bc9420b
+    suspend: false
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/name: glm53
+          batch.kubernetes.io/controller-uid: cd1d0ec9-a3b5-4ea5-a7e1-dd5f2bc9420b
+          batch.kubernetes.io/job-name: glm53-flash-mtpfix-node-2
+          controller-uid: cd1d0ec9-a3b5-4ea5-a7e1-dd5f2bc9420b
+          job-name: glm53-flash-mtpfix-node-2
+      spec:
+        containers:
+        - args:
+          - |-
+            set -euo pipefail
+            MODEL_DIR="/models/GLM-5.3-Flash-NVFP4"
+            cd "${MODEL_DIR}"
+            echo "--- fetching delta from prod S3"
+            /s5cmd --endpoint-url "${ENDPOINT}" cp --concurrency 16 "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/model_mtp.safetensors" .
+            /s5cmd --endpoint-url "${ENDPOINT}" cp "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/model.safetensors.index.json" .
+            /s5cmd --endpoint-url "${ENDPOINT}" cp "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/model_mtp.safetensors.index.json" .
+            echo "--- verify-index against new main index"
+            MISSING=$(grep -oE "\"[^\"]+\.safetensors\"" model.safetensors.index.json | tr -d "\"" | sort -u | while read -r f; do [ -f "$f" ] || echo "$f"; done)
+            if [ -n "${MISSING}" ]; then echo "MISSING SHARDS:"; echo "${MISSING}" | head -40; exit 1; fi
+            REFS=$(grep -oE "\"[^\"]+\.safetensors\"" model.safetensors.index.json | tr -d "\"" | sort -u | wc -l)
+            echo "verify-index: all ${REFS} referenced shards present"
+            touch .download-complete
+            echo DONE
+          command:
+          - /bin/sh
+          - -c
+          env:
+          - name: ENDPOINT
+            value: http://host.example.internal
+          - name: AWS_ACCESS_KEY_ID
+            value: REDACTED-ENV
+          - name: AWS_SECRET_ACCESS_KEY
+            value: REDACTED-ENV
+          image: registry-internal/tools/s5cmd:v2.3.0
+          imagePullPolicy: IfNotPresent
+          name: fix
+          resources:
+            limits:
+              cpu: "8"
+              memory: 16Gi
+            requests:
+              cpu: "4"
+              memory: 8Gi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /models
+            name: models
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/hostname: gpu-node-x
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: s3sa
+        serviceAccountName: s3sa
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: glm53-models
+  status:
+    completionTime: "2026-10-12T13:32:59Z"
+    conditions:
+    - lastProbeTime: "2026-10-12T13:32:59Z"
+      lastTransitionTime: "2026-10-12T13:32:59Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: SuccessCriteriaMet
+    - lastProbeTime: "2026-10-12T13:32:59Z"
+      lastTransitionTime: "2026-10-12T13:32:59Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: Complete
+    ready: 0
+    startTime: "2026-10-12T13:32:47Z"
+    succeeded: 1
+    terminating: 0
+    uncountedTerminatedPods: {}
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    creationTimestamp: "2026-10-12T13:26:22Z"
+    generation: 1
+    labels:
+      batch.kubernetes.io/controller-uid: d00f9c79-514d-4457-aad9-cf407d488d06
+      batch.kubernetes.io/job-name: glm53-flash-s3-search2
+      controller-uid: d00f9c79-514d-4457-aad9-cf407d488d06
+      job-name: glm53-flash-s3-search2
+    name: glm53-flash-s3-search2
+    namespace: llm-glm53
+    resourceVersion: "55025845"
+    uid: d00f9c79-514d-4457-aad9-cf407d488d06
+  spec:
+    backoffLimit: 1
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    selector:
+      matchLabels:
+        batch.kubernetes.io/controller-uid: d00f9c79-514d-4457-aad9-cf407d488d06
+    suspend: false
+    template:
+      metadata:
+        labels:
+          batch.kubernetes.io/controller-uid: d00f9c79-514d-4457-aad9-cf407d488d06
+          batch.kubernetes.io/job-name: glm53-flash-s3-search2
+          controller-uid: d00f9c79-514d-4457-aad9-cf407d488d06
+          job-name: glm53-flash-s3-search2
+      spec:
+        containers:
+        - args:
+          - |
+            set -eu
+            echo "=== .Trash-0/:"
+            /s5cmd --endpoint-url "$ENDPOINT" ls "s3://llms/.Trash-0/"
+            echo "=== .Trash-0/RedHatAI/:"
+            /s5cmd --endpoint-url "$ENDPOINT" ls "s3://llms/.Trash-0/RedHatAI/" 2>/dev/null || true
+            echo "=== .Trash-0/RedHatAI/GLM-5.3-Flash-NVFP4/ mtp files:"
+            /s5cmd --endpoint-url "$ENDPOINT" ls "s3://llms/.Trash-0/RedHatAI/GLM-5.3-Flash-NVFP4/" 2>/dev/null | grep -i mtp || true
+            echo "=== tmp/:"
+            /s5cmd --endpoint-url "$ENDPOINT" ls "s3://llms/tmp/"
+            echo "=== zai-org/GLM-5.3-Flash/ objects (head):"
+            /s5cmd --endpoint-url "$ENDPOINT" ls "s3://llms/zai-org/GLM-5.3-Flash/" | head -15
+            echo "=== zai-org/GLM-5.3-Flash/ mtp files:"
+            /s5cmd --endpoint-url "$ENDPOINT" ls "s3://llms/zai-org/GLM-5.3-Flash/" | grep -i mtp || echo "(no mtp files)"
+            echo "=== zai-org/GLM-5.3-Flash/ quant method:"
+            /s5cmd --endpoint-url "$ENDPOINT" cat "s3://llms/zai-org/GLM-5.3-Flash/config.json" | grep -A2 quantization_config | head -5 || true
+          command:
+          - /bin/sh
+          - -c
+          env:
+          - name: ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ENDPOINT_URL
+                name: glm53-s3
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ACCESS_KEY_ID
+                name: glm53-s3
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: AWS_SECRET_ACCESS_KEY
+                name: glm53-s3
+          image: registry-internal/tools/s5cmd:v2.3.0
+          imagePullPolicy: IfNotPresent
+          name: search
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: s3sa
+        serviceAccountName: s3sa
+        terminationGracePeriodSeconds: 30
+  status:
+    completionTime: "2026-10-12T13:26:25Z"
+    conditions:
+    - lastProbeTime: "2026-10-12T13:26:25Z"
+      lastTransitionTime: "2026-10-12T13:26:25Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: SuccessCriteriaMet
+    - lastProbeTime: "2026-10-12T13:26:25Z"
+      lastTransitionTime: "2026-10-12T13:26:25Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: Complete
+    ready: 0
+    startTime: "2026-10-12T13:26:22Z"
+    succeeded: 1
+    terminating: 0
+    uncountedTerminatedPods: {}
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    creationTimestamp: "2026-10-12T13:27:41Z"
+    generation: 1
+    labels:
+      batch.kubernetes.io/controller-uid: 97b160e0-4922-4d70-b485-5280bc49592b
+      batch.kubernetes.io/job-name: glm53-flash-s3-search3
+      controller-uid: 97b160e0-4922-4d70-b485-5280bc49592b
+      job-name: glm53-flash-s3-search3
+    name: glm53-flash-s3-search3
+    namespace: llm-glm53
+    resourceVersion: "55026650"
+    uid: 97b160e0-4922-4d70-b485-5280bc49592b
+  spec:
+    backoffLimit: 1
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    selector:
+      matchLabels:
+        batch.kubernetes.io/controller-uid: 97b160e0-4922-4d70-b485-5280bc49592b
+    suspend: false
+    template:
+      metadata:
+        labels:
+          batch.kubernetes.io/controller-uid: 97b160e0-4922-4d70-b485-5280bc49592b
+          batch.kubernetes.io/job-name: glm53-flash-s3-search3
+          controller-uid: 97b160e0-4922-4d70-b485-5280bc49592b
+          job-name: glm53-flash-s3-search3
+      spec:
+        containers:
+        - args:
+          - "set -eu\necho \"=== .Trash-0/files/:\"\n/s5cmd --endpoint-url \"$ENDPOINT\"
+            ls \"s3://llms/.Trash-0/files/\"\necho \"=== .Trash-0/files/RedHatAI/:\"\n/s5cmd
+            --endpoint-url \"$ENDPOINT\" ls \"s3://llms/.Trash-0/files/RedHatAI/\"
+            2>/dev/null || true\necho \"=== .Trash-0/files/RedHatAI/GLM-5.3-Flash-NVFP4/
+            mtp:\"\n/s5cmd --endpoint-url \"$ENDPOINT\" ls \"s3://llms/.Trash-0/files/RedHatAI/GLM-5.3-Flash-NVFP4/\"
+            2>/dev/null | grep -i mtp || echo \"(none)\"\necho \"=== glm51/:\"\n/s5cmd
+            --endpoint-url \"$ENDPOINT\" ls \"s3://llms/glm51/\"\necho \"=== tmp/openai/:\"\n/s5cmd
+            --endpoint-url \"$ENDPOINT\" ls \"s3://llms/tmp/\" \n"
+          command:
+          - /bin/sh
+          - -c
+          env:
+          - name: ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ENDPOINT_URL
+                name: glm53-s3
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ACCESS_KEY_ID
+                name: glm53-s3
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: AWS_SECRET_ACCESS_KEY
+                name: glm53-s3
+          image: registry-internal/tools/s5cmd:v2.3.0
+          imagePullPolicy: IfNotPresent
+          name: search
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+        dnsPolicy: ClusterFirst
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: s3sa
+        serviceAccountName: s3sa
+        terminationGracePeriodSeconds: 30
+  status:
+    completionTime: "2026-10-12T13:27:45Z"
+    conditions:
+    - lastProbeTime: "2026-10-12T13:27:45Z"
+      lastTransitionTime: "2026-10-12T13:27:45Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: SuccessCriteriaMet
+    - lastProbeTime: "2026-10-12T13:27:45Z"
+      lastTransitionTime: "2026-10-12T13:27:45Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: Complete
+    ready: 0
+    startTime: "2026-10-12T13:27:41Z"
+    succeeded: 1
+    terminating: 0
+    uncountedTerminatedPods: {}
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    creationTimestamp: "2026-10-12T13:18:54Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/name: glm53
+      app.kubernetes.io/part-of: glm53-chart
+    name: glm53-pull-flash-gpu-node-x
+    namespace: llm-glm53
+    resourceVersion: "55023557"
+    uid: 463422e8-9d6f-4404-beea-de88ba9d4763
+  spec:
+    backoffLimit: 2
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    selector:
+      matchLabels:
+        batch.kubernetes.io/controller-uid: 463422e8-9d6f-4404-beea-de88ba9d4763
+    suspend: false
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/name: glm53
+          batch.kubernetes.io/controller-uid: 463422e8-9d6f-4404-beea-de88ba9d4763
+          batch.kubernetes.io/job-name: glm53-pull-flash-gpu-node-x
+          controller-uid: 463422e8-9d6f-4404-beea-de88ba9d4763
+          job-name: glm53-pull-flash-gpu-node-x
+      spec:
+        containers:
+        - args:
+          - |
+            set -euo pipefail
+            MODEL_DIR="/models/GLM-5.3-Flash-NVFP4"
+            mkdir -p "${MODEL_DIR}"
+            if [ -f "${MODEL_DIR}/.download-complete" ]; then
+              echo "Model already present, skipping download"; exit 0
+            fi
+            START_TIME=$(date +%s)
+            /s5cmd --endpoint-url "${ENDPOINT}" cp \
+              --concurrency 128 \
+              --part-size 256 \
+              "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/*" "${MODEL_DIR}/"
+            cd "${MODEL_DIR}"
+            if [ -f model.safetensors.index.json ]; then
+              MISSING=$(grep -oE '"[^"]+\.safetensors"' model.safetensors.index.json \
+                | tr -d '"' | sort -u | while read -r f; do
+                  [ -f "$f" ] || echo "$f"; done)
+              if [ -n "${MISSING}" ]; then
+                echo "MISSING SHARDS:"; echo "${MISSING}"; exit 1
+              fi
+              echo "verify-index: all shards present"
+            else
+              echo "verify-index: no index json, skipping"
+            fi
+            touch "${MODEL_DIR}/.download-complete"
+            END_TIME=$(date +%s)
+            echo "Download completed in $((END_TIME - START_TIME)) seconds"
+          command:
+          - /bin/sh
+          - -c
+          env:
+          - name: ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ENDPOINT_URL
+                name: glm53-s3
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ACCESS_KEY_ID
+                name: glm53-s3
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: AWS_SECRET_ACCESS_KEY
+                name: glm53-s3
+          image: registry-internal/tools/s5cmd:v2.3.0
+          imagePullPolicy: IfNotPresent
+          name: pull
+          resources:
+            limits:
+              cpu: "48"
+              memory: 100Gi
+            requests:
+              cpu: "16"
+              memory: 32Gi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /models
+            name: models
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/hostname: gpu-node-x
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: s3sa
+        serviceAccountName: s3sa
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: glm53-models
+  status:
+    conditions:
+    - lastProbeTime: "2026-10-12T13:22:39Z"
+      lastTransitionTime: "2026-10-12T13:22:39Z"
+      message: Job has reached the specified backoff limit
+      reason: BackoffLimitExceeded
+      status: "True"
+      type: FailureTarget
+    - lastProbeTime: "2026-10-12T13:22:39Z"
+      lastTransitionTime: "2026-10-12T13:22:39Z"
+      message: Job has reached the specified backoff limit
+      reason: BackoffLimitExceeded
+      status: "True"
+      type: Failed
+    failed: 3
+    ready: 0
+    startTime: "2026-10-12T13:18:54Z"
+    terminating: 0
+    uncountedTerminatedPods: {}
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    creationTimestamp: "2026-10-12T13:18:54Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/name: glm53
+      app.kubernetes.io/part-of: glm53-chart
+    name: glm53-pull-flash-gpu-node-x
+    namespace: llm-glm53
+    resourceVersion: "55023579"
+    uid: d8e99771-f204-4d9f-b9f7-cfd3fcccbce0
+  spec:
+    backoffLimit: 2
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    selector:
+      matchLabels:
+        batch.kubernetes.io/controller-uid: d8e99771-f204-4d9f-b9f7-cfd3fcccbce0
+    suspend: false
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/name: glm53
+          batch.kubernetes.io/controller-uid: d8e99771-f204-4d9f-b9f7-cfd3fcccbce0
+          batch.kubernetes.io/job-name: glm53-pull-flash-gpu-node-x
+          controller-uid: d8e99771-f204-4d9f-b9f7-cfd3fcccbce0
+          job-name: glm53-pull-flash-gpu-node-x
+      spec:
+        containers:
+        - args:
+          - |
+            set -euo pipefail
+            MODEL_DIR="/models/GLM-5.3-Flash-NVFP4"
+            mkdir -p "${MODEL_DIR}"
+            if [ -f "${MODEL_DIR}/.download-complete" ]; then
+              echo "Model already present, skipping download"; exit 0
+            fi
+            START_TIME=$(date +%s)
+            /s5cmd --endpoint-url "${ENDPOINT}" cp \
+              --concurrency 128 \
+              --part-size 256 \
+              "s3://llms/RedHatAI/GLM-5.3-Flash-NVFP4/*" "${MODEL_DIR}/"
+            cd "${MODEL_DIR}"
+            if [ -f model.safetensors.index.json ]; then
+              MISSING=$(grep -oE '"[^"]+\.safetensors"' model.safetensors.index.json \
+                | tr -d '"' | sort -u | while read -r f; do
+                  [ -f "$f" ] || echo "$f"; done)
+              if [ -n "${MISSING}" ]; then
+                echo "MISSING SHARDS:"; echo "${MISSING}"; exit 1
+              fi
+              echo "verify-index: all shards present"
+            else
+              echo "verify-index: no index json, skipping"
+            fi
+            touch "${MODEL_DIR}/.download-complete"
+            END_TIME=$(date +%s)
+            echo "Download completed in $((END_TIME - START_TIME)) seconds"
+          command:
+          - /bin/sh
+          - -c
+          env:
+          - name: ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ENDPOINT_URL
+                name: glm53-s3
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ACCESS_KEY_ID
+                name: glm53-s3
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: AWS_SECRET_ACCESS_KEY
+                name: glm53-s3
+          image: registry-internal/tools/s5cmd:v2.3.0
+          imagePullPolicy: IfNotPresent
+          name: pull
+          resources:
+            limits:
+              cpu: "48"
+              memory: 100Gi
+            requests:
+              cpu: "16"
+              memory: 32Gi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /models
+            name: models
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/hostname: gpu-node-x
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: s3sa
+        serviceAccountName: s3sa
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: glm53-models
+  status:
+    conditions:
+    - lastProbeTime: "2026-10-12T13:22:40Z"
+      lastTransitionTime: "2026-10-12T13:22:40Z"
+      message: Job has reached the specified backoff limit
+      reason: BackoffLimitExceeded
+      status: "True"
+      type: FailureTarget
+    - lastProbeTime: "2026-10-12T13:22:40Z"
+      lastTransitionTime: "2026-10-12T13:22:40Z"
+      message: Job has reached the specified backoff limit
+      reason: BackoffLimitExceeded
+      status: "True"
+      type: Failed
+    failed: 3
+    ready: 0
+    startTime: "2026-10-12T13:18:54Z"
+    terminating: 0
+    uncountedTerminatedPods: {}
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:batch/Job:llm-glm53/glm53-pull-gpu-node-x
+    creationTimestamp: "2026-10-05T17:27:11Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-pull-gpu-node-x
+    namespace: llm-glm53
+    resourceVersion: "49318228"
+    uid: 042c4186-6824-4b24-ac36-de773bf434cf
+  spec:
+    backoffLimit: 3
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    selector:
+      matchLabels:
+        batch.kubernetes.io/controller-uid: 042c4186-6824-4b24-ac36-de773bf434cf
+    suspend: false
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/instance: glm53
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/name: glm53
+          batch.kubernetes.io/controller-uid: 042c4186-6824-4b24-ac36-de773bf434cf
+          batch.kubernetes.io/job-name: glm53-pull-gpu-node-x
+          controller-uid: 042c4186-6824-4b24-ac36-de773bf434cf
+          helm.sh/chart: glm53-bundled-0.1.0
+          job-name: glm53-pull-gpu-node-x
+      spec:
+        containers:
+        - command:
+          - /bin/sh
+          - -c
+          - |
+            set -euo pipefail
+            MODEL_DIR="/models/GLM-5.3"
+            mkdir -p "${MODEL_DIR}"
+            if [ -f "${MODEL_DIR}/.download-complete" ]; then
+              echo "Model already present, skipping download"
+              exit 0
+            fi
+            START_TIME=$(date +%s)
+            /s5cmd --endpoint-url "${ENDPOINT}" cp \
+              --concurrency 128 \
+              --part-size 256 \
+              "s3://llms/zai-org/GLM-5.3/*" "${MODEL_DIR}/"
+            touch "${MODEL_DIR}/.download-complete"
+            END_TIME=$(date +%s)
+            ELAPSED=$((END_TIME - START_TIME))
+            echo "Download completed in ${ELAPSED} seconds ($((${ELAPSED}/60))m $((${ELAPSED}%60))s)"
+          env:
+          - name: ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ENDPOINT_URL
+                name: glm53-s3
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ACCESS_KEY_ID
+                name: glm53-s3
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: AWS_SECRET_ACCESS_KEY
+                name: glm53-s3
+          image: registry-internal/tools/s5cmd:v2.3.0
+          imagePullPolicy: IfNotPresent
+          name: pull
+          resources:
+            limits:
+              cpu: "48"
+              memory: 100Gi
+            requests:
+              cpu: "16"
+              memory: 32Gi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /models
+            name: models
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/hostname: gpu-node-x
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: s3sa
+        serviceAccountName: s3sa
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: glm53-models
+  status:
+    completionTime: "2026-10-05T17:27:15Z"
+    conditions:
+    - lastProbeTime: "2026-10-05T17:27:15Z"
+      lastTransitionTime: "2026-10-05T17:27:15Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: SuccessCriteriaMet
+    - lastProbeTime: "2026-10-05T17:27:15Z"
+      lastTransitionTime: "2026-10-05T17:27:15Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: Complete
+    ready: 0
+    startTime: "2026-10-05T17:27:11Z"
+    succeeded: 1
+    terminating: 0
+    uncountedTerminatedPods: {}
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:batch/Job:llm-glm53/glm53-pull-gpu-node-x
+    creationTimestamp: "2026-10-05T17:27:11Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-pull-gpu-node-x
+    namespace: llm-glm53
+    resourceVersion: "49318193"
+    uid: 64068adb-7108-4408-b985-4519c5468f15
+  spec:
+    backoffLimit: 3
+    completionMode: NonIndexed
+    completions: 1
+    manualSelector: false
+    parallelism: 1
+    podReplacementPolicy: TerminatingOrFailed
+    selector:
+      matchLabels:
+        batch.kubernetes.io/controller-uid: 64068adb-7108-4408-b985-4519c5468f15
+    suspend: false
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/instance: glm53
+          app.kubernetes.io/managed-by: Helm
+          app.kubernetes.io/name: glm53
+          batch.kubernetes.io/controller-uid: 64068adb-7108-4408-b985-4519c5468f15
+          batch.kubernetes.io/job-name: glm53-pull-gpu-node-x
+          controller-uid: 64068adb-7108-4408-b985-4519c5468f15
+          helm.sh/chart: glm53-bundled-0.1.0
+          job-name: glm53-pull-gpu-node-x
+      spec:
+        containers:
+        - command:
+          - /bin/sh
+          - -c
+          - |
+            set -euo pipefail
+            MODEL_DIR="/models/GLM-5.3"
+            mkdir -p "${MODEL_DIR}"
+            if [ -f "${MODEL_DIR}/.download-complete" ]; then
+              echo "Model already present, skipping download"
+              exit 0
+            fi
+            START_TIME=$(date +%s)
+            /s5cmd --endpoint-url "${ENDPOINT}" cp \
+              --concurrency 128 \
+              --part-size 256 \
+              "s3://llms/zai-org/GLM-5.3/*" "${MODEL_DIR}/"
+            touch "${MODEL_DIR}/.download-complete"
+            END_TIME=$(date +%s)
+            ELAPSED=$((END_TIME - START_TIME))
+            echo "Download completed in ${ELAPSED} seconds ($((${ELAPSED}/60))m $((${ELAPSED}%60))s)"
+          env:
+          - name: ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ENDPOINT_URL
+                name: glm53-s3
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                key: AWS_ACCESS_KEY_ID
+                name: glm53-s3
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: AWS_SECRET_ACCESS_KEY
+                name: glm53-s3
+          image: registry-internal/tools/s5cmd:v2.3.0
+          imagePullPolicy: IfNotPresent
+          name: pull
+          resources:
+            limits:
+              cpu: "48"
+              memory: 100Gi
+            requests:
+              cpu: "16"
+              memory: 32Gi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /models
+            name: models
+        dnsPolicy: ClusterFirst
+        nodeSelector:
+          kubernetes.io/hostname: gpu-node-x
+        restartPolicy: Never
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: s3sa
+        serviceAccountName: s3sa
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: glm53-models
+  status:
+    completionTime: "2026-10-05T17:27:15Z"
+    conditions:
+    - lastProbeTime: "2026-10-05T17:27:15Z"
+      lastTransitionTime: "2026-10-05T17:27:15Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: SuccessCriteriaMet
+    - lastProbeTime: "2026-10-05T17:27:15Z"
+      lastTransitionTime: "2026-10-05T17:27:15Z"
+      message: Reached expected number of succeeded pods
+      reason: CompletionsReached
+      status: "True"
+      type: Complete
+    ready: 0
+    startTime: "2026-10-05T17:27:11Z"
+    succeeded: 1
+    terminating: 0
+    uncountedTerminatedPods: {}
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,36 @@
+apiVersion: v1
+items:
+- apiVersion: monitoring.coreos.com/v1
+  kind: ServiceMonitor
+  metadata:
+    creationTimestamp: "2026-10-07T14:22:09Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: qwen38-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+    name: qwen38-cache
+    namespace: llm-qwen38
+    ownerReferences:
+    - apiVersion: lmcache.lmcache.ai/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: LMCacheEngine
+      name: qwen38-cache
+      uid: 42d51c69-528c-4bdd-9b7b-651fbf109c90
+    resourceVersion: "50859392"
+    uid: 0408295d-db1a-4bd3-99c4-9a6c2f5da81b
+  spec:
+    endpoints:
+    - interval: 30s
+      port: metrics
+    namespaceSelector: {}
+    selector:
+      matchLabels:
+        app.kubernetes.io/instance: qwen38-cache
+        app.kubernetes.io/managed-by: lmcache-operator
+        app.kubernetes.io/name: lmcache
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,56 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  data:
+    ca.crt: |
+      REDACTED-PEM-BLOCK
+      REDACTED-PEM-BLOCK
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/description: Contains a CA bundle that can be used to verify the
+        kube-apiserver when using internal endpoints such as the internal service
+        IP or kubernetes.default.svc. No other usage is guaranteed across distributions
+        of Kubernetes clusters.
+    creationTimestamp: "2026-09-29T13:11:55Z"
+    name: kube-root-ca.crt
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "530325"
+    uid: a380be38-9a32-46eb-a443-f26e6bf39a93
+- apiVersion: v1
+  data:
+    ca.crt: |
+      REDACTED-PEM-BLOCK
+  kind: ConfigMap
+  metadata:
+    annotations:
+      argocd.argoproj.io/sync-wave: "0"
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-ai-deploy:/ConfigMap:envoy-ai-gateway-system/llm-peer-ca
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-11T22:19:19Z"
+    labels:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: envoy-ai-gateway-openshift
+      app.kubernetes.io/part-of: envoy-ai-gateway
+      helm.sh/chart: envoy-ai-gateway-openshift-0.1.0
+    name: llm-peer-ca
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54505719"
+    uid: 903d0030-0788-4265-afb9-6e28c7422aca
+- apiVersion: v1
+  data:
+    service-ca.crt: |
+      REDACTED-PEM-BLOCK
+  kind: ConfigMap
+  metadata:
+    annotations:
+      service.beta.openshift.io/inject-cabundle: "true"
+    creationTimestamp: "2026-09-29T13:11:55Z"
+    name: openshift-service-ca.crt
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "530344"
+    uid: 28c89e24-66f2-4d9f-948a-8075a57cd90c
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,118 @@
+apiVersion: v1
+items:
+- apiVersion: lmcache.lmcache.ai/v1alpha1
+  kind: LMCacheEngine
+  metadata:
+    annotations:
+      argocd.argoproj.io/sync-wave: "-1"
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:lmcache.lmcache.ai/LMCacheEngine:llm-qwen38/qwen38-cache
+    creationTimestamp: "2026-10-07T14:22:09Z"
+    generation: 8
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-cache
+    namespace: llm-qwen38
+    resourceVersion: "54450702"
+    uid: 42d51c69-528c-4bdd-9b7b-651fbf109c90
+  spec:
+    env:
+    - name: HOME
+      value: /tmp
+    - name: NUMBA_CACHE_DIR
+      value: /tmp/numba
+    eviction:
+      evictionRatio: 0.2
+      policy: LRU
+      triggerWatermark: 0.8
+    extraArgs:
+    - --separate-object-groups
+    gpuVendor: nvidia
+    hostIPC: false
+    hostNetwork: false
+    image:
+      pullPolicy: IfNotPresent
+      repository: registry-internal/lmcache/lmcache/vllm-openai
+      tag: v0.5.5
+    isolatedIPC: true
+    l1:
+      sizeGB: 200
+    l2Backend:
+      prefetchMaxInFlight: 8
+      prefetchPolicy: default
+      raw:
+        config:
+          backend: POSIX
+          backend_params:
+            file_path: /mnt/lmcache-l2
+            max_capacity_gb: "900"
+            shard_dirs: "true"
+            use_direct_io: "false"
+          eviction:
+            eviction_policy: LRU
+            eviction_ratio: 0.1
+            trigger_watermark: 0.9
+          persist_enabled: true
+        type: nixl_store_dynamic
+      storePolicy: default
+    logLevel: INFO
+    nodeSelector:
+      nvidia.com/gpu.product: NVIDIA-L4
+    priorityClassName: openshift-user-critical
+    privileged: false
+    prometheus:
+      enabled: true
+      port: 8080
+      serviceMonitor:
+        enabled: true
+        interval: 30s
+    server:
+      chunkSize: 1600
+      hashAlgorithm: blake3
+      httpPort: 8080
+      maxWorkers: 1
+      port: 5555
+    serviceAccountName: qwen38-cache
+    volumeMounts:
+    - mountPath: /mnt/lmcache-l2
+      name: l2
+    volumes:
+    - name: l2
+      persistentVolumeClaim:
+        claimName: qwen38-cache-l2
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-07T14:22:09Z"
+      message: Spec validation passed
+      observedGeneration: 8
+      reason: Valid
+      status: "True"
+      type: ConfigValid
+    - lastTransitionTime: "2026-10-11T21:08:45Z"
+      message: 1/1 instances ready
+      observedGeneration: 8
+      reason: AtLeastOneReady
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2026-10-11T21:08:45Z"
+      message: 1/1 instances ready
+      observedGeneration: 8
+      reason: AllReady
+      status: "True"
+      type: AllInstancesReady
+    desiredInstances: 1
+    endpoints:
+    - hostIP: 192.0.2.98
+      metricsPort: 8080
+      nodeName: ocp-util-node-1
+      podName: qwen38-cache-k2whm
+      port: 5555
+      ready: true
+    observedGeneration: 8
+    phase: Running
+    readyInstances: 1
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,61 @@
+apiVersion: v1
+items:
+- apiVersion: cert-manager.io/v1
+  kind: CertificateRequest
+  metadata:
+    annotations:
+      cert-manager.io/certificate-name: llmisvc-serving-cert
+      cert-manager.io/certificate-revision: "1"
+      cert-manager.io/private-key-secret-name: llmisvc-serving-cert-fwm9c
+    creationTimestamp: "2026-09-29T15:01:10Z"
+    generation: 1
+    name: llmisvc-serving-cert-1
+    namespace: kserve
+    ownerReferences:
+    - apiVersion: cert-manager.io/v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Certificate
+      name: llmisvc-serving-cert
+      uid: 2aefe651-fe2c-4d73-ab3f-bceef6d92666
+    resourceVersion: "593972"
+    uid: aa540550-74e0-48c7-ac2b-a176b186264a
+  spec:
+    extra:
+      authentication.kubernetes.io/credential-id:
+      - JTI=33ac9b19-4c36-4b20-80ba-ba8a208f42d9
+      authentication.kubernetes.io/node-name:
+      - gpu-node-x
+      authentication.kubernetes.io/node-uid:
+      - 3b1e5686-2954-4841-89c9-02a404699ce0
+      authentication.kubernetes.io/pod-name:
+      - cert-manager-6b54cd75d9-qw9rm
+      authentication.kubernetes.io/pod-uid:
+      - 685558be-bf3d-47d5-b2f7-5cb880de2c98
+    groups:
+    - system:serviceaccounts
+    - system:serviceaccounts:cert-manager
+    - system:authenticated
+    issuerRef:
+      kind: Issuer
+      name: selfsigned-issuer
+    request: REDACTED-B64
+    uid: 04b7811e-0107-461a-a8d7-e148646b7b91
+    username: system:serviceaccount:cert-manager:cert-manager
+  status:
+    ca: REDACTED-B64
+    certificate: REDACTED-B64
+    conditions:
+    - lastTransitionTime: "2026-09-29T15:01:11Z"
+      message: Certificate request has been approved by cert-manager.io
+      reason: cert-manager.io
+      status: "True"
+      type: Approved
+    - lastTransitionTime: "2026-09-29T15:01:11Z"
+      message: Certificate fetched from issuer successfully
+      reason: Issued
+      status: "True"
+      type: Ready
+kind: List
+metadata:
+  resourceVersion: ""

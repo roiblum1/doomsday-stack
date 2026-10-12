@@ -1,0 +1,6 @@
+apiVersion: v2
+name: numaresources
+description: NUMA Resources operator (standalone) — Namespace + OperatorGroup + Subscription + NUMAResourcesOperator (cluster-scoped), 4.22-aligned
+type: application
+version: 4.22.1
+appVersion: "4.22.1"

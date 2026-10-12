@@ -1,0 +1,73 @@
+# Per-cluster overrides for gpu on cluster-gpu-test.
+#
+# Cluster has 4 B300 GPU nodes that stay standalone (no RoCE) and 4 new H200 RoCE nodes.
+# The H200 nodes get an RDMA-enabled NVIDIA driver via the NVIDIADriver CRD; the existing
+# B300 nodes (and any future B200 standalone GPU nodes) keep a standard non-RDMA driver.
+#
+# This cluster's GPU Operator is 26.3.3 but its NVIDIADriver CRD does NOT expose
+# spec.default, so we are in "Case B": every GPU node must be positively claimed by
+# exactly one NVIDIADriver instance. We therefore use the generic driver-config label
+# nvidia.com/driver-config rather than machine-model role labels:
+#   - H200 RoCE nodes -> nvidia.com/driver-config=roce
+#   - B300 / B200 standalone GPU nodes -> nvidia.com/driver-config=standard
+# This lets tomorrow's B200 nodes join the default driver pool without editing the chart.
+# (Do not use a selector-less default CR here — it would conflict with the roce instance.)
+#
+# NVIDIADriver does NOT inherit repository/image/version from ClusterPolicy; the image
+# path must be explicit in each CR. The digest below matches the driver currently running
+# on the B300 nodes (nvcr.io/nvidia/driver@sha256:f8e3dc9111...). Because digests are not
+# supported with usePrecompiled=true, usePrecompiled is set to false so the operator falls
+# back to the driver-toolkit build path (same behaviour the B300 nodes currently have).
+# ---------------------------------------------------------------------------
+nvidiaDrivers:
+  enabled: true
+  defaults:
+    repository: registry-internal/operators/nvidia
+    image: driver
+    version: sha256:f8e3dc9111c5a7a0cfac73e87d03c0b7b3d1e11f3b61654cca5461847660aa2c
+    imagePullPolicy: IfNotPresent
+    kernelModuleType: auto
+    usePrecompiled: false
+    certConfig:
+      # MUST stay empty on this cluster. The platform already distributes the artifactory
+      # CA via Proxy.spec.trustedCA (custom-ca): the operator's gpu-operator-trusted-ca
+      # bundle already carries it,
+      # so the CA is present in the driver container without certConfig. On top of that,
+      # certConfig's per-key subPath file mounts over that bundle's directory break container
+      # creation in the nvidia/driver image on CRI-O: CreateContainerError
+      # "Not a directory" (mount volume-subpaths/artifactory-ca/nvidia-driver-ctr/12).
+      name: ""
+    repoConfig:
+      name: ""                         # NVIDIADriver CRD uses repoConfig.name; configMapName is ClusterPolicy-only
+    driverType: gpu                    # required by the CRD (API-defaults to gpu); explicit so live matches render
+    licensingConfig:
+      nlsEnabled: true
+      secretName: ""
+    kernelModuleConfig:
+      name: kernel-module-params
+    # No `manager` key: in the NVIDIADriver CRD spec.manager is an init-container image
+    # spec only and has NO upgradePolicy (invalid subtree was silently dropped by the API
+    # server -> permanent Argo diff). Driver upgrade policy lives in
+    # clusterPolicy.spec.driver.upgradePolicy (operators-level values).
+    rdma:                             # default (overridden by the roce driver below)
+      enabled: false
+      useHostMofed: false
+  drivers:
+    # H200 RoCE nodes — GPUDirect RDMA enabled in the NVIDIA driver itself.
+    # useHostMofed=false because the Network Operator provides MOFED/DOCA on these nodes.
+    - name: nvidia-driver-roce
+      spec:
+        nodeSelector:
+          nvidia.com/driver-config: roce
+        rdma:
+          enabled: true
+          useHostMofed: false
+    # B300 / B200 standalone GPU nodes — positively selected by driver-config=standard.
+    # Any non-RoCE GPU node carrying this label joins this driver pool.
+    - name: nvidia-driver-standard
+      spec:
+        nodeSelector:
+          nvidia.com/driver-config: standard
+        rdma:
+          enabled: false
+          useHostMofed: false

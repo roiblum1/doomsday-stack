@@ -1,0 +1,154 @@
+apiVersion: v1
+items:
+- apiVersion: authorization.openshift.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-10-11T20:46:39Z"
+    labels:
+      app.kubernetes.io/part-of: kserve-models-dashboards
+    name: prometheus-k8s
+    namespace: llm-judge
+    resourceVersion: "54437239"
+    uid: 05232e19-5931-4e8d-b0a4-ed859c9ce2a2
+  rules:
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - endpoints
+    - pods
+    - services
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - discovery.k8s.io
+    attributeRestrictions: null
+    resources:
+    - endpointslices
+    verbs:
+    - get
+    - list
+    - watch
+- apiVersion: authorization.openshift.io/v1
+  kind: Role
+  metadata:
+    creationTimestamp: "2026-10-07T16:13:47Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: qwen36-judge
+      app.kubernetes.io/part-of: llminferenceservice
+    name: qwen36-judge-epp-role
+    namespace: llm-judge
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: qwen36-judge
+      uid: 3d24a4ee-260e-4bfe-8427-1839eb41b068
+    resourceVersion: "50925587"
+    uid: 3430e510-4776-46ef-bbf0-7ca247e72d3c
+  rules:
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - inference.networking.k8s.io
+    - inference.networking.x-k8s.io
+    attributeRestrictions: null
+    resources:
+    - inferencemodels
+    - inferenceobjectives
+    - inferencepools
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - inference.networking.x-k8s.io
+    attributeRestrictions: null
+    resources:
+    - inferencemodelrewrites
+    - inferencepoolimports
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - llm-d.ai
+    attributeRestrictions: null
+    resources:
+    - inferencemodelrewrites
+    - inferenceobjectives
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - discovery.k8s.io
+    attributeRestrictions: null
+    resources:
+    - endpointslices
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - coordination.k8s.io
+    attributeRestrictions: null
+    resources:
+    - leases
+    verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - ""
+    attributeRestrictions: null
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+- apiVersion: authorization.openshift.io/v1
+  kind: Role
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen36-judge-deploy:rbac.authorization.k8s.io/Role:llm-judge/use-qwen36-judge-model-serving-scc
+    creationTimestamp: "2026-10-07T16:13:41Z"
+    labels:
+      app.kubernetes.io/instance: qwen36-judge
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen36-judge
+      helm.sh/chart: qwen36-judge-0.2.2
+    name: use-qwen36-judge-model-serving-scc
+    namespace: llm-judge
+    resourceVersion: "54449915"
+    uid: e511d1e9-c285-443c-84aa-d5a2459a02ca
+  rules:
+  - apiGroups:
+    - security.openshift.io
+    attributeRestrictions: null
+    resourceNames:
+    - qwen36-judge-model-serving
+    resources:
+    - securitycontextconstraints
+    verbs:
+    - use
+kind: List
+metadata:
+  resourceVersion: ""

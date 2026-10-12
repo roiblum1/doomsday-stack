@@ -1,0 +1,51 @@
+# ---------------------------------------------------------------------------
+# Alternate-registry overlay for envoy-gateway-openshift.
+#
+# The chart's values.yaml already points every image at the site mirror
+# (registry-internal/kserve), which is what the prod
+# install uses with no overlay at all. Use this file ONLY to point at a
+# DIFFERENT registry:
+#
+#   helm install envoy-gateway charts/envoy-gateway-openshift \
+#     -n envoy-gateway-system --create-namespace \
+#     -f charts/envoy-gateway-openshift/values-mirror.yaml
+#
+# Replace REGISTRY.EXAMPLE.COM below with that registry, then delete every key
+# you do not need.
+#
+# Keep the data-plane digest: mirroring a tag copies the manifest it points
+# at, so the digest published on Docker Hub resolves on any faithful mirror of
+# the tag.
+#
+# NOTE: the full references below cannot be built from global.imageRegistry.
+# The subchart's helpers replace only a reference's HOST (docker.io), so
+# imageRegistry cannot add the repository path a registry like the site
+# mirror's needs. Set each one in full.
+# ---------------------------------------------------------------------------
+envoy-gateway:
+  global:
+    # Rewrites the control-plane, certgen and ratelimit images ONLY, and only
+    # when this is a plain registry host (docker.io -> REGISTRY.EXAMPLE.COM).
+    imageRegistry: REGISTRY.EXAMPLE.COM
+
+    # Uncomment if your mirror needs credentials. The secret must already exist
+    # in the release namespace.
+    # imagePullSecrets:
+    #   - name: mirror-pull-secret
+
+    images:
+      # Full references: NOT rewritten by imageRegistry.
+      envoyGateway:
+        image: REGISTRY.EXAMPLE.COM/envoyproxy/gateway:v1.9.1
+      ratelimit:
+        image: REGISTRY.EXAMPLE.COM/envoyproxy/ratelimit:8fe6ea42
+      envoyProxy:
+        image: REGISTRY.EXAMPLE.COM/envoyproxy/envoy:distroless-v1.39.1@sha256:eb2c01c13125d1629637cb4e4cce7207009fb7cc2c8027f9742758549d15b6f4
+
+  config:
+    envoyGateway:
+      provider:
+        kubernetes:
+          shutdownManager:
+            # Full reference: NOT rewritten by imageRegistry.
+            image: REGISTRY.EXAMPLE.COM/envoyproxy/gateway:v1.9.1

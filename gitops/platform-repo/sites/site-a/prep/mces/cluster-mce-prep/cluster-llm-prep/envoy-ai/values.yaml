@@ -1,0 +1,10 @@
+# cluster-llm-prep has a live load balancer (AVI / AKO) even though
+# status.platform reports "None": front the Envoy data plane with a
+# LoadBalancer Service instead of the chart's ClusterIP + Route default.
+gateway:
+  envoyProxy:
+    service:
+      type: LoadBalancer
+      # Preserves the real client IP; only nodes running an Envoy pod are used
+      # (the chart runs 3 replicas for exactly this).
+      externalTrafficPolicy: Local

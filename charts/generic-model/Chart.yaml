@@ -1,0 +1,19 @@
+apiVersion: v2
+name: generic-model
+description: >-
+  Generic per-model LLM serving bundle: ONE KServe LLMInferenceService
+  (any parallel shape: DP/TP/EP, PVC or S3-uri model source) behind the
+  llm-d router (EPP + InferencePool) and the shared Envoy AI Gateway
+  (AIGatewayRoute + direct AIServiceBackend quota path, Anthropic or
+  OpenAI schema, workload-svc or DP-rank-ports styles). Optional pieces
+  render only when enabled: node storage prep (VG + LV ensure-mount
+  DaemonSet, flashinfer cubin seeding), static local PVs, per-node model
+  pull jobs, LMCache engine (RAM L1 + disk L2 + PrometheusRule) and an
+  AIPerf benchmark job. Supersedes the per-model glm53/qwen38/qwen36-judge
+  charts: a new model is a values file, not a new chart.
+type: application
+version: 0.1.0
+appVersion: "generic-model"
+kubeVersion: ">=1.29.0-0"
+maintainers:
+  - name: popai platform team

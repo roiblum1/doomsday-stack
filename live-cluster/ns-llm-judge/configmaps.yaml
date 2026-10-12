@@ -1,0 +1,35 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  data:
+    ca.crt: |
+      REDACTED-PEM-BLOCK
+      REDACTED-PEM-BLOCK
+  kind: ConfigMap
+  metadata:
+    annotations:
+      kubernetes.io/description: Contains a CA bundle that can be used to verify the
+        kube-apiserver when using internal endpoints such as the internal service
+        IP or kubernetes.default.svc. No other usage is guaranteed across distributions
+        of Kubernetes clusters.
+    creationTimestamp: "2026-10-07T16:13:40Z"
+    name: kube-root-ca.crt
+    namespace: llm-judge
+    resourceVersion: "50925415"
+    uid: 43b3f8ea-9811-40ef-9859-cef3e9cb3120
+- apiVersion: v1
+  data:
+    service-ca.crt: |
+      REDACTED-PEM-BLOCK
+  kind: ConfigMap
+  metadata:
+    annotations:
+      service.beta.openshift.io/inject-cabundle: "true"
+    creationTimestamp: "2026-10-07T16:13:40Z"
+    name: openshift-service-ca.crt
+    namespace: llm-judge
+    resourceVersion: "50925421"
+    uid: c7b8fee1-d987-41d1-862d-f0f6f070b8a5
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,35 @@
+apiVersion: v1
+items:
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: Backend
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen36-judge-deploy:gateway.envoyproxy.io/Backend:llm-judge/qwen36-judge-workload
+    creationTimestamp: "2026-10-07T16:13:43Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: qwen36-judge
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen36-judge
+      helm.sh/chart: qwen36-judge-0.2.2
+    name: qwen36-judge-workload
+    namespace: llm-judge
+    resourceVersion: "54449976"
+    uid: 9e7e0d35-f196-4fb3-9a38-72d0f9e3dd99
+  spec:
+    endpoints:
+    - fqdn:
+        hostname: qwen36-judge-kserve-workload-svc.llm-judge.svc.cluster.local
+        port: 8000
+    type: Endpoints
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-07T16:13:43Z"
+      message: The Backend was accepted
+      observedGeneration: 1
+      reason: Accepted
+      status: "True"
+      type: Accepted
+kind: List
+metadata:
+  resourceVersion: ""

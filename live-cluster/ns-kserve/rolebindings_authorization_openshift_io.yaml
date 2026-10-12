@@ -1,0 +1,114 @@
+apiVersion: v1
+items:
+- apiVersion: authorization.openshift.io/v1
+  groupNames:
+  - system:serviceaccounts:kserve
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-kserve-deploy:rbac.authorization.k8s.io/RoleBinding:kserve/kserve-kserve-llmisvc-openshift-scc-nonroot-v2
+      helm.sh/hook: pre-install,pre-upgrade
+      helm.sh/hook-delete-policy: before-hook-creation
+      helm.sh/hook-weight: "-5"
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T15:02:19Z"
+    labels:
+      app.kubernetes.io/instance: kserve
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: kserve-llmisvc-openshift
+      app.kubernetes.io/part-of: kserve-llm
+      helm.sh/chart: kserve-llmisvc-openshift-0.1.0
+    name: kserve-kserve-llmisvc-openshift-scc-nonroot-v2
+    namespace: kserve
+    resourceVersion: "594720"
+    uid: fe3eb0fa-73d0-4a45-9679-abe579380c81
+  roleRef:
+    name: system:openshift:scc:nonroot-v2
+  subjects:
+  - kind: SystemGroup
+    name: system:serviceaccounts:kserve
+  userNames: null
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-kserve-deploy:rbac.authorization.k8s.io/RoleBinding:kserve/llmisvc-leader-election-rolebinding
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T15:01:10Z"
+    name: llmisvc-leader-election-rolebinding
+    namespace: kserve
+    resourceVersion: "593913"
+    uid: 5b46b174-401a-4c08-8cdf-7ad78b7b0f1b
+  roleRef:
+    name: llmisvc-leader-election-role
+    namespace: kserve
+  subjects:
+  - kind: ServiceAccount
+    name: llmisvc-controller-manager
+    namespace: kserve
+  userNames:
+  - system:serviceaccount:kserve:llmisvc-controller-manager
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows deploymentconfigs in this namespace to rollout
+        pods in this namespace.  It is auto-managed by a controller; remove subjects
+        to disable.
+    creationTimestamp: "2026-09-29T13:11:32Z"
+    name: system:deployers
+    namespace: kserve
+    resourceVersion: "530174"
+    uid: d941cc95-351c-4257-9dc1-ad442f8013a6
+  roleRef:
+    name: system:deployer
+  subjects:
+  - kind: ServiceAccount
+    name: deployer
+    namespace: kserve
+  userNames:
+  - system:serviceaccount:kserve:deployer
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows builds in this namespace to push images to
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-09-29T13:11:32Z"
+    name: system:image-builders
+    namespace: kserve
+    resourceVersion: "530176"
+    uid: cbbc9ed2-238f-49e4-b4aa-2236787eb36b
+  roleRef:
+    name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    name: builder
+    namespace: kserve
+  userNames:
+  - system:serviceaccount:kserve:builder
+- apiVersion: authorization.openshift.io/v1
+  groupNames:
+  - system:serviceaccounts:kserve
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows all pods in this namespace to pull images from
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-09-29T13:11:32Z"
+    name: system:image-pullers
+    namespace: kserve
+    resourceVersion: "530175"
+    uid: 474f2250-0ced-4a96-a992-6cce41da014e
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:serviceaccounts:kserve
+  userNames: null
+kind: List
+metadata:
+  resourceVersion: ""

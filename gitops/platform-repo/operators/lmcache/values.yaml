@@ -1,0 +1,2 @@
+# Chart defaults live in the chart repo (lmcache-chart.git), like glm53.
+# Layered here: operators/lmcache/values.yaml -> site values below.

@@ -1,0 +1,122 @@
+{{- if .Values.aigatewayRoute.enabled }}
+# Agent Router (Envoy AI Gateway) route on the shared gateway: header-based
+# model routing. The extproc derives x-ai-eg-model from the request body's
+# "model" field on every registered endpoint (both /v1/chat/completions and
+# /anthropic/v1/messages), so the SAME model name selects the same rule
+# regardless of client protocol.
+#
+# Rule map (first match wins, all Exact unless noted):
+#   <model.name>                  -> directBackend (quota path; protocol
+#                                    passthrough per directBackend.schema);
+#                                    DISABLED instead: EPP/InferencePool
+#                                    via the direct-epp rule below
+#   publishers/<ns>/models/<name> -> InferencePool/EPP (OpenAI protocol;
+#                                    vLLM natively serves this model id,
+#                                    no rewrite needed)
+#   ^claude-.*$ (regex)              -> directBackend + model rewrite
+#                                       (safety net for Claude Code clients
+#                                       without ANTHROPIC_MODEL remapping;
+#                                       without it they 404)
+#   anything else                   -> auto-generated route-not-found 404
+#
+# Constraints honored here:
+# - Only ONE InferencePool per rule; cannot mix with AIServiceBackend.
+# - modelNameOverride only applies to AIServiceBackend refs (ignored for
+#   InferencePool). On the direct rule it is REQUIRED for quotas: a
+#   QuotaPolicy perModelQuotas.modelName only applies when it matches this
+#   value (silently ignored otherwise); the rewrite itself is a no-op (the
+#   rule already only matches requests whose model field equals
+#   model.name).
+# - Default request timeout 60s kills long reasoning -> raised here.
+# - Cross-namespace parentRef: the shared gateway's listener allows routes
+#   from all namespaces.
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIGatewayRoute
+metadata:
+  name: {{ .Values.aigatewayRoute.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "genericmodel.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.gateway.aiGateway.name }}
+      namespace: {{ .Values.gateway.aiGateway.namespace }}
+      sectionName: {{ .Values.gateway.aiGateway.listener }}
+  rules:
+    # --- direct quota path / native protocol passthrough -------------------
+    {{- if .Values.directBackend.enabled }}
+    - name: {{ include "genericmodel.directRuleName" . }}
+      matches:
+        - headers:
+            - type: Exact
+              name: {{ .Values.aigatewayRoute.headerName }}
+              value: {{ .Values.model.name }}
+      backendRefs:
+        # group/kind omitted: defaults to AIServiceBackend
+        # (aigateway.envoyproxy.io) -- the CRD only accepts an explicit
+        # group for InferencePool refs.
+        - name: {{ .Values.directBackend.name }}
+          modelNameOverride: {{ .Values.model.name }}
+      timeouts:
+        request: {{ .Values.aigatewayRoute.requestTimeout }}
+    {{- else }}
+    # (directBackend disabled: the short model name goes to the
+    # EPP/InferencePool, nothing quota-managed.)
+    - name: direct-epp
+      matches:
+        - headers:
+            - type: Exact
+              name: {{ .Values.aigatewayRoute.headerName }}
+              value: {{ .Values.model.name }}
+      backendRefs:
+        - group: inference.networking.k8s.io
+          kind: InferencePool
+          name: {{ .Values.llmisvc.name }}-inference-pool
+      timeouts:
+        request: {{ .Values.aigatewayRoute.requestTimeout }}
+    {{- end }}
+    # --- OpenAI protocol via EPP/InferencePool --------------------------------
+    # vLLM natively serves this second model id, so no model rewrite is
+    # needed on this rule. OpenAI-format clients use this name to keep the
+    # EPP path while the short name is on the direct backend.
+    - name: openai-epp
+      matches:
+        {{- if not .Values.directBackend.enabled }}
+        - headers:
+            - type: Exact
+              name: {{ .Values.aigatewayRoute.headerName }}
+              value: {{ .Values.model.name }}
+        {{- end }}
+        - headers:
+            - type: Exact
+              name: {{ .Values.aigatewayRoute.headerName }}
+              value: {{ include "genericmodel.openaiModel" . }}
+      backendRefs:
+        - group: inference.networking.k8s.io
+          kind: InferencePool
+          name: {{ .Values.llmisvc.name }}-inference-pool
+      timeouts:
+        request: {{ .Values.aigatewayRoute.requestTimeout }}
+    # --- Claude Code clients not remapping the model name --------------------
+    {{- if and .Values.directBackend.enabled (eq .Values.directBackend.schema "Anthropic") .Values.aigatewayRoute.claudeAlias.enabled }}
+    - name: claude-alias
+      matches:
+        - headers:
+            - type: RegularExpression
+              name: {{ .Values.aigatewayRoute.headerName }}
+              value: {{ .Values.aigatewayRoute.claudeAlias.regex | quote }}
+      backendRefs:
+        # group/kind omitted: defaults to AIServiceBackend (see above)
+        - name: {{ .Values.directBackend.name }}
+          modelNameOverride: {{ .Values.model.name }}
+      timeouts:
+        request: {{ .Values.aigatewayRoute.requestTimeout }}
+    {{- end }}
+  llmRequestCosts:
+    - {metadataKey: llm_input_token, type: InputToken}
+    - {metadataKey: llm_output_token, type: OutputToken}
+    - {metadataKey: llm_reasoning_token, type: ReasoningToken}
+    - {metadataKey: llm_total_token, type: TotalToken}
+{{- end }}

@@ -1,0 +1,401 @@
+# GLM-5.3 on 2x B200 -- full deployment bundle values.
+#
+# Defaults reproduce the deployment in namespace llm-glm53 on the site-a A
+# cluster. Everything cluster-specific is a value; nothing is hardcoded in
+# the templates.
+
+namespace: llm-glm53
+nameOverride: glm53
+
+# --- target nodes ---------------------------------------------------------
+nodes:
+  # Label the node-prep DaemonSet and the vLLM pods select on.
+  gpuProduct: NVIDIA-B200
+  # The static local PVs' nodeAffinity lists ALL of these hostnames; every
+  # node must have the model at the SAME host path (node-prep + pull jobs
+  # below guarantee that).
+  hostnames:
+    - gpu-node-x
+    - gpu-node-x
+
+# --- node storage (manual LVs, no MCO/MachineConfig available) -----------
+nodePrep:
+  enabled: true
+  image: registry-internal/vllm/vllm-openai:v0.30.0
+  imagePullPolicy: IfNotPresent
+  # LVM volume group carved from /dev/md/lvmdata on each node.
+  vg: vg1
+  # LVs are mounted here (same path on every node in nodes.hostnames).
+  hostPathBase: /var/mnt/llm
+  loopIntervalSeconds: 60
+  resources:
+    requests: {cpu: "1", memory: 512Mi}
+    limits: {cpu: "2", memory: 1Gi}
+
+# --- static local PVs + pre-created PVCs ------------------------------------
+storage:
+  className: local-static
+  # The pre-created claim names. model.uri and the pull jobs derive from
+  # these -- change here, not in the templates.
+  models:
+    pvcName: glm53-models
+    lvName: llm-models
+    lvSize: 1200G          # LV created by node-prep (LVM suffix)
+    pvSize: 1200Gi          # PV/PVC capacity
+    subdir: models          # under nodePrep.hostPathBase
+  cache:
+    pvcName: glm53-cache
+    lvName: llm-cache
+    lvSize: 300G
+    pvSize: 300Gi
+    subdir: cache
+
+# --- model + S3 source -----------------------------------------------------
+model:
+  name: glm-5.3
+  # Subdirectory inside the models PVC / S3 bucket.
+  subPath: GLM-5.3
+  s3:
+    path: llms/zai-org/GLM-5.3   # s3://<this>/*
+
+# S3 credentials. NEVER put real keys in values files -- default is to
+# reference a pre-existing secret (created out-of-band). Set create: true
+# only for testing, with keys passed via --set-file / external secrets.
+s3:
+  create: false
+  secretName: glm53-s3
+  keys:
+    accessKeyId: AWS_ACCESS_KEY_ID
+    secretAccessKey: AWS_SECRET_ACCESS_KEY
+    endpoint: AWS_ENDPOINT_URL
+    region: AWS_DEFAULT_REGION
+  # Only used when create: true:
+  endpoint: ""
+  region: us-east-1
+  accessKeyId: ""
+  secretAccessKey: ""
+
+# --- service accounts / SCC ------------------------------------------------
+serviceAccount:
+  name: s3sa
+
+scc:
+  # Cluster-scoped SecurityContextConstraints object name.
+  name: glm53-model-serving
+  create: true
+
+# --- images -----------------------------------------------------------------
+images:
+  vllm: registry-internal/vllm/vllm-openai:v0.30.0
+  s5cmd: registry-internal/tools/s5cmd:v2.3.0
+
+# --- per-node model pull jobs ------------------------------------------------
+pullJobs:
+  enabled: true
+  concurrency: 128
+  partSize: 256
+  resources:
+    requests: {cpu: "16", memory: 32Gi}
+    limits: {cpu: "48", memory: 100Gi}
+
+# --- gateways -----------------------------------------------------------------
+# ONE Gateway for everything: the shared Envoy AI Gateway (VIP
+# 192.0.2.7). The AIGatewayRoute attaches to it (model-header rules,
+# extproc translation/passthrough) AND the KServe router HTTPRoute attaches to
+# it as well (path-based rules: /llm-glm53/glm53-b200/... and
+# /publishers/llm-glm53/...). There is NO per-model Gateway and no second
+# VIP. The former dedicated glm53-kserve Gateway/EnvoyProxy (VIP .146) was
+# removed: the InferencePool/EPP path does not depend on it, and KServe only
+# needs the referenced Gateway to exist and accept the route.
+gateway:
+  aiGateway:
+    name: envoy-ai-gateway
+    namespace: envoy-ai-gateway-system
+    listener: http
+
+# --- the LLMInferenceService ---------------------------------------------------
+llmisvc:
+  name: glm53-b200
+  replicas: 2                  # one pod per node (one full node each)
+  runtimeClassName: performance-gpu-hpc-performanceprofile-extras-b200
+  schedulerName: default-scheduler
+  terminationGracePeriodSeconds: 300
+  rolloutStrategy:
+    maxSurge: 0                # no free GPUs for a surge pod -> deadlock
+    maxUnavailable: 1
+  # KV-cache offloading to host RAM, via the KServe spec attribute. The
+  # llmisvc controller renders it into the vLLM launcher's KV_TRANSFER_ARGS
+  # (only when the args list below does NOT carry its own
+  # --kv-transfer-config) as OffloadingConnector with TieringOffloadingSpec,
+  # i.e. a CPU primary tier + optional secondary tiers.
+  #
+  # What it buys HERE (one-shot distinct prompts have ~0.015% prefix-cache
+  # hit, so plain cache hits are NOT the motivation):
+  #   - the connector hooks handle_preemptions: a preempted 100k-token
+  #     request keeps its KV in RAM and DMA-loads it back instead of
+  #     recomputing the entire prefill (~26s of work);
+  #   - multi-turn conversations (same 100k context re-sent every turn)
+  #     re-prefill from RAM instead of ~26s GPU re-prefill.
+  #
+  # cpu is PER ENGINE (per DP rank -- vLLM does not divide it): 8 engines
+  # x 64Gi = 512Gi per pod of tmpfs in /dev/shm, ~= 1x the per-rank GPU KV
+  # pool (~66GiB at gpu-memory-utilization 0.93). Pod memory peak was
+  # ~682Gi of the 2000Gi limit; +512Gi leaves ~800Gi headroom on the
+  # 2048Gi single-tenant node. dshmSize above is sized to match.
+  #
+  # HISTORY: vllm-openai v0.29.0's SimpleCPUOffloadConnector crash-looped
+  # on this model (GlmMoeDsa hybrid KV layouts, non-integer block-view
+  # ratio). v0.30.0 replaced it with OffloadingConnector which explicitly
+  # supports "MLA plus its DSA indexer" groups -- verified against the
+  # shipped source in the v0.30.0 image AND against a zero-replica probe
+  # llmisvc (see git history, 2026-10-04) before enabling. The kserve
+  # launcher also version-gates this at vLLM >= 0.22.0.
+  #
+  # evictionPolicy: lru (default) or arc.
+  # secondary: optional list of fileSystem tiers (emptyDir/PVC) for a
+  # disk tier -- not enabled; RAM is large enough.
+  kvCacheOffloading:
+    cpu: 64Gi
+    evictionPolicy: lru
+  # --- EPP (router scheduler) config -------------------------------------------
+  # Rendered verbatim by the kserve controller into the EPP deployment's
+  # --config-text (EndpointPickerConfig). Replaces the controller's built-in
+  # default profile, which used queue-scorer + kv-cache-utilization-scorer --
+  # both read vLLM's /metrics, and with DP8 every metric family is exposed
+  # 8x (engine="0".."7") while the EPP's core-metrics-extractor takes ONE
+  # sample per family (no aggregation exists in llm-d-router v0.10.0), so
+  # those scorers effectively sampled a single arbitrary rank and read 0
+  # most of the time. This profile uses EPP-INTERNAL counting instead
+  # (inflight-load-producer): active-request-scorer counts requests the EPP
+  # itself dispatched, immune to the engine-label problem. Measured: exact
+  # 50/50 pod split at c16 (token-level, 2026-10-04).
+  # prefix-cache-scorer + approx-prefix-cache-producer now have a wired
+  # producer (the built-in default config-text lacked it entirely, so the
+  # scorer always scored 0).
+  scheduler:
+    # Complete pool spec: the controller copies it verbatim into the
+    # InferencePool, and with multi-port external LB the EPP registers one
+    # endpoint per (pod, port) -- 8 ranks per pod. Must match what the
+    # controller would generate (see live InferencePool) plus the 8 ports.
+    pool:
+      spec:
+        appProtocol: http
+        endpointPickerRef:
+          failureMode: FailOpen
+          group: ""
+          kind: Service
+          name: glm53-b200-epp-service
+          port:
+            number: 9002
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: glm53-b200
+            app.kubernetes.io/part-of: llminferenceservice
+            kserve.io/component: workload
+        targetPorts:
+          - number: 8000
+          - number: 8001
+          - number: 8002
+          - number: 8003
+          - number: 8004
+          - number: 8005
+          - number: 8006
+          - number: 8007
+    config:
+      inline:
+        apiVersion: llm-d.ai/v1alpha1
+        kind: EndpointPickerConfig
+        plugins:
+          - type: single-profile-handler
+          - type: approx-prefix-cache-producer
+          - type: inflight-load-producer
+          - type: prefix-cache-scorer
+          - type: active-request-scorer
+          - type: token-load-scorer
+          - type: max-score-picker
+        schedulingProfiles:
+          - name: default
+            plugins:
+              - pluginRef: active-request-scorer
+                weight: 3
+              - pluginRef: token-load-scorer
+                weight: 1
+              - pluginRef: prefix-cache-scorer
+                weight: 1
+              - pluginRef: max-score-picker
+  # Merged on the base preset kserve-config-llm-template which runs
+  # `vllm serve /mnt/models ... "$@"` (bash eval) -> single tokens only.
+  args:
+    # --- parallelism: DP8 x EP8 inside the node ---
+    # Multi-port external LB: one API server per DP rank on ports
+    # 8000-8007 (base --port 8000 from the preset + rank), supervisor serves
+    # aggregated /health + /readyz on 8208. Each rank becomes its own
+    # InferencePool endpoint (pod-rank-0..7) so the EPP balances at RANK
+    # level -- vLLM's internal DP balancer otherwise double-loads ranks
+    # (measured: rank 3 got 2 of 5 requests on one pod, 2026-10-04).
+    # Constraints (vLLM v0.30.0 dp_supervisor.py): supervisor port must not
+    # overlap 8000-8007; incompatible with --data-parallel-external-lb /
+    # --data-parallel-hybrid-lb (not used). Probes point at the supervisor.
+    - --data-parallel-size=8
+    - --data-parallel-size-local=8
+    - --data-parallel-multi-port-external-lb
+    - --data-parallel-supervisor-port=8208
+    - --enable-expert-parallel
+    - --all2all-backend=allgather_reducescatter
+    # --- memory / KV ---
+    - --kv-cache-dtype=fp8_e4m3
+    # KEEP AT 0.90 with --max-num-batched-tokens=16384: 0.93 was tried on
+    # 2026-10-04 and crash-looped at engine init with CUDA OOM -- the bigger
+    # chunk budget needs more activation/graph-capture headroom than 0.93
+    # leaves (only ~6.75 GiB free per GPU, a later +8 GiB alloc failed).
+    # The KV headroom goal is covered by kvCacheOffloading below instead.
+    - --gpu-memory-utilization=0.90
+    - --max-model-len=262144
+    - --max-num-seqs=64            # per DP rank -> 512 per node
+    # Chunked-prefill budget per engine step. 8192 (vLLM default) forced a
+    # 100k-token prompt through >=13 chunked forwards and capped aggregate
+    # prefill at ~26k tok/s per pod (~4.5 effective streams out of 16 DP
+    # ranks -- with EP+allgather_reducescatter the pod, not the rank, is the
+    # independent unit). 16384 doubles the per-step budget; TTFT for 100k
+    # prompts measured p50 22.8s / aggregate 52.8k tok/s at 8192 (aiperf
+    # 2026-10-04, /tmp/aiperf-ext-100k-v3). Try 32768 next if this helps.
+    - --max-num-batched-tokens=16384
+    - --enable-prefix-caching
+    # --- observability ---
+    # summary (not detailed): detailed appends unbounded per-step accepted/
+    # drafted lists to every response (~num_verify_steps entries x2).
+    - --per-request-spec-decode-metrics=summary
+    # Adds kv_block_{lifetime,idle_before_evict,reuse_gap}_seconds histograms
+    # (1% block sampling default). Both flags verified no CUDA-graph or DP
+    # interaction in v0.30.0 source.
+    - --kv-cache-metrics
+    # --- GLM-5.3 recipe ---
+    # If engine init dies inside the MTP drafter under DP, drop these two
+    # lines first (MTP+DP broke on GLM-5.2 / vLLM 0.24 before).
+    - --speculative-config.method=mtp
+    - --speculative-config.num_speculative_tokens=5
+    - --reasoning-parser=glm47
+    - --tool-call-parser=glm47
+    - --enable-auto-tool-choice
+    - --trust-remote-code
+  env:
+    HF_HUB_OFFLINE: "1"
+    TRANSFORMERS_OFFLINE: "1"
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    # single-node NVLink transport (no RoCE)
+    NCCL_IB_DISABLE: "1"
+    NCCL_P2P_LEVEL: NVL
+    NVSHMEM_REMOTE_TRANSPORT: none
+    NVSHMEM_IB_ENABLE_IBGDA: "0"
+    VLLM_USE_DEEP_GEMM: "1"
+    OMP_NUM_THREADS: "16"
+    # persistent JIT caches on the cache PVC
+    VLLM_CACHE_ROOT: /cache/vllm
+    DG_JIT_CACHE_DIR: /cache/deep_gemm
+    TRITON_CACHE_DIR: /cache/triton
+    FLASHINFER_WORKSPACE_BASE: /cache/flashinfer
+    TORCHINDUCTOR_CACHE_DIR: /cache/inductor
+    TORCHINDUCTOR_FX_GRAPH_CACHE: "1"
+    HF_HOME: /cache/hf
+  resources:
+    requests:
+      cpu: "96"
+      memory: 512Gi
+      nvidia.com/gpu: "8"
+      hugepages-1Gi: 16Gi
+    limits:
+      cpu: "192"
+      memory: 2000Gi
+      nvidia.com/gpu: "8"
+      hugepages-1Gi: 16Gi
+  volumes:
+    # /dev/shm is where vLLM mmaps the CPU offload tier
+    # (/dev/shm/vllm_offload_<engine>.mmap, one per DP engine, each sized
+    # kvCacheOffloading.cpu). Must hold 8 x 64Gi offload + NCCL psm windows
+    # (~36MiB observed). Memory-backed emptyDir: counts against the pod
+    # memory limit and node RAM.
+    dshmSize: 600Gi
+    hugepagesSize: 16Gi
+  probes:
+    startup:
+      periodSeconds: 10
+      failureThreshold: 180     # cold boot: load + DeepGEMM JIT + graph capture
+      timeoutSeconds: 5
+    readiness:
+      periodSeconds: 10
+      failureThreshold: 5
+      timeoutSeconds: 5
+    liveness:
+      periodSeconds: 30
+      failureThreshold: 5
+      timeoutSeconds: 5
+
+# --- Envoy AI Gateway route ---------------------------------------------------
+aigatewayRoute:
+  enabled: true
+  name: glm53
+  headerName: x-ai-eg-model
+  requestTimeout: 3600s
+  # OpenAI-protocol clients use this model id (vLLM serves it natively
+  # alongside glm-5.3) so they keep the EPP/InferencePool path while
+  # glm-5.3 itself routes to the native Anthropic backend.
+  # NOTE: while anthropicBackend.enabled is true, OpenAI clients sending
+  # model glm-5.3 on /v1/chat/completions are routed to the Anthropic
+  # backend with OpenAI<->Anthropic translation (slower, EPP-less). Prefer
+  # the publishers name below for OpenAI tooling (aiperf, scripts, shims).
+  openaiModel: publishers/llm-glm53/models/glm-5.3
+  # Safety net for Claude Code clients that do NOT remap their model name
+  # (no ANTHROPIC_DEFAULT_*_MODEL): anything claude-* routes to the native
+  # Anthropic backend with the model rewritten to model.name. Without this
+  # rule those clients get the route-not-found 404.
+  claudeAlias:
+    enabled: true
+    regex: '^claude-.*$'
+  # NOTE (2026-10-05, updated): the Agent Router (ai-gateway-controller
+  # v1.1.0) exposes a native Anthropic endpoint on the shared gateway:
+  #   POST /anthropic/v1/messages  (+ /v1/messages/count_tokens, /v1/models)
+  # Claude Code clients point here:
+  #   ANTHROPIC_BASE_URL=http://192.0.2.7/anthropic
+  #   ANTHROPIC_MODEL=glm-5.3  (or ANTHROPIC_DEFAULT_{SONNET,OPUS,HAIKU}_MODEL)
+  # With anthropicBackend.enabled (below), model glm-5.3 routes to vLLM's
+  # NATIVE /v1/messages: thinking content blocks and count_tokens work
+  # (no extproc translation -- the v1.1.0 Anthropic<->OpenAI translation
+  # drops vLLM v0.30's "reasoning" field and 500s on count_tokens).
+  # OpenAI-protocol clients: use model publishers/llm-glm53/models/glm-5.3
+  # (EPP path, aiperf/benchmark tooling) -- see openaiModel above.
+  # FUTURE (option, not deployed): per-user token quotas = usage-based
+  # rate limiting. llmRequestCosts on this route already populate
+  # llm_{input,output,reasoning,total}_token metadata; what is still
+  # missing is the rate-limit layer: enable the Envoy Gateway ratelimit
+  # section in envoy-chart (EnvoyGateway config) + a Redis (mirrored image
+  # registry-internal/docker.io/bitnamilegacy/
+  # redis:8.2.1-debian-12-r0) + a BackendTrafficPolicy keyed on the user
+  # identity header. The controller already runs with
+  # --quotaRateLimitServiceAddr=envoy-ai-gateway-ratelimit.envoy-gateway-system
+  # (service not yet deployed; failureModeDeny=false so it is inert).
+
+# --- native Anthropic backend (Claude Code path) -------------------------------
+anthropicBackend:
+  enabled: true
+  name: glm53-anthropic            # AIServiceBackend (schema: Anthropic)
+  backendName: glm53-ranks         # Envoy Gateway Backend (8 rank endpoints)
+  ranksServiceName: glm53-b200-ranks-svc  # Service exposing DP ranks 8000-8007
+
+# --- optional AIPerf benchmark Job ---------------------------------------------
+aiperf:
+  enabled: false
+  name: glm53-aiperf
+  version: 0.7.0
+  pypiIndex: https://registry-internal/pypi/simple/
+  pypiHost: registry-internal
+  # Target the in-cluster Envoy AI Gateway service (full path incl. EPP).
+  url: http://envoy-ai-gateway.envoy-gateway-system.svc:80
+  streaming: true
+  concurrency: 64
+  numPrompts: 512
+  inputTokensMean: 1024
+  inputTokensStddev: 256
+  outputTokensMean: 256
+  resources:
+    requests: {cpu: "8", memory: 16Gi}
+    limits: {cpu: "16", memory: 32Gi}

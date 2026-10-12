@@ -1,0 +1,19 @@
+apiVersion: v1
+items:
+- apiVersion: coordination.k8s.io/v1
+  kind: Lease
+  metadata:
+    creationTimestamp: "2026-09-29T13:12:45Z"
+    name: envoy-ai-gateway-controller
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "55044414"
+    uid: 15729042-70ac-4223-a5b7-6d267e166756
+  spec:
+    acquireTime: "2026-10-11T20:48:46.945426Z"
+    holderIdentity: ai-gateway-controller-796f5f5467-7fv5c_05edc07f-5be0-4bb0-94e4-2ae8f4bf18a4
+    leaseDurationSeconds: 15
+    leaseTransitions: 10
+    renewTime: "2026-10-12T13:56:27.728307Z"
+kind: List
+metadata:
+  resourceVersion: ""

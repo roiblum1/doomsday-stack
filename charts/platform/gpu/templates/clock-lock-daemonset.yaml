@@ -1,0 +1,117 @@
+{{- if .Values.clockLock.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: clock-lock
+  namespace: {{ .Values.clockLock.namespace.name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  labels:
+    {{- include "clock-lock.labels" . | nindent 4 }}
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      {{- include "clock-lock.selectorLabels" . | nindent 6 }}
+  {{- with .Values.clockLock.daemonset.updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "clock-lock.selectorLabels" . | nindent 8 }}
+        {{- with .Values.clockLock.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        app.kubernetes.io/managed-by: Helm
+        {{- with .Values.clockLock.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ .Values.clockLock.serviceAccount.name }}
+      restartPolicy: Always
+      {{- with .Values.clockLock.daemonset.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.clockLock.daemonset.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: clock-lock
+          image: "{{ .Values.clockLock.image.repository }}:{{ .Values.clockLock.image.tag }}"
+          imagePullPolicy: {{ .Values.clockLock.image.pullPolicy }}
+          command:
+            - bash
+            - -c
+            - /etc/chronos/chronos.sh
+          securityContext:
+            privileged: true
+            seLinuxOptions:
+              level: s0
+          {{- with .Values.clockLock.daemonset.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: DAEMONSET_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: DAEMONSET_RELEASE
+              value: clock-lock
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            {{- if .Values.clockLock.chronos.checkInterval }}
+            - name: CHECK_INTERVAL
+              value: "{{ .Values.clockLock.chronos.checkInterval }}"
+            {{- end }}
+          volumeMounts:
+            - name: chronos-script
+              mountPath: /etc/chronos
+            - name: dev
+              mountPath: /dev
+            - name: host-lib64
+              mountPath: /usr/host-lib64
+              readOnly: true
+            - name: host-usr-lib64
+              mountPath: /host-lib64
+              readOnly: true
+            - name: run-nvidia-driver
+              mountPath: /run/nvidia/driver
+            - name: run-nvidia-validations
+              mountPath: /run/nvidia/validations
+      hostPID: true
+      hostIPC: true
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: chronos-script
+          configMap:
+            defaultMode: 511
+            name: {{ .Values.clockLock.configMap.name }}
+        - name: dev
+          hostPath:
+            path: /dev
+        - name: host-usr-lib64
+          hostPath:
+            path: /usr/lib64
+        - name: host-lib64
+          hostPath:
+            path: /lib64
+        - name: run-nvidia-driver
+          hostPath:
+            path: /run/nvidia/driver
+        - name: run-nvidia-validations
+          hostPath:
+            path: /run/nvidia/validations
+{{- end }}

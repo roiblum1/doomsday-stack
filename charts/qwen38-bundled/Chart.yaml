@@ -1,0 +1,17 @@
+apiVersion: v2
+name: qwen38-bundled
+description: >-
+  Qwen3.8-27B-FP8 (hybrid linear/full-attention MoE, multimodal-capable) on
+  ONE L4 node (TP2 x DP3 = 6 GPUs) as a KServe LLMInferenceService behind
+  the llm-d router (EPP + InferencePool) on the shared Envoy AI Gateway,
+  with LMCache KV-cache offloading (pinned-RAM L1 + local-LV disk L2)
+  instead of Mooncake. Includes node storage prep (VG creation from the
+  blank data disk + privileged ensure-mount DaemonSet), static local PVs,
+  a per-node model pull job and the serving workload. Adds the Envoy AI
+  Gateway AIGatewayRoute + native Anthropic AIServiceBackend quota path
+  (Claude Code /anthropic/v1/messages passthrough; see
+  aigatewayRoute/anthropicBackend values).
+type: application
+version: 0.2.6
+appVersion: "qwen3.8-27b-fp8"
+kubeVersion: ">=1.29.0-0"

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: lvms
+description: LVM Storage operator (standalone) — Namespace + OperatorGroup + Subscription + LVMCluster, 4.22-aligned
+type: application
+version: 4.22.0
+appVersion: "4.22.0"

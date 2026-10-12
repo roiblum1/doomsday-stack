@@ -1,0 +1,374 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:/PersistentVolume:llm-glm53/glm53-cache
+      pv.kubernetes.io/bound-by-controller: "yes"
+    creationTimestamp: "2026-09-29T16:42:30Z"
+    finalizers:
+    - kubernetes.io/pv-protection
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-cache
+    resourceVersion: "49317569"
+    uid: 5e8238b1-6d16-48ed-b9b8-2ec601e697f8
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 300Gi
+    claimRef:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      name: glm53-cache
+      namespace: llm-glm53
+      resourceVersion: "650789"
+      uid: 011a0f2c-0671-4cd4-8b82-15e4c37054b8
+    local:
+      path: /var/mnt/llm/cache
+    nodeAffinity:
+      required:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+            - gpu-node-x
+            - gpu-node-x
+    persistentVolumeReclaimPolicy: Retain
+    storageClassName: local-static
+    volumeMode: Filesystem
+  status:
+    lastPhaseTransitionTime: "2026-09-29T16:42:30Z"
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:/PersistentVolume:llm-glm53/glm53-cache-l2
+      pv.kubernetes.io/bound-by-controller: "yes"
+    creationTimestamp: "2026-10-07T10:48:07Z"
+    finalizers:
+    - kubernetes.io/pv-protection
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-cache-l2
+    resourceVersion: "50733783"
+    uid: c11d9ff3-d734-4ae7-a91c-074a527d6543
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 2500Gi
+    claimRef:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      name: glm53-cache-l2
+      namespace: llm-glm53
+      resourceVersion: "50733781"
+      uid: 26bf4362-662a-432d-af72-fde0dd5f8551
+    local:
+      path: /var/mnt/llm/lmcache-l2
+    nodeAffinity:
+      required:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+            - gpu-node-x
+            - gpu-node-x
+    persistentVolumeReclaimPolicy: Retain
+    storageClassName: local-static
+    volumeMode: Filesystem
+  status:
+    lastPhaseTransitionTime: "2026-10-07T10:48:07Z"
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:/PersistentVolume:llm-glm53/glm53-models
+      pv.kubernetes.io/bound-by-controller: "yes"
+    creationTimestamp: "2026-09-29T16:42:30Z"
+    finalizers:
+    - kubernetes.io/pv-protection
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-models
+    resourceVersion: "49317570"
+    uid: 08b9f978-6786-489c-9d40-665e10e30488
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 1200Gi
+    claimRef:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      name: glm53-models
+      namespace: llm-glm53
+      resourceVersion: "650776"
+      uid: 8f85052c-4778-42e0-81d2-a07fe57bf010
+    local:
+      path: /var/mnt/llm/models
+    nodeAffinity:
+      required:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+            - gpu-node-x
+            - gpu-node-x
+    persistentVolumeReclaimPolicy: Retain
+    storageClassName: local-static
+    volumeMode: Filesystem
+  status:
+    lastPhaseTransitionTime: "2026-09-29T16:42:30Z"
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    annotations:
+      pv.kubernetes.io/provisioned-by: topolvm.io
+      volume.kubernetes.io/provisioner-deletion-secret-name: ""
+      volume.kubernetes.io/provisioner-deletion-secret-namespace: ""
+    creationTimestamp: "2026-09-29T13:51:31Z"
+    finalizers:
+    - external-provisioner.volume.kubernetes.io/finalizer
+    - kubernetes.io/pv-protection
+    labels:
+      kubernetes.io/hostname: gpu-node-x
+    name: pvc-31f3252f-f856-47eb-a946-7b9113977fde
+    resourceVersion: "558064"
+    uid: fb548ba4-adc1-467d-a67e-552e741d3d84
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 1Gi
+    claimRef:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      name: grafana-data
+      namespace: openshift-monitoring
+      resourceVersion: "558024"
+      uid: 31f3252f-f856-47eb-a946-7b9113977fde
+    csi:
+      driver: topolvm.io
+      fsType: xfs
+      volumeAttributes:
+        storage.kubernetes.io/csiProvisionerIdentity: 1790688412435-9633-topolvm.io
+      volumeHandle: a7257aa1-d161-4d40-8411-c566b6aa9545
+    nodeAffinity:
+      required:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: topology.topolvm.io/node
+            operator: In
+            values:
+            - gpu-node-x
+    persistentVolumeReclaimPolicy: Delete
+    storageClassName: lvms-vg1
+    volumeMode: Filesystem
+  status:
+    lastPhaseTransitionTime: "2026-09-29T13:51:31Z"
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    annotations:
+      pv.kubernetes.io/provisioned-by: topolvm.io
+      volume.kubernetes.io/provisioner-deletion-secret-name: ""
+      volume.kubernetes.io/provisioner-deletion-secret-namespace: ""
+    creationTimestamp: "2026-09-29T15:17:10Z"
+    finalizers:
+    - external-provisioner.volume.kubernetes.io/finalizer
+    - kubernetes.io/pv-protection
+    labels:
+      kubernetes.io/hostname: gpu-node-x
+    name: pvc-7cbbc0cf-2320-4a7a-8139-d404e5aa24bc
+    resourceVersion: "602829"
+    uid: 4ae978ab-f817-4e08-badc-f97d3ecc6288
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 1Ti
+    claimRef:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      name: glm53-model
+      namespace: llm-glm53
+      resourceVersion: "602809"
+      uid: 7cbbc0cf-2320-4a7a-8139-d404e5aa24bc
+    csi:
+      driver: topolvm.io
+      fsType: xfs
+      volumeAttributes:
+        storage.kubernetes.io/csiProvisionerIdentity: 1790688412435-9633-topolvm.io
+      volumeHandle: 7c186dd1-e458-44f5-a0b8-11a153880b26
+    nodeAffinity:
+      required:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: topology.topolvm.io/node
+            operator: In
+            values:
+            - gpu-node-x
+    persistentVolumeReclaimPolicy: Delete
+    storageClassName: lvms-vg1
+    volumeMode: Filesystem
+  status:
+    lastPhaseTransitionTime: "2026-09-29T15:17:10Z"
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:/PersistentVolume:llm-qwen38/qwen38-cache
+      pv.kubernetes.io/bound-by-controller: "yes"
+    creationTimestamp: "2026-10-07T14:22:11Z"
+    finalizers:
+    - kubernetes.io/pv-protection
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-cache
+    resourceVersion: "51078387"
+    uid: ceef88cf-adc7-4158-bb30-01fad6e13167
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 150Gi
+    claimRef:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      name: qwen38-cache
+      namespace: llm-qwen38
+      resourceVersion: "50859455"
+      uid: 6b8ffc29-4caf-4e2f-b9e9-e16ed5810628
+    local:
+      path: /var/mnt/llm/cache
+    nodeAffinity:
+      required:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+            - ocp-util-node-1
+    persistentVolumeReclaimPolicy: Retain
+    storageClassName: qwen38-local-static
+    volumeMode: Filesystem
+  status:
+    lastPhaseTransitionTime: "2026-10-07T14:22:11Z"
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:/PersistentVolume:llm-qwen38/qwen38-cache-l2
+      pv.kubernetes.io/bound-by-controller: "yes"
+    creationTimestamp: "2026-10-07T14:22:11Z"
+    finalizers:
+    - kubernetes.io/pv-protection
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-cache-l2
+    resourceVersion: "51078388"
+    uid: d95f624d-9ff5-4c30-91fb-feaa11a4a6cb
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 1000Gi
+    claimRef:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      name: qwen38-cache-l2
+      namespace: llm-qwen38
+      resourceVersion: "50859451"
+      uid: 01795883-ee02-48ca-afaf-26fb6f49476f
+    local:
+      path: /var/mnt/llm/lmcache-l2
+    nodeAffinity:
+      required:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+            - ocp-util-node-1
+    persistentVolumeReclaimPolicy: Retain
+    storageClassName: qwen38-local-static
+    volumeMode: Filesystem
+  status:
+    lastPhaseTransitionTime: "2026-10-07T14:22:11Z"
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen38-deploy:/PersistentVolume:llm-qwen38/qwen38-models
+      pv.kubernetes.io/bound-by-controller: "yes"
+    creationTimestamp: "2026-10-07T14:22:11Z"
+    finalizers:
+    - kubernetes.io/pv-protection
+    labels:
+      app.kubernetes.io/instance: qwen38
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen38
+      helm.sh/chart: qwen38-bundled-0.2.6
+    name: qwen38-models
+    resourceVersion: "51078389"
+    uid: 2907361c-7a6a-4c97-bd25-c047bceb792a
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    capacity:
+      storage: 200Gi
+    claimRef:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      name: qwen38-models
+      namespace: llm-qwen38
+      resourceVersion: "50859454"
+      uid: 0e1cef6a-2f1b-4512-987c-7b9e256f69e2
+    local:
+      path: /var/mnt/llm/models
+    nodeAffinity:
+      required:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+            - ocp-util-node-1
+    persistentVolumeReclaimPolicy: Retain
+    storageClassName: qwen38-local-static
+    volumeMode: Filesystem
+  status:
+    lastPhaseTransitionTime: "2026-10-07T14:22:11Z"
+    phase: Bound
+kind: List
+metadata:
+  resourceVersion: ""

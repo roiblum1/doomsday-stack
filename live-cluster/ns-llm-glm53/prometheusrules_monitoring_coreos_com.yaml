@@ -1,0 +1,77 @@
+apiVersion: v1
+items:
+- apiVersion: monitoring.coreos.com/v1
+  kind: PrometheusRule
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:monitoring.coreos.com/PrometheusRule:llm-glm53/glm53-cache
+    creationTimestamp: "2026-10-07T12:31:21Z"
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-cache
+    namespace: llm-glm53
+    resourceVersion: "50794938"
+    uid: 1cc6a7e8-b44d-47a1-ba38-ed3729cec9f9
+  spec:
+    groups:
+    - name: glm53-lmcache.rules
+      rules:
+      - alert: LMCacheEngineTargetDown
+        annotations:
+          description: Prometheus has failed to scrape engine target {{ $labels.pod
+            }} for 5 minutes. vLLM on that node serves uncached (slower) until the
+            engine returns.
+          summary: LMCache engine down ({{ $labels.pod }})
+        expr: up{namespace="llm-glm53", job="glm53-cache-metrics"} == 0
+        for: 5m
+        labels:
+          severity: critical
+      - alert: LMCacheEngineNoTargets
+        annotations:
+          description: No up{job="glm53-cache-metrics"} series exists. The scrape
+            path broke (ServiceMonitor / Service / discovery Role) or the engine DaemonSet
+            is gone. Check `oc -n llm-glm53 get pods -l app.kubernetes.io/instance=glm53-cache`.
+          summary: LMCache engine metrics gone entirely
+        expr: absent(up{namespace="llm-glm53", job="glm53-cache-metrics"})
+        for: 5m
+        labels:
+          severity: critical
+      - alert: LMCacheL2UsageHigh
+        annotations:
+          description: L2 disk-tier usage has been above 90% of the 2200Gi cap for
+            30 minutes. Normal at steady state under heavy unique-prefix load (LRU
+            eviction cycles); investigate only if hit rates drop.
+          summary: LMCache L2 near capacity on {{ $labels.pod }}
+        expr: max by (pod) (lmcache_mp_l2_usage_bytes{namespace="llm-glm53"}) > 2200
+          * 1024 * 1024 * 1024 * 0.9
+        for: 30m
+        labels:
+          severity: warning
+      - alert: LMCacheL1EvictionPressure
+        annotations:
+          description: L1 host-RAM tier above 95% for 1h (trigger watermark is 0.8).
+            Eviction is not reclaiming fast enough for the write rate.
+          summary: LMCache L1 eviction falling behind on {{ $labels.pod }}
+        expr: max by (pod) (lmcache_mp_l1_usage_ratio{namespace="llm-glm53"}) > 0.95
+        for: 1h
+        labels:
+          severity: info
+      - alert: LMCacheNoLookups
+        annotations:
+          description: 'Requests may still be flowing but no cache lookups have happened
+            in 4h. Most likely the vLLM pods hold sessions to dead engine pods after
+            a roll: recycle the vLLM pods one at a time (README ''Operations runbook'').
+            Also expected overnight on an idle cluster -- severity is info for a reason.'
+          summary: LMCache engines serving zero lookups for 4h
+        expr: sum(increase(lmcache_mp_lookups_requests_total{namespace="llm-glm53"}[4h]))
+          == 0
+        for: 30m
+        labels:
+          severity: info
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,34 @@
+{{- if and .Values.clockLock.enabled .Values.clockLock.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clock-lock
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    {{- include "clock-lock.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: clock-lock
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    {{- include "clock-lock.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: clock-lock
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.clockLock.serviceAccount.name }}
+    namespace: {{ .Values.clockLock.namespace.name }}
+{{- end }}

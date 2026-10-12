@@ -1,0 +1,18 @@
+# Grants the privileged SCC to the exporter ServiceAccount. Both DaemonSets
+# run privileged (hostNetwork/hostPID + hostPath mounts + NET_ADMIN/SYS_ADMIN),
+# so without this RoleBinding new pods fail SCC admission.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: system:openshift:scc:privileged
+  namespace: hpc-observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "hpc-observability.fullname" . }}
+    namespace: hpc-observability

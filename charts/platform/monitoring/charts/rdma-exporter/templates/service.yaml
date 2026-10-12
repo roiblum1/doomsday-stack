@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rdma-exporter
+  namespace: rdma-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+    prometheus.io/path: /metrics
+    prometheus.io/port: "9402"
+    prometheus.io/scrape: "true"
+  labels:
+    {{- include "rdma-exporter.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 9402
+      protocol: TCP
+      targetPort: 9402
+  selector:
+    {{- include "rdma-exporter.selectorLabels" . | nindent 4 }}

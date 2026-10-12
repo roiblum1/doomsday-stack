@@ -1,0 +1,2 @@
+# Exclude dependency-build tarballs; vendored subchart DIRECTORIES (charts/*/) are tracked.
+charts/*.tgz

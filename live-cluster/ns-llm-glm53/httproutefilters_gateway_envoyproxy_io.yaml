@@ -1,0 +1,134 @@
+apiVersion: v1
+items:
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: HTTPRouteFilter
+  metadata:
+    creationTimestamp: "2026-09-29T16:53:10Z"
+    generation: 1
+    name: ai-eg-host-rewrite-glm53
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: aigateway.envoyproxy.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: AIGatewayRoute
+      name: glm53
+      uid: b8776fe2-a0c6-4179-930c-7a9afd9b1781
+    resourceVersion: "703199"
+    uid: b5df8d77-514c-4daf-a3b6-9f3a265ae247
+  spec:
+    urlRewrite:
+      hostname:
+        type: Backend
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: HTTPRouteFilter
+  metadata:
+    creationTimestamp: "2026-10-12T10:30:13Z"
+    generation: 1
+    name: ai-eg-host-rewrite-glm53-anthropic-alias
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: aigateway.envoyproxy.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: AIGatewayRoute
+      name: glm53-anthropic-alias
+      uid: 851022ac-98fc-4f3b-a459-9fb056f34155
+    resourceVersion: "54919590"
+    uid: 1c54470e-e296-4b84-9b5d-db327c9cad80
+  spec:
+    urlRewrite:
+      hostname:
+        type: Backend
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: HTTPRouteFilter
+  metadata:
+    creationTimestamp: "2026-10-11T22:21:18Z"
+    generation: 1
+    name: ai-eg-host-rewrite-glm53-peer
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: aigateway.envoyproxy.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: AIGatewayRoute
+      name: glm53-peer
+      uid: 553bd3eb-cfc3-4250-90d1-8d044c73ab4b
+    resourceVersion: "54493711"
+    uid: 2ae183c5-1056-4f80-81b3-938659c9244b
+  spec:
+    urlRewrite:
+      hostname:
+        type: Backend
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: HTTPRouteFilter
+  metadata:
+    creationTimestamp: "2026-09-29T16:53:10Z"
+    generation: 1
+    name: ai-eg-route-not-found-response-glm53
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: aigateway.envoyproxy.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: AIGatewayRoute
+      name: glm53
+      uid: b8776fe2-a0c6-4179-930c-7a9afd9b1781
+    resourceVersion: "703201"
+    uid: 050c65e5-81ee-4570-8bd8-f98336b938eb
+  spec:
+    directResponse:
+      body:
+        inline: No matching route found. It is likely because the model specified
+          in your request is not configured in the Gateway.
+        type: Inline
+      statusCode: 404
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: HTTPRouteFilter
+  metadata:
+    creationTimestamp: "2026-10-12T10:30:13Z"
+    generation: 1
+    name: ai-eg-route-not-found-response-glm53-anthropic-alias
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: aigateway.envoyproxy.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: AIGatewayRoute
+      name: glm53-anthropic-alias
+      uid: 851022ac-98fc-4f3b-a459-9fb056f34155
+    resourceVersion: "54919591"
+    uid: 499a5b16-2e4a-496f-a03a-d7f1c7b9d155
+  spec:
+    directResponse:
+      body:
+        inline: No matching route found. It is likely because the model specified
+          in your request is not configured in the Gateway.
+        type: Inline
+      statusCode: 404
+- apiVersion: gateway.envoyproxy.io/v1alpha1
+  kind: HTTPRouteFilter
+  metadata:
+    creationTimestamp: "2026-10-11T22:21:18Z"
+    generation: 1
+    name: ai-eg-route-not-found-response-glm53-peer
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: aigateway.envoyproxy.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: AIGatewayRoute
+      name: glm53-peer
+      uid: 553bd3eb-cfc3-4250-90d1-8d044c73ab4b
+    resourceVersion: "54493712"
+    uid: 0a8af528-73c6-4092-93b5-b84d12ca2eff
+  spec:
+    directResponse:
+      body:
+        inline: No matching route found. It is likely because the model specified
+          in your request is not configured in the Gateway.
+        type: Inline
+      statusCode: 404
+kind: List
+metadata:
+  resourceVersion: ""

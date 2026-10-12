@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nfd
+description: Node Feature Discovery operator (standalone) — Namespace + OperatorGroup + Subscription + NodeFeatureDiscovery instance, 4.22-aligned
+type: application
+version: 4.22.0
+appVersion: "4.22.0"

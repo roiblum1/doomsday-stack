@@ -1,0 +1,41 @@
+{{- if and .Values.lmcache.enabled .Values.lmcache.prometheus.enabled .Values.lmcache.prometheus.serviceMonitor.enabled }}
+{{- $l := .Values.lmcache }}
+# The platform Prometheus (openshift-monitoring k8s instance -- there is no
+# user-workload-monitoring Prometheus on this cluster) discovers endpoints in
+# every namespace its selected ServiceMonitors point at, but its ServiceAccount
+# has no cluster-wide pods/services/endpoints RBAC: the CMO ClusterRole
+# prometheus-k8s only covers nodes, nodes/metrics and review APIs. Namespaces
+# that the platform Prometheus actually scrapes (nvidia-gpu-operator,
+# hpc-observability) each grant the three discovery verbs locally, and without
+# this pair the SD reflector just logs
+#   endpoints is forbidden: ... cannot list resource "endpoints" ...
+# in the namespace -- the ServiceMonitor is selected, the scrape job lands in
+# the generated config, but no target ever appears.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-k8s
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen38.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["services", "endpoints", "pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-k8s
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen38.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-k8s
+subjects:
+  - kind: ServiceAccount
+    name: prometheus-k8s
+    namespace: openshift-monitoring
+{{- end }}

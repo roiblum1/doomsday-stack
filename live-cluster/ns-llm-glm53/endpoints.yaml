@@ -1,0 +1,219 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-11T21:28:03Z"
+    creationTimestamp: "2026-09-29T16:48:05Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+    name: glm53-b200-epp-service
+    namespace: llm-glm53
+    resourceVersion: "54462455"
+    uid: 68be4cdb-16bf-425d-80b4-c0e56ab7aa7c
+  subsets:
+  - addresses:
+    - ip: 192.0.2.80
+      nodeName: ocp-util-node-1
+      targetRef:
+        kind: Pod
+        name: glm53-b200-kserve-router-scheduler-7f9bf959d9-g88cg
+        namespace: llm-glm53
+        uid: bf8d9b33-ff65-4ac9-9583-f5e23dc0652c
+    ports:
+    - name: grpc
+      port: 9002
+      protocol: TCP
+    - name: zmq
+      port: 5557
+      protocol: TCP
+    - name: grpc-health
+      port: 9003
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      protocol: TCP
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-12T13:52:17Z"
+    creationTimestamp: "2026-09-29T15:27:01Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-workload
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+    name: glm53-b200-kserve-workload-svc
+    namespace: llm-glm53
+    resourceVersion: "55041840"
+    uid: 5b1ce94b-d5e8-4fec-803f-c4581b629be0
+  subsets:
+  - notReadyAddresses:
+    - ip: 192.0.2.81
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: glm53-b200-kserve-8668c8774c-9vkm9
+        namespace: llm-glm53
+        uid: 3431f0bb-27ea-4c66-835c-f72dd198fd91
+    - ip: 192.0.2.82
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: glm53-b200-kserve-584766dc64-lz4lm
+        namespace: llm-glm53
+        uid: ff1f7894-290d-4b86-9b45-206ea6483a38
+    ports:
+    - appProtocol: http
+      name: http
+      port: 8000
+      protocol: TCP
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-12T13:52:17Z"
+    creationTimestamp: "2026-10-05T16:00:48Z"
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-b200-ranks-svc
+    namespace: llm-glm53
+    resourceVersion: "55041841"
+    uid: 26c072ad-c7b8-4208-9570-27d2d57f1e88
+  subsets:
+  - notReadyAddresses:
+    - ip: 192.0.2.81
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: glm53-b200-kserve-8668c8774c-9vkm9
+        namespace: llm-glm53
+        uid: 3431f0bb-27ea-4c66-835c-f72dd198fd91
+    - ip: 192.0.2.82
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: glm53-b200-kserve-584766dc64-lz4lm
+        namespace: llm-glm53
+        uid: ff1f7894-290d-4b86-9b45-206ea6483a38
+    ports:
+    - appProtocol: http
+      name: rank-0
+      port: 8000
+      protocol: TCP
+    - appProtocol: http
+      name: rank-7
+      port: 8007
+      protocol: TCP
+    - appProtocol: http
+      name: rank-1
+      port: 8001
+      protocol: TCP
+    - appProtocol: http
+      name: rank-4
+      port: 8004
+      protocol: TCP
+    - appProtocol: http
+      name: rank-6
+      port: 8006
+      protocol: TCP
+    - appProtocol: http
+      name: rank-5
+      port: 8005
+      protocol: TCP
+    - appProtocol: http
+      name: rank-3
+      port: 8003
+      protocol: TCP
+    - appProtocol: http
+      name: rank-2
+      port: 8002
+      protocol: TCP
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-12T13:42:52Z"
+    creationTimestamp: "2026-10-06T21:24:47Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+    name: glm53-cache
+    namespace: llm-glm53
+    resourceVersion: "55035956"
+    uid: 0d44d04e-6c99-465c-b382-68f17fa9d537
+  subsets:
+  - addresses:
+    - ip: 192.0.2.83
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: glm53-cache-5dl2l
+        namespace: llm-glm53
+        uid: 5527ae77-c4a6-47a7-ab31-23ec084afe52
+    - ip: 192.0.2.84
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: glm53-cache-p5thj
+        namespace: llm-glm53
+        uid: f630a570-cd61-4dad-b54b-7899f868a708
+    ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+    - name: server
+      port: 5555
+      protocol: TCP
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-12T13:42:52Z"
+    creationTimestamp: "2026-10-06T21:24:47Z"
+    labels:
+      app.kubernetes.io/component: cache-engine
+      app.kubernetes.io/instance: glm53-cache
+      app.kubernetes.io/managed-by: lmcache-operator
+      app.kubernetes.io/name: lmcache
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+      service.kubernetes.io/headless: ""
+    name: glm53-cache-metrics
+    namespace: llm-glm53
+    resourceVersion: "55035955"
+    uid: 1b9cac26-f260-4e81-96a7-d96dc7723214
+  subsets:
+  - addresses:
+    - ip: 192.0.2.83
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: glm53-cache-5dl2l
+        namespace: llm-glm53
+        uid: 5527ae77-c4a6-47a7-ab31-23ec084afe52
+    - ip: 192.0.2.84
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: glm53-cache-p5thj
+        namespace: llm-glm53
+        uid: f630a570-cd61-4dad-b54b-7899f868a708
+    ports:
+    - name: metrics
+      port: 8080
+      protocol: TCP
+kind: List
+metadata:
+  resourceVersion: ""

@@ -1,0 +1,36 @@
+{{- if .Values.lvmCluster.enabled }}
+apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  name: {{ .Values.lvmCluster.name }}
+  namespace: {{ include "lvms.namespace" . }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    {{- include "lvms.labels" . | nindent 4 }}
+spec:
+  storage:
+    deviceClasses:
+      {{- range $dc := .Values.lvmCluster.storage.deviceClasses }}
+      - name: {{ $dc.name }}
+        default: {{ $dc.default | default false }}
+        fstype: {{ $dc.fstype | default "xfs" }}
+        {{- with $dc.deviceSelector }}
+        deviceSelector:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with $dc.nodeSelector }}
+        nodeSelector:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if $.Values.lvmCluster.thinPool.enabled }}
+        thinPoolConfig:
+          name: {{ $.Values.lvmCluster.thinPool.name }}
+          sizePercent: {{ $.Values.lvmCluster.thinPool.sizePercent }}
+          overprovisionRatio: {{ $.Values.lvmCluster.thinPool.overprovisionRatio }}
+          chunkSizeCalculationPolicy: {{ $.Values.lvmCluster.thinPool.chunkSizeCalculationPolicy }}
+          metadataSizeCalculationPolicy: {{ $.Values.lvmCluster.thinPool.metadataSizeCalculationPolicy }}
+        {{- end }}
+      {{- end }}
+{{- end }}

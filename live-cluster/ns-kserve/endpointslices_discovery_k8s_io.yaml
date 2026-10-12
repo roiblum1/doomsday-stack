@@ -1,0 +1,101 @@
+apiVersion: v1
+items:
+- addressType: IPv4
+  apiVersion: discovery.k8s.io/v1
+  endpoints:
+  - addresses:
+    - 192.0.2.112
+    conditions:
+      ready: true
+      serving: true
+      terminating: false
+    nodeName: gpu-node-x
+    targetRef:
+      kind: Pod
+      name: llmisvc-controller-manager-555889c9b5-6j2rq
+      namespace: kserve
+      uid: eea59cbe-c7a2-4355-9514-226bb679f061
+  kind: EndpointSlice
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-04T11:20:18Z"
+    creationTimestamp: "2026-09-29T15:01:10Z"
+    generateName: llmisvc-controller-manager-service-
+    generation: 7
+    labels:
+      app.kubernetes.io/component: controller
+      app.kubernetes.io/instance: kserve
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: llmisvc-controller-manager
+      app.kubernetes.io/version: v0.21.0-rc1
+      control-plane: llmisvc-controller-manager
+      controller-tools.k8s.io: "1.0"
+      endpointslice.kubernetes.io/managed-by: endpointslice-controller.k8s.io
+      helm.sh/chart: kserve-llmisvc-resources-v0.21.0-rc1
+      kubernetes.io/service-name: llmisvc-controller-manager-service
+    name: llmisvc-controller-manager-service-mf52f
+    namespace: kserve
+    ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Service
+      name: llmisvc-controller-manager-service
+      uid: 944ff607-487c-4106-a333-e3556788bf98
+    resourceVersion: "39194740"
+    uid: 572a753f-1798-4b6b-a4d1-ddba14495a45
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+- addressType: IPv4
+  apiVersion: discovery.k8s.io/v1
+  endpoints:
+  - addresses:
+    - 192.0.2.112
+    conditions:
+      ready: true
+      serving: true
+      terminating: false
+    nodeName: gpu-node-x
+    targetRef:
+      kind: Pod
+      name: llmisvc-controller-manager-555889c9b5-6j2rq
+      namespace: kserve
+      uid: eea59cbe-c7a2-4355-9514-226bb679f061
+  kind: EndpointSlice
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-04T11:20:18Z"
+    creationTimestamp: "2026-09-29T15:01:10Z"
+    generateName: llmisvc-webhook-server-service-
+    generation: 7
+    labels:
+      app.kubernetes.io/component: controller
+      app.kubernetes.io/instance: kserve
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: llmisvc-controller-manager
+      app.kubernetes.io/version: v0.21.0-rc1
+      control-plane: llmisvc-controller-manager
+      controller-tools.k8s.io: "1.0"
+      endpointslice.kubernetes.io/managed-by: endpointslice-controller.k8s.io
+      helm.sh/chart: kserve-llmisvc-resources-v0.21.0-rc1
+      kubernetes.io/service-name: llmisvc-webhook-server-service
+    name: llmisvc-webhook-server-service-sgldt
+    namespace: kserve
+    ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Service
+      name: llmisvc-webhook-server-service
+      uid: 43cad299-2efb-4546-8d6a-45d469d51686
+    resourceVersion: "39194741"
+    uid: 5f542421-362f-4541-a508-542af55553e1
+  ports:
+  - name: https
+    port: 9443
+    protocol: TCP
+kind: List
+metadata:
+  resourceVersion: ""

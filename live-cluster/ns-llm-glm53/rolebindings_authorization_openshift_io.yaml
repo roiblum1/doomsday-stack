@@ -1,0 +1,195 @@
+apiVersion: v1
+items:
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    creationTimestamp: "2026-09-29T16:48:05Z"
+    labels:
+      app.kubernetes.io/component: llminferenceservice-router-scheduler
+      app.kubernetes.io/name: glm53-b200
+      app.kubernetes.io/part-of: llminferenceservice
+    name: glm53-b200-epp-rb
+    namespace: llm-glm53
+    ownerReferences:
+    - apiVersion: serving.kserve.io/v1alpha2
+      blockOwnerDeletion: true
+      controller: true
+      kind: LLMInferenceService
+      name: glm53-b200
+      uid: 6acd4f43-424b-47ee-b53e-1ba129ceeadb
+    resourceVersion: "49352500"
+    uid: 401803dc-04d0-45e6-951d-570c52c5a19a
+  roleRef:
+    name: glm53-b200-epp-role
+    namespace: llm-glm53
+  subjects:
+  - kind: ServiceAccount
+    name: s3sa
+    namespace: llm-glm53
+  userNames:
+  - system:serviceaccount:llm-glm53:s3sa
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/sync-wave: "-1"
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:rbac.authorization.k8s.io/RoleBinding:llm-glm53/glm53-cache-use-glm53-model-serving-scc
+    creationTimestamp: "2026-10-06T21:24:47Z"
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-cache-use-glm53-model-serving-scc
+    namespace: llm-glm53
+    resourceVersion: "54450507"
+    uid: d274036e-05a3-4154-838e-266c81478c69
+  roleRef:
+    name: use-glm53-model-serving-scc
+    namespace: llm-glm53
+  subjects:
+  - kind: ServiceAccount
+    name: glm53-cache
+    namespace: llm-glm53
+  userNames:
+  - system:serviceaccount:llm-glm53:glm53-cache
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:rbac.authorization.k8s.io/RoleBinding:llm-glm53/glm53-node-prep-use-privileged-scc
+    creationTimestamp: "2026-09-29T16:39:46Z"
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-node-prep-use-privileged-scc
+    namespace: llm-glm53
+    resourceVersion: "49317596"
+    uid: f22260f0-b08e-48c1-bafa-4d9471243958
+  roleRef:
+    name: use-privileged-scc
+    namespace: llm-glm53
+  subjects:
+  - kind: ServiceAccount
+    name: glm53-node-prep
+    namespace: llm-glm53
+  userNames:
+  - system:serviceaccount:llm-glm53:glm53-node-prep
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:rbac.authorization.k8s.io/RoleBinding:llm-glm53/prometheus-k8s
+    creationTimestamp: "2026-10-06T23:04:14Z"
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: prometheus-k8s
+    namespace: llm-glm53
+    resourceVersion: "50321789"
+    uid: a455fc48-5f28-45bc-bf4e-b716c247336d
+  roleRef:
+    name: prometheus-k8s
+    namespace: llm-glm53
+  subjects:
+  - kind: ServiceAccount
+    name: prometheus-k8s
+    namespace: openshift-monitoring
+  userNames:
+  - system:serviceaccount:openshift-monitoring:prometheus-k8s
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:rbac.authorization.k8s.io/RoleBinding:llm-glm53/s3sa-use-glm53-model-serving-scc
+    creationTimestamp: "2026-09-29T15:28:33Z"
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: s3sa-use-glm53-model-serving-scc
+    namespace: llm-glm53
+    resourceVersion: "49317597"
+    uid: b1568e2b-0377-4edb-8af4-cc9c4663dcea
+  roleRef:
+    name: use-glm53-model-serving-scc
+    namespace: llm-glm53
+  subjects:
+  - kind: ServiceAccount
+    name: s3sa
+    namespace: llm-glm53
+  userNames:
+  - system:serviceaccount:llm-glm53:s3sa
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows deploymentconfigs in this namespace to rollout
+        pods in this namespace.  It is auto-managed by a controller; remove subjects
+        to disable.
+    creationTimestamp: "2026-09-29T15:13:11Z"
+    name: system:deployers
+    namespace: llm-glm53
+    resourceVersion: "600545"
+    uid: e40e98ef-0527-49c4-aab3-284d9542ea35
+  roleRef:
+    name: system:deployer
+  subjects:
+  - kind: ServiceAccount
+    name: deployer
+    namespace: llm-glm53
+  userNames:
+  - system:serviceaccount:llm-glm53:deployer
+- apiVersion: authorization.openshift.io/v1
+  groupNames: null
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows builds in this namespace to push images to
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-09-29T15:13:11Z"
+    name: system:image-builders
+    namespace: llm-glm53
+    resourceVersion: "600544"
+    uid: 98086870-cfe4-4a3c-a9c1-3f7fa1c661a5
+  roleRef:
+    name: system:image-builder
+  subjects:
+  - kind: ServiceAccount
+    name: builder
+    namespace: llm-glm53
+  userNames:
+  - system:serviceaccount:llm-glm53:builder
+- apiVersion: authorization.openshift.io/v1
+  groupNames:
+  - system:serviceaccounts:llm-glm53
+  kind: RoleBinding
+  metadata:
+    annotations:
+      openshift.io/description: Allows all pods in this namespace to pull images from
+        this namespace.  It is auto-managed by a controller; remove subjects to disable.
+    creationTimestamp: "2026-09-29T15:13:11Z"
+    name: system:image-pullers
+    namespace: llm-glm53
+    resourceVersion: "600543"
+    uid: 6963618e-df77-4db1-acb1-92af479ed0dd
+  roleRef:
+    name: system:image-puller
+  subjects:
+  - kind: SystemGroup
+    name: system:serviceaccounts:llm-glm53
+  userNames: null
+kind: List
+metadata:
+  resourceVersion: ""

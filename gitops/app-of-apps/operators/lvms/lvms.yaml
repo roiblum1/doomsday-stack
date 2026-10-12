@@ -1,0 +1,9 @@
+name: lvms
+projectNamespace: openshift-storage
+repourl: 'https://git.example.internal/popai/helm-charts/lvms-chart.git'
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true

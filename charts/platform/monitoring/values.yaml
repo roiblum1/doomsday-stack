@@ -1,0 +1,29 @@
+# HPC/RDMA monitoring stack — parent values.
+#
+# This chart vendors four proven subcharts (no OLM operator, plain workloads):
+#   - rdma-exporter      : DaemonSet scraping RDMA/GPU metrics (port 9402, /metrics + /aggregate)
+#   - hpc-observability  : fabric (RDMA/GPU/PCIe) + node (CPU/NUMA/NVMe/RAID) exporters (ports 9500/9501)
+#   - prometheus-mcp     : MCP server exposing Prometheus queries (namespace prometheus-mcp)
+#   - grafana            : dashboards (namespace openshift-monitoring, PVC on lvms-vg1)
+#
+# Subcharts carry their own deployable defaults; override per-cluster via
+# mces/<mce>/<cluster>/monitoring/values.yaml. The globals below propagate to all subcharts.
+global:
+  clusterName: cluster-gpu-test   # override per-cluster
+  baseDomain: example.internal             # override per-cluster
+
+# Component enable flags (map to dependency conditions).
+rdma-exporter:
+  enabled: true
+  daemonset:
+    nodeSelector:
+      node-role.kubernetes.io/roce: ""
+hpc-observability:
+  enabled: true
+  daemonset:
+    nodeSelector:
+      node-role.kubernetes.io/roce: ""
+prometheus-mcp:
+  enabled: true
+grafana:
+  enabled: true

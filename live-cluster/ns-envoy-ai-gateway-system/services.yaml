@@ -1,0 +1,58 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-envoy-ai-deploy:/Service:envoy-ai-gateway-system/ai-gateway-controller
+      kubectl.kubernetes.io/last-applied-configuration: REDACTED
+    creationTimestamp: "2026-09-29T13:12:41Z"
+    labels:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: ai-gateway
+      app.kubernetes.io/version: v1.2.0
+      helm.sh/chart: ai-gateway-v1.2.0
+    name: ai-gateway-controller
+    namespace: envoy-ai-gateway-system
+    resourceVersion: "54289804"
+    uid: b2461fbf-4002-458f-b3e5-8c2cef22dcda
+  spec:
+    clusterIP: 192.0.2.103
+    clusterIPs:
+    - 192.0.2.103
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - appProtocol: http
+      name: mutating-webhook
+      port: 9443
+      protocol: TCP
+      targetPort: 9443
+    - appProtocol: grpc
+      name: grpc
+      port: 1063
+      protocol: TCP
+      targetPort: 1063
+    - appProtocol: http
+      name: http-metrics
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    - appProtocol: grpc
+      name: ratelimit-xds
+      port: 18002
+      protocol: TCP
+      targetPort: 18002
+    selector:
+      app.kubernetes.io/instance: envoy-ai
+      app.kubernetes.io/name: ai-gateway
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+kind: List
+metadata:
+  resourceVersion: ""

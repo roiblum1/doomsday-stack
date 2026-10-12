@@ -1,0 +1,145 @@
+# The serving workload: ONE LLMInferenceService, TP2 per replica,
+# autoscaled 1->3 replicas by WVA/KEDA, behind the llm-d router
+# (EPP + InferencePool).
+#
+# Storage: model.uri s3://llms/Qwen/Qwen3.6-35B-A3B-FP8 -- the controller
+# injects a storage-initializer init container that downloads the model
+# into the pod's emptyDir at /mnt/models (no PVC: the L4 node has no
+# LVMS, single NVMe). Credentials: the controller reads the secret
+# linked to the s3sa ServiceAccount (data keys AWS_ACCESS_KEY_ID /
+# AWS_SECRET_ACCESS_KEY + the serving.kserve.io/s3-endpoint annotation)
+# and injects them as env into the storage-initializer. The
+# initContainers block below overrides ONLY the injected
+# storage-initializer's image (docker.io is not mirrored in this
+# cluster's IDMS) and resources -- the controller's args/command win.
+#
+# Parallelism: spec.parallelism.tensor=2 -> the preset renders
+# --tensor-parallel-size 2. TP2 is the whole pod: 2x L4 in one node over
+# PCIe (L4s have no NVLink; wider TP only adds PCIe traffic).
+#
+# runtimeClassName / priorityClassName are deliberately NOT rendered: the
+# proven L4 deployments (qwen-3-5-35b-a3b, qwen-3-8-27b-fp8) only schedule
+# when they stay unset -- see values.yaml. The nodeSelector below is what
+# pins the pod to the L4 node.
+#
+# Args: merged on the base preset kserve-config-llm-template which evals
+# `vllm serve /mnt/models --served-model-name ... --port 8000 ...
+# ${VLLM_ADDITIONAL_ARGS} $@`
+# -> every arg must be a single token; JSON blobs are pre-wrapped in
+# single quotes in values.yaml (bash brace expansion).
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: {{ .Values.llmisvc.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "qwen36-judge.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.llmisvc.scaling.enabled }}
+  # WVA-driven autoscaling (llm-d Workload Variant Autoscaler -> KEDA ->
+  # HPA, scaling on vLLM queue depth + KV-cache usage). Prerequisites not
+  # yet installed on this cluster -- until they are, the deployment sits
+  # at minReplicas. See values.yaml / docs/RECIPE.md.
+  scaling:
+    minReplicas: {{ .Values.llmisvc.scaling.minReplicas }}
+    maxReplicas: {{ .Values.llmisvc.scaling.maxReplicas }}
+    wva:
+      keda:
+        pollingInterval: {{ .Values.llmisvc.scaling.wva.keda.pollingInterval }}
+        cooldownPeriod: {{ .Values.llmisvc.scaling.wva.keda.cooldownPeriod }}
+  {{- else }}
+  replicas: {{ .Values.llmisvc.scaling.minReplicas }}
+  {{- end }}
+  model:
+    name: {{ .Values.model.name }}
+    uri: {{ include "qwen36-judge.modelUri" . }}
+  parallelism:
+    tensor: {{ .Values.llmisvc.parallelism.tensor }}
+  router:
+    # The KServe router HTTPRoute attaches to the SHARED Envoy AI Gateway
+    # (same one as the AIGatewayRoute), so there is ONE external VIP and
+    # the path-based rules (/llm-judge/qwen36-judge/...,
+    # /publishers/llm-judge/...) coexist with the header-based model
+    # routing below.
+    gateway:
+      refs:
+        - name: {{ .Values.gateway.aiGateway.name }}
+          namespace: {{ .Values.gateway.aiGateway.namespace }}
+    route: {}
+    scheduler:
+      # Pin the EPP to the chart's ServiceAccount instead of letting kserve
+      # mint its own <name>-epp-sa. Unpinned, the controller deep-copies
+      # the WORKLOAD SA into the epp-sa -- dragging along OpenShift's
+      # rotating dockercfg secret (s3sa-dockercfg-*), which OCM then
+      # re-adopts onto the copy, fighting the original SA's owner for it
+      # every few seconds (verified on this cluster's glm53 deployment).
+      # No custom EPP profile here: unlike glm53's DP8 multi-port setup,
+      # plain TP2 exposes ONE port 8000 per pod, so the default
+      # queue/kv-cache scorers read vLLM /metrics correctly.
+      template:
+        serviceAccountName: {{ .Values.serviceAccount.name }}
+  template:
+    serviceAccountName: {{ .Values.serviceAccount.name }}
+    schedulerName: {{ .Values.llmisvc.schedulerName }}
+    terminationGracePeriodSeconds: {{ .Values.llmisvc.terminationGracePeriodSeconds }}
+    nodeSelector:
+      nvidia.com/gpu.product: {{ .Values.nodes.gpuProduct }}
+    # Image override for the controller-injected storage-initializer
+    # (the controller merges this patch: image/resources here win,
+    # args/command stay the controller's). inferenceservice-config
+    # points at docker.io kserve/storage-initializer:latest and docker.io
+    # is NOT in the cluster's IDMS mirrors -- see values.yaml.
+    initContainers:
+      - name: storage-initializer
+        image: {{ .Values.images.storageInitializer }}
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: "2"
+            memory: 2Gi
+          limits:
+            cpu: "8"
+            memory: 8Gi
+    containers:
+      - name: main
+        image: {{ .Values.images.vllm }}
+        imagePullPolicy: IfNotPresent
+        args:
+          {{- toYaml .Values.llmisvc.args | nindent 10 }}
+        env:
+          {{- range $key, $value := .Values.llmisvc.env }}
+          - name: {{ $key }}
+            value: {{ $value | quote }}
+          {{- end }}
+        resources:
+          {{- toYaml .Values.llmisvc.resources | nindent 10 }}
+        securityContext:
+          runAsNonRoot: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+              - IPC_LOCK
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: {{ .Values.llmisvc.probes.startup.periodSeconds }}
+          failureThreshold: {{ .Values.llmisvc.probes.startup.failureThreshold }}
+          timeoutSeconds: {{ .Values.llmisvc.probes.startup.timeoutSeconds }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: {{ .Values.llmisvc.probes.readiness.periodSeconds }}
+          failureThreshold: {{ .Values.llmisvc.probes.readiness.failureThreshold }}
+          timeoutSeconds: {{ .Values.llmisvc.probes.readiness.timeoutSeconds }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: {{ .Values.llmisvc.probes.liveness.periodSeconds }}
+          failureThreshold: {{ .Values.llmisvc.probes.liveness.failureThreshold }}
+          timeoutSeconds: {{ .Values.llmisvc.probes.liveness.timeoutSeconds }}

@@ -1,0 +1,77 @@
+apiVersion: v1
+items:
+- apiVersion: aigateway.envoyproxy.io/v1beta1
+  kind: AIGatewayRoute
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen36-judge-deploy:aigateway.envoyproxy.io/AIGatewayRoute:llm-judge/qwen36-judge
+      gateway.envoyproxy.io/aigw-ui-quota-revision: dc222c28b37e
+    creationTimestamp: "2026-10-07T16:13:42Z"
+    finalizers:
+    - aigateway.envoyproxy.io/finalizer
+    generation: 2
+    labels:
+      app.kubernetes.io/instance: qwen36-judge
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen36-judge
+      helm.sh/chart: qwen36-judge-0.2.2
+    name: qwen36-judge
+    namespace: llm-judge
+    resourceVersion: "55026532"
+    uid: eb8598b7-c8b7-4e62-b7ed-2236ab7a6bd7
+  spec:
+    llmRequestCosts:
+    - metadataKey: llm_input_token
+      type: InputToken
+    - metadataKey: llm_output_token
+      type: OutputToken
+    - metadataKey: llm_reasoning_token
+      type: ReasoningToken
+    - metadataKey: llm_total_token
+      type: TotalToken
+    parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: envoy-ai-gateway
+      namespace: envoy-ai-gateway-system
+      sectionName: http
+    rules:
+    - backendRefs:
+      - modelNameOverride: judge
+        name: qwen36-judge-openai
+        priority: 0
+        weight: 1
+      matches:
+      - headers:
+        - name: x-ai-eg-model
+          type: Exact
+          value: judge
+      modelsOwnedBy: Envoy AI Gateway
+      name: openai-direct
+      timeouts:
+        request: 600s
+    - backendRefs:
+      - group: inference.networking.k8s.io
+        kind: InferencePool
+        name: qwen36-judge-inference-pool
+        priority: 0
+        weight: 1
+      matches:
+      - headers:
+        - name: x-ai-eg-model
+          type: Exact
+          value: publishers/llm-judge/models/judge
+      modelsOwnedBy: Envoy AI Gateway
+      name: openai-epp
+      timeouts:
+        request: 600s
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-12T13:27:35Z"
+      message: AI Gateway Route reconciled successfully
+      reason: ReconciliationSucceeded
+      status: "True"
+      type: Accepted
+kind: List
+metadata:
+  resourceVersion: ""

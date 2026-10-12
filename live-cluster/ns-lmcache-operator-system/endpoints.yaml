@@ -1,0 +1,67 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-06T21:24:30Z"
+    creationTimestamp: "2026-10-06T21:24:16Z"
+    labels:
+      app.kubernetes.io/instance: lmcache
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: operator
+      app.kubernetes.io/part-of: lmcache
+      app.kubernetes.io/version: v0.5.5
+      control-plane: controller-manager
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+      helm.sh/chart: lmcache-operator-openshift-0.1.0
+    name: lmcache-operator-controller-manager-metrics-service
+    namespace: lmcache-operator-system
+    resourceVersion: "50263911"
+    uid: 271aa338-d09f-4d3d-b65a-2819789e536a
+  subsets:
+  - addresses:
+    - ip: 192.0.2.115
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: lmcache-operator-controller-manager-674bdd89f4-npvgl
+        namespace: lmcache-operator-system
+        uid: 60bad8fb-f291-4e86-8aa8-267febad5e97
+    ports:
+    - name: https
+      port: 8443
+      protocol: TCP
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    annotations:
+      endpoints.kubernetes.io/last-change-trigger-time: "2026-10-06T21:24:30Z"
+    creationTimestamp: "2026-10-06T21:24:16Z"
+    labels:
+      app.kubernetes.io/instance: lmcache
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: operator
+      app.kubernetes.io/part-of: lmcache
+      app.kubernetes.io/version: v0.5.5
+      endpoints.kubernetes.io/managed-by: endpoint-controller
+      helm.sh/chart: lmcache-operator-openshift-0.1.0
+    name: lmcache-operator-webhook-service
+    namespace: lmcache-operator-system
+    resourceVersion: "50263912"
+    uid: 84c96eb6-d5e3-4a31-929a-bc777ba17a8a
+  subsets:
+  - addresses:
+    - ip: 192.0.2.115
+      nodeName: gpu-node-x
+      targetRef:
+        kind: Pod
+        name: lmcache-operator-controller-manager-674bdd89f4-npvgl
+        namespace: lmcache-operator-system
+        uid: 60bad8fb-f291-4e86-8aa8-267febad5e97
+    ports:
+    - port: 9443
+      protocol: TCP
+kind: List
+metadata:
+  resourceVersion: ""

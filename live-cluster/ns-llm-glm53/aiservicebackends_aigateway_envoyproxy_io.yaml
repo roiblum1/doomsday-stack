@@ -1,0 +1,37 @@
+apiVersion: v1
+items:
+- apiVersion: aigateway.envoyproxy.io/v1beta1
+  kind: AIServiceBackend
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-glm53-deploy:aigateway.envoyproxy.io/AIServiceBackend:llm-glm53/glm53-anthropic
+    creationTimestamp: "2026-10-05T16:00:48Z"
+    finalizers:
+    - aigateway.envoyproxy.io/finalizer
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: glm53
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: glm53
+      helm.sh/chart: glm53-bundled-0.1.0
+    name: glm53-anthropic
+    namespace: llm-glm53
+    resourceVersion: "54438756"
+    uid: 0da2409d-a8bc-4c52-a89c-48b9662f6fd1
+  spec:
+    backendRef:
+      group: gateway.envoyproxy.io
+      kind: Backend
+      name: glm53-ranks
+    schema:
+      name: Anthropic
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-11T20:48:47Z"
+      message: AIServiceBackend reconciled successfully
+      reason: ReconciliationSucceeded
+      status: "True"
+      type: Accepted
+kind: List
+metadata:
+  resourceVersion: ""

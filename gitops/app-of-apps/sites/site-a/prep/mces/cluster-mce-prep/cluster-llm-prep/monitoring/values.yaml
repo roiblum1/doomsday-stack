@@ -1,0 +1,5 @@
+# Per-cluster overrides for monitoring on cluster-gpu-test.
+# Globals propagate to all vendored subcharts (rdma-exporter, prometheus-mcp, grafana).
+global:
+  clusterName: cluster-llm-prep
+  baseDomain: example.internal

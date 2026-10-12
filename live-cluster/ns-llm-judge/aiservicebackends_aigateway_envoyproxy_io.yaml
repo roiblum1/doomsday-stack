@@ -1,0 +1,37 @@
+apiVersion: v1
+items:
+- apiVersion: aigateway.envoyproxy.io/v1beta1
+  kind: AIServiceBackend
+  metadata:
+    annotations:
+      argocd.argoproj.io/tracking-id: gitops-popai_popai-cluster-llm-prep-qwen36-judge-deploy:aigateway.envoyproxy.io/AIServiceBackend:llm-judge/qwen36-judge-openai
+    creationTimestamp: "2026-10-07T16:13:42Z"
+    finalizers:
+    - aigateway.envoyproxy.io/finalizer
+    generation: 1
+    labels:
+      app.kubernetes.io/instance: qwen36-judge
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: qwen36-judge
+      helm.sh/chart: qwen36-judge-0.2.2
+    name: qwen36-judge-openai
+    namespace: llm-judge
+    resourceVersion: "54449970"
+    uid: ade30001-9ebe-4479-8d18-4c0969dafa65
+  spec:
+    backendRef:
+      group: gateway.envoyproxy.io
+      kind: Backend
+      name: qwen36-judge-workload
+    schema:
+      name: OpenAI
+  status:
+    conditions:
+    - lastTransitionTime: "2026-10-11T20:48:47Z"
+      message: AIServiceBackend reconciled successfully
+      reason: ReconciliationSucceeded
+      status: "True"
+      type: Accepted
+kind: List
+metadata:
+  resourceVersion: ""
