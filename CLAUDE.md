@@ -46,6 +46,8 @@ Precedence when sources disagree: `live-cluster/` YAML > `gitops/app-of-apps/` >
 
 ## Request path
 
+The bullets below describe the `live-cluster/` snapshot. **The three model charts and the `envoy-ai` image tags describe a target that is not deployed**: every request takes aigw-ui's entry route, and the charts put nothing on the client listener (`docs/ENTRY_ROUTE_MIGRATION.md`). For routing, the charts and the snapshot disagree on purpose.
+
 Client → OpenShift Route or LoadBalancer → Gateway `envoy-ai-gateway` (namespace `envoy-ai-gateway-system`; data plane and ratelimit run in `envoy-gateway-system`).
 
 - Listener `http` :80 accepts routes from all namespaces. SecurityPolicy `aigw-ui-api-key-auth` targets the whole listener, takes the key from `Authorization` or `x-api-key`, and forwards identity as `x-aigw-client-id`.
@@ -96,6 +98,8 @@ helm template x charts/platform/<c> -f gitops/app-of-apps/operators/<c>/values.y
 
 ### Invariants from chart comments
 
+- Model charts serve the model on the peer listener only (`templates/peer.yaml`). Keep `aigatewayRoute.enabled`, the direct backend (`anthropicBackend` / `openaiBackend`) and `claudeAlias.enabled` off, and `gateway.aiGateway.kserveRouteListener` at `peers`: each of them puts a way to the model on the client listener that skips the entry route. The peer route's match must stay `Exact`, or aigw-ui does not find the model.
+- `llmisvc.keepAliveSeconds` (75) restarts the model pods when it changes. With vLLM's default of 5 a health check meets closing connections, and one 503 on a health check takes the entry route's only endpoint out.
 - vLLM args must be single tokens in dot-notation. Do not add `--kv-transfer-config` to values; the template appends it when `lmcache.enabled`.
 - The vLLM image and the LMCache engine image must be the same build. qwen38 `nodePrep.image` stays `v0.30.0` (it donates the flashinfer cubins for the air-gap).
 - LMCache `chunkSize` is tied to the model and TP shape (256 for glm53, 1600 for qwen38 at TP4). A wrong value silently disables caching, and changing it invalidates the L2 cache.

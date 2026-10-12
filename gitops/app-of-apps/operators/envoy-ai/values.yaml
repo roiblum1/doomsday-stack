@@ -5,14 +5,23 @@
 # refuse each other's configuration. Both are mirrored under
 # registry-internal/kserve/personal-ns-2/. The rate limit
 # image is a full reference the overlay pattern does not cover.
+#
+# patched.2 is v1.2.0 plus patches 0001 to 0004. Patch 0004 keeps a model's
+# thinking on /anthropic/v1/messages when the backend speaks OpenAI format,
+# which is what aigw-ui's entry routes are. Mirror both images before this
+# is synced. The digests are the builds that were tested:
+#   docker.io/roi12345/ai-gateway-controller:v1.2.0-patched.2
+#     sha256:abbb96c134609d224fd6ac7452ab27b823b285df1347aab2d8e9225f227868bc
+#   docker.io/roi12345/ai-gateway-extproc:v1.2.0-patched.2
+#     sha256:b32ef4e50a90479496a4c2a2a15ad2e17307e95f26f40712cecc50f3b462e437
 ai-gateway:
   controller:
     image:
       repository: registry-internal/kserve/personal-ns-2/ai-gateway-controller
-      tag: v1.2.0-patched.1
+      tag: v1.2.0-patched.2
   extProc:
     image:
       repository: registry-internal/kserve/personal-ns-2/ai-gateway-extproc
-      tag: v1.2.0-patched.1
+      tag: v1.2.0-patched.2
 rateLimit:
   image: registry-internal/kserve/envoyproxy/ratelimit:0482748e

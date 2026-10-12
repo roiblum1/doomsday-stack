@@ -12,8 +12,8 @@ verdict, and emits a permissionDecision:
 Fail-safe: if the judge is unreachable, times out, or returns garbage,
 the decision is "ask" — never a silent auto-allow.
 
-Config: ~/.claude/judge.json (endpoint, model, timeout_s, max_tokens,
-shadow). shadow=true logs the verdict to stderr but always answers
+Config: ~/.claude/judge.json (endpoint, model, api_key, timeout_s,
+max_tokens, shadow). shadow=true logs the verdict to stderr but always answers
 "ask" — used to observe the judge before trusting it.
 """
 import json
@@ -26,8 +26,13 @@ import time
 CONFIG_PATH = os.path.expanduser("~/.claude/judge.json")
 LOG_PATH = os.path.expanduser("~/.claude/judge.log")
 DEFAULTS = {
-    "endpoint": "http://192.0.2.7/llm-judge/qwen36-judge/v1/chat/completions",
+    # The gateway's client listener. The model is picked by "model" below;
+    # the old /llm-judge/qwen36-judge/... path is no longer served there.
+    "endpoint": "http://192.0.2.7/v1/chat/completions",
     "model": "judge",
+    # A tenant key from aigw-ui. The gateway answers 401 without one, and
+    # the hook then falls back to "ask".
+    "api_key": "",
     "timeout_s": 10,
     "max_tokens": 512,
     "shadow": False,
@@ -103,19 +108,31 @@ def decide(event, cfg):
         "temperature": 0,
     }
     req = json.dumps(body).encode()
+    cmd = ["curl", "-sS", "--max-time", str(cfg["timeout_s"]),
+           "-H", "content-type: application/json",
+           "-X", "POST", "--data-binary", "@-"]
+    key_fd = None
     try:
+        if cfg.get("api_key"):
+            # The key reaches curl through a pipe, not on the command line,
+            # where any local user could read it from the process list.
+            key_fd, w = os.pipe()
+            os.write(w, f"Authorization: Bearer {cfg['api_key']}\n".encode())
+            os.close(w)
+            cmd += ["-H", f"@/dev/fd/{key_fd}"]
         out = subprocess.run(
-            ["curl", "-sS", "--max-time", str(cfg["timeout_s"]),
-             "-H", "content-type: application/json",
-             "-X", "POST", "--data-binary", "@-",
-             cfg["endpoint"]],
+            cmd + [cfg["endpoint"]],
             input=req, capture_output=True, timeout=cfg["timeout_s"] + 5,
+            pass_fds=() if key_fd is None else (key_fd,),
         )
         resp = json.loads(out.stdout)
         text = resp["choices"][0]["message"]["content"] or ""
         finish = resp["choices"][0].get("finish_reason", "")
     except Exception as e:
         return "ask", f"judge unreachable/unparseable ({e}); manual approval required"
+    finally:
+        if key_fd is not None:
+            os.close(key_fd)
 
     if finish == "length":
         return "ask", "judge reply was truncated (ran out of output tokens) before a verdict; manual approval required"

@@ -1,0 +1,100 @@
+{{- if .Values.peer.enabled }}
+{{- $gw := .Values.gateway.aiGateway }}
+# The only way to the model.
+#
+# Clients reach the gateway's client listener. There aigw-ui's entry route
+# (fleet-<model>, written by the hub) checks the key, counts the quota and
+# picks a site. It then calls that site's peer listener over mTLS, and the
+# routes below answer there: gateway -> scheduler (EPP) -> vLLM.
+#
+# Nothing in this file is on the client listener, so no request reaches the
+# model without the key check, the quota and the scheduler.
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIGatewayRoute
+metadata:
+  name: {{ .Values.peer.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    # DO NOT REMOVE sectionName: without it the route is also on the
+    # listener clients reach, where it skips keys and quotas.
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ $gw.name }}
+      namespace: {{ $gw.namespace }}
+      sectionName: {{ $gw.peerListener }}
+  rules:
+    # Exact match on the name clients send. aigw-ui finds the model on this
+    # site by this match; it does not see a regular expression.
+    - name: serve
+      matches:
+        - headers:
+            - type: Exact
+              name: {{ .Values.aigatewayRoute.headerName }}
+              value: {{ .Values.model.name }}
+      backendRefs:
+        - group: inference.networking.k8s.io
+          kind: InferencePool
+          name: {{ .Values.llmisvc.name }}-inference-pool
+      timeouts:
+        request: {{ .Values.peer.requestTimeout }}
+      modelsOwnedBy: {{ .Values.namespace }}
+---
+# What the entry route's health check asks: GET /healthz/<model name>.
+# It goes straight to vLLM and not through the scheduler, so a busy site
+# still answers and is not taken for a dead one.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ .Values.peer.healthName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ $gw.name }}
+      namespace: {{ $gw.namespace }}
+      sectionName: {{ $gw.peerListener }}
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /healthz/{{ .Values.model.name }}
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: /health
+      backendRefs:
+        - name: {{ .Values.llmisvc.name }}-kserve-workload-svc
+          port: 8000
+---
+# vLLM closes an HTTP connection that has been idle for its keep-alive time
+# (5 seconds unless llmisvc.keepAliveSeconds is set). A health check that
+# meets a connection being closed is answered 503, and Envoy takes an
+# endpoint out on ONE answer with a wrong status: unhealthyThreshold does
+# not apply to that case. With one site, every request then got
+# "503 no healthy upstream" for about 10 seconds.
+# The check is tried again on a new connection instead.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: {{ .Values.peer.healthName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "glm53.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ .Values.peer.healthName }}
+  retry:
+    numRetries: {{ .Values.peer.healthRetries }}
+    retryOn:
+      triggers: ["reset", "connect-failure"]
+{{- end }}

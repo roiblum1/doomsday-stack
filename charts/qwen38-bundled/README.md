@@ -13,6 +13,8 @@ long-form storage/protocol rationale -- the geometry here is identical.
 |---|---|---|
 | Namespace | `llm-qwen38` | label `openshift.io/cluster-monitoring=true` for the platform Prometheus |
 | LLMInferenceService | `qwen38-l4` | 1 pod, TP2 x DP3 = 6x NVIDIA L4, runtimeClass `performance-...-l4` |
+| AIGatewayRoute | `qwen38-peer` | on the gateway's peer listener: `Qwen3.8-27B-FP8` → InferencePool (scheduler) |
+| HTTPRoute + BackendTrafficPolicy | `qwen38-peer-health` | `GET /healthz/Qwen3.8-27B-FP8` for the entry route's health check, tried again on a closing connection |
 | LMCacheEngine | `qwen38-cache` | DaemonSet (1 pod), L1 200Gi pinned RAM + L2 900Gi on a local LV |
 | Static PVs/PVCs | `qwen38-models` 200Gi, `qwen38-cache` 150Gi, `qwen38-cache-l2` 1000Gi | local `StorageClass qwen38-local-static`, nodeAffinity-pinned |
 | node-prep DaemonSet | `qwen38-node-prep` | privileged nsenter; creates VG + LVs, keeps them mounted, seeds flashinfer cubins |
@@ -20,12 +22,17 @@ long-form storage/protocol rationale -- the geometry here is identical.
 | SCC | `qwen38-model-serving` | cluster-scoped; own copy, no glm53 dependency |
 | PrometheusRule | `qwen38-cache` | engine-down / no-targets / L2-high / L1-pressure / no-lookups |
 
-External endpoint (shared Envoy AI Gateway, VIP 192.0.2.7):
+External endpoint (shared Envoy AI Gateway, VIP 192.0.2.7), with a tenant
+key from aigw-ui and `"model": "Qwen3.8-27B-FP8"`:
 
 ```
-http://192.0.2.7/llm-qwen38/qwen38-l4/v1/models
-http://192.0.2.7/llm-qwen38/qwen38-l4/v1/chat/completions
+http://192.0.2.7/v1/chat/completions
+http://192.0.2.7/anthropic/v1/messages
 ```
+
+The model is served on the gateway's peer listener and clients reach it
+through aigw-ui's entry route. The `/llm-qwen38/qwen38-l4/...` paths are
+no longer served to clients.
 
 Grafana: the shared `lmcache-observability` dashboard (monitoring-chart) --
 select namespace `llm-qwen38` / job `qwen38-cache-metrics` in its variables.

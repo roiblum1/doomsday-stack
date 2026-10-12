@@ -11,16 +11,18 @@ Check bring-up:
   oc -n {{ .Values.namespace }} get pods -w                                                   # storage-initializer -> main: 0/1 -> 1/1
   oc -n {{ .Values.namespace }} logs deploy/{{ .Values.llmisvc.name }}-predictor -c storage-initializer   # download progress
 
-Smoke test once Ready (in-cluster, via the shared gateway -> EPP -> vLLM):
-  curl http://envoy-ai-gateway.envoy-ai-gateway-system.svc/v1/chat/completions \
+Smoke test once Ready (entry route -> peer listener -> EPP -> vLLM). It
+needs the model's entry route turned on in aigw-ui and a tenant key:
+  curl http://envoy-ai-gateway.envoy-gateway-system.svc/v1/chat/completions \
     -H 'content-type: application/json' \
-    -H 'x-ai-eg-model: {{ .Values.model.name }}' \
+    -H 'Authorization: Bearer <tenant key>' \
     -d '{"model":"{{ .Values.model.name }}","messages":[{"role":"user","content":"Reply with the single word: ready"}],"max_tokens":8}'
 
 External: same request against http://192.0.2.7 (the shared gateway VIP).
 
-Judge hook wiring (out of band): judge.json -> base_url http://192.0.2.7,
-model "{{ .Values.model.name }}".
+Judge hook wiring (out of band): judge.json -> endpoint
+http://192.0.2.7/v1/chat/completions, model "{{ .Values.model.name }}",
+api_key <tenant key>.
 
 Autoscaling: WVA/KEDA prerequisites are NOT installed on this cluster yet --
 the judge runs pinned at minReplicas until they are (see docs/RECIPE.md).

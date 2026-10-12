@@ -4,3 +4,8 @@ metadata:
   name: {{ .Values.namespace }}
   labels:
     {{- include "glm53.labels" . | nindent 4 }}
+    {{- if .Values.peer.enabled }}
+    # The gateway's peer listener accepts routes only from namespaces that
+    # carry this label.
+    aigw-ui.io/serving: "true"
+    {{- end }}

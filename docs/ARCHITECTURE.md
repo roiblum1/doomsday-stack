@@ -463,6 +463,12 @@ internal `<s3-endpoint>`).
 
 ## 7. Envoy AI Gateway
 
+> §7.2 and §7.3 describe the snapshot in `live-cluster/`. The charts in
+> this repo now render a different shape, in which every request takes
+> the entry route and nothing else is on the client listener. That shape,
+> and the order to apply it, are in
+> [ENTRY_ROUTE_MIGRATION.md](ENTRY_ROUTE_MIGRATION.md).
+
 ### 7.1 Control plane
 
 | Component | Version / shape | Source |

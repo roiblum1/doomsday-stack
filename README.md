@@ -99,3 +99,6 @@ Per-kind counts and object names: `docs/LIVE_STATE.md` §1.
 - `SECURITY_SANITIZATION.md` — what was sanitized, what was kept, the 3-pass
   verification, and the placeholder conventions for reading this archive.
 - `VERIFICATION.md` — verification pass logs (written by the export pipeline).
+- `ENTRY_ROUTE_MIGRATION.md` — a change made to the charts after the export: every
+  request takes aigw-ui's entry route. What changed, the order to apply it, what was
+  tested. Not applied to the cluster; `live-cluster/` still shows the old paths.

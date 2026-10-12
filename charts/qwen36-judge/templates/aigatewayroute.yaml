@@ -1,4 +1,9 @@
 {{- if .Values.aigatewayRoute.enabled }}
+# OFF by default (aigatewayRoute.enabled: false) since the model is served by
+# templates/peer.yaml. What this file renders sits on the client listener
+# and skips aigw-ui's entry route. Kept for the migration and as a way
+# back; the comments below describe the old path.
+#
 # Agent Router (Envoy AI Gateway) route on the shared gateway (VIP
 # 192.0.2.7): header-based model routing. The extproc derives
 # x-ai-eg-model from the request body's "model" field, so OpenAI clients

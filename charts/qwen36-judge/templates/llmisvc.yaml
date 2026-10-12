@@ -56,15 +56,18 @@ spec:
   parallelism:
     tensor: {{ .Values.llmisvc.parallelism.tensor }}
   router:
-    # The KServe router HTTPRoute attaches to the SHARED Envoy AI Gateway
-    # (same one as the AIGatewayRoute), so there is ONE external VIP and
-    # the path-based rules (/llm-judge/qwen36-judge/...,
-    # /publishers/llm-judge/...) coexist with the header-based model
-    # routing below.
+    # KServe's own HTTPRoute (path rules /<namespace>/<name>/... and
+    # /publishers/...) attaches to the shared gateway's PEER listener only.
+    # On the client listener it is a way to the model past aigw-ui's entry
+    # route: nothing is counted against a quota there.
     gateway:
       refs:
         - name: {{ .Values.gateway.aiGateway.name }}
           namespace: {{ .Values.gateway.aiGateway.namespace }}
+          {{- with .Values.gateway.aiGateway.kserveRouteListener }}
+          # Without sectionName the route is on both listeners.
+          sectionName: {{ . }}
+          {{- end }}
     route: {}
     scheduler:
       # Pin the EPP to the chart's ServiceAccount instead of letting kserve
@@ -110,6 +113,10 @@ spec:
           {{- range $key, $value := .Values.llmisvc.env }}
           - name: {{ $key }}
             value: {{ $value | quote }}
+          {{- end }}
+          {{- with $.Values.llmisvc.keepAliveSeconds }}
+          - name: VLLM_HTTP_TIMEOUT_KEEP_ALIVE
+            value: {{ . | quote }}
           {{- end }}
         resources:
           {{- toYaml .Values.llmisvc.resources | nindent 10 }}
