@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A **sanitized, point-in-time export** (2026-10-12) of an LLM serving stack on a HyperShift-hosted OpenShift 4.22 cluster (`cluster-llm-prep`): GLM-5.3 on two B200 nodes, Qwen3.8 and a Qwen3.6 "judge" on one L4 node, served by KServe `LLMInferenceService` + llm-d EPP, fronted by Envoy Gateway + Envoy AI Gateway, with LMCache, per-client token quotas and a cross-site "fleet" path.
 
-It is not a git repo and not the source of truth. The real sources are per-chart git repos, the `popai` values repo, and `argocd-day2-platform`. Editing files here deploys nothing.
+It is a snapshot kept in git, not the source of truth. The real sources are per-chart git repos, the `popai` values repo, and `argocd-day2-platform`. Editing files here deploys nothing.
 
 ## Hard rules
 
