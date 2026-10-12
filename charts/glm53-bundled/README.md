@@ -23,15 +23,15 @@ the llm-d router (EPP + InferencePool) and an Envoy AI Gateway
 4. **Model pull Jobs** — one per node, s5cmd from S3 into that node's
    copy, idempotent via `.download-complete` marker (~3 min for 564G).
 5. **One shared Gateway** (`envoy-ai-gateway`, VIP 192.0.2.7) for
-   everything: the AIGatewayRoute (model-header rules, extproc) and the
-   KServe router HTTPRoute (path rules `/llm-glm53/glm53-b200/...`,
-   `/publishers/...`). The former dedicated `glm53-kserve` Gateway +
-   EnvoyProxy (VIP .146) was removed — the InferencePool/EPP path never
-   depended on it, and the KServe route's longer path prefixes never
-   shadow the extproc-driven rules.
+   everything, with two listeners. Clients reach `http`, where only
+   aigw-ui's entry routes live. This chart's routes and the KServe
+   router HTTPRoute are on `peers` (mTLS). The former dedicated
+   `glm53-kserve` Gateway + EnvoyProxy (VIP .146) was removed.
 6. **LLMInferenceService** (`glm53-b200`) — the serving workload.
-7. **AIGatewayRoute** (`glm53`) — header `x-ai-eg-model: glm-5.3` →
-   InferencePool, request timeout 3600s, token-cost metadata.
+7. **AIGatewayRoute** (`glm53-peer`) on the peer listener: header
+   `x-ai-eg-model: glm-5.3` → InferencePool, request timeout 3600s. And
+   **HTTPRoute** (`glm53-peer-health`) for the entry route's health
+   check, with a retry policy.
 8. *(optional, `aiperf.enabled: true`)* **AIPerf benchmark Job**.
 
 ## Out-of-band prerequisites (NOT in this chart)
@@ -73,12 +73,14 @@ boots are faster.
 ## Accessing the model
 
 ```bash
-# In-cluster (full path: Envoy -> EPP -> vLLM):
+# Through the gateway (entry route -> peer listener -> EPP -> vLLM).
+# Needs a tenant key from aigw-ui.
 curl http://envoy-ai-gateway.envoy-gateway-system.svc/v1/chat/completions \
   -H 'content-type: application/json' \
-  -H 'x-ai-eg-model: glm-5.3' \
+  -H 'Authorization: Bearer <tenant key>' \
   -d '{"model":"glm-5.3","messages":[{"role":"user","content":"hi"}]}'
-# (the body "model" field alone also routes; streaming supported)
+# Claude Code and other Anthropic clients: POST /anthropic/v1/messages
+# with the same key and "model": "glm-5.3". Streaming is supported.
 ```
 
 External clients use the shared gateway's LoadBalancer VIP. GLM-5.3

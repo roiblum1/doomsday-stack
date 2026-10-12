@@ -1,6 +1,7 @@
 {
-  "endpoint": "http://192.0.2.7/llm-judge/qwen36-judge/v1/chat/completions",
+  "endpoint": "http://192.0.2.7/v1/chat/completions",
   "model": "judge",
+  "api_key": "",
   "timeout_s": 10,
   "max_tokens": 512,
   "shadow": false

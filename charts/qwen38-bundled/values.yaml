@@ -134,15 +134,28 @@ pullJobs:
 
 # --- gateways -----------------------------------------------------------------
 # ONE Gateway for everything: the shared Envoy AI Gateway (VIP
-# 192.0.2.7). The KServe router HTTPRoute attaches to it (path-based
-# rules: /llm-qwen38/qwen38-l4/...). There is NO per-model Gateway and no
-# second VIP; qwen38 coexists with glm53's AIGatewayRoute on the same
-# listener (longer-prefix KServe paths never shadow the extproc rules).
+# 192.0.2.7), with two listeners.
+#   http  : what clients reach. Only aigw-ui's entry routes (fleet-<model>)
+#           belong on it: key check, quota, choice of site.
+#   peers : mTLS, reached only by an entry route. This chart's peer route,
+#           its health route and KServe's own path routes attach here.
+# There is NO per-model Gateway and no second VIP.
 gateway:
   aiGateway:
     name: envoy-ai-gateway
     namespace: envoy-ai-gateway-system
+    # The client listener. This chart puts a route on it only when
+    # aigatewayRoute.enabled is set, which is off.
     listener: http
+    # The peer listener: mTLS, reachable only with the fleet client
+    # certificate.
+    peerListener: peers
+    # Where KServe's own path routes (/<namespace>/<name>/v1/...) attach.
+    # KEEP AT peers: on the client listener they are a way to the model
+    # past the entry route. Empty puts them on both listeners, which is
+    # what the chart did before; use that only while clients still call
+    # the path form during the migration.
+    kserveRouteListener: peers
 
 # --- the LLMInferenceService ---------------------------------------------------
 llmisvc:
@@ -293,6 +306,12 @@ llmisvc:
     - --tool-call-parser=qwen3_xml
     - --enable-auto-tool-choice
     - --trust-remote-code
+  # How long vLLM keeps an idle HTTP connection open, in seconds. vLLM's
+  # own default is 5: Envoy then meets connections that are just being
+  # closed, and a health check or a request on one is answered 503. 75 is
+  # longer than any gap between health checks. 0 leaves vLLM's default.
+  # Changing this value restarts the model pods.
+  keepAliveSeconds: 75
   env:
     HF_HUB_OFFLINE: "1"
     TRANSFORMERS_OFFLINE: "1"
@@ -463,9 +482,33 @@ lmcache:
       # namespace llm-qwen38 / job qwen38-cache-metrics.
       enabled: true
 
-# --- Envoy AI Gateway route -------------------------------------------------------
-aigatewayRoute:
+# --- peer route: how the model is served ------------------------------------------
+# A request arrives on the gateway's client listener, where aigw-ui's entry
+# route (fleet-<model>, written by the hub once the model's entry route is
+# turned on there) checks the key, counts the quota and picks a site. From
+# there it goes over mTLS to the peer listener, to the scheduler (EPP), to
+# vLLM. Clients send model.name on /v1/chat/completions or on
+# /anthropic/v1/messages; the gateway translates Anthropic to OpenAI at the
+# entry, and with the patched.2 gateway build thinking survives that.
+peer:
   enabled: true
+  name: qwen38-peer
+  # HTTPRoute for GET /healthz/<model.name>, and the retry policy on it.
+  healthName: qwen38-peer-health
+  requestTimeout: 900s
+  # How often a health check is tried again when it meets a connection that
+  # vLLM is closing.
+  healthRetries: 2
+
+# --- direct route on the client listener (OFF) ------------------------------------
+# Before the peer route, this chart put its own route on the client
+# listener. Every rule in it skips aigw-ui's entry route: the direct backend
+# skips the scheduler, and the publishers/... name and the claude-* pattern
+# were never counted against a quota. Keep it off. It stays in the chart for
+# the migration and as a way back. name and headerName below are still
+# used.
+aigatewayRoute:
+  enabled: false
   name: qwen38
   headerName: x-ai-eg-model
   # 65k-token contexts on L4 GPUs: prefill of a worst-case prompt alone can
@@ -476,7 +519,11 @@ aigatewayRoute:
   # model rewritten to model.name (without it they get the route-not-found
   # 404). Same safety net as glm53.
   claudeAlias:
-    enabled: true
+    # OFF. Two charts claimed this same pattern, so which model answered
+    # claude-* depended on which route was older. Clients set the model
+    # name instead (ANTHROPIC_MODEL and ANTHROPIC_DEFAULT_HAIKU_MODEL,
+    # _SONNET_MODEL, _OPUS_MODEL for Claude Code).
+    enabled: false
     regex: '^claude-.*$'
 
 # --- native Anthropic backend (Claude Code + quota path) -------------------------
@@ -499,7 +546,11 @@ aigatewayRoute:
 # /v1/chat/completions gets the OpenAI<->Anthropic extproc translation
 # (slower; the aigw-ui quota counters still work). The claudeAlias rule
 # below also rewrites claude-* client model ids to the short name.
+# OFF, together with aigatewayRoute above. This backend existed because the
+# gateway lost thinking when it translated Anthropic to OpenAI; the
+# patched.2 gateway build keeps it. The text above this note describes the
+# old direct path.
 anthropicBackend:
-  enabled: true
+  enabled: false
   name: qwen38-anthropic            # AIServiceBackend (schema: Anthropic)
   backendName: qwen38-anthropic-workload   # Envoy Gateway Backend (FQDN endpoint)

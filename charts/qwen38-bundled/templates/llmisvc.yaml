@@ -33,16 +33,18 @@ spec:
     maxSurge: {{ .Values.llmisvc.rolloutStrategy.maxSurge }}
     maxUnavailable: {{ .Values.llmisvc.rolloutStrategy.maxUnavailable }}
   router:
-    # The KServe router HTTPRoute attaches to the SHARED Envoy AI Gateway
-    # (the same one glm53's AIGatewayRoute uses), so there is ONE external
-    # VIP. The KServe-generated paths (/llm-qwen38/qwen38-l4/...) are more
-    # specific (longer path prefixes) than the AIGatewayRoute's model-header
-    # rules, so they never shadow them and are not translated by the
-    # extproc themselves.
+    # KServe's own HTTPRoute (path rules /<namespace>/<name>/... and
+    # /publishers/...) attaches to the shared gateway's PEER listener only.
+    # On the client listener it is a way to the model past aigw-ui's entry
+    # route: nothing is counted against a quota there.
     gateway:
       refs:
         - name: {{ .Values.gateway.aiGateway.name }}
           namespace: {{ .Values.gateway.aiGateway.namespace }}
+          {{- with .Values.gateway.aiGateway.kserveRouteListener }}
+          # Without sectionName the route is on both listeners.
+          sectionName: {{ . }}
+          {{- end }}
     route: {}
     {{- with .Values.llmisvc.scheduler }}
     scheduler:
@@ -87,6 +89,10 @@ spec:
           {{- range $key, $value := .Values.llmisvc.env }}
           - name: {{ $key }}
             value: {{ $value | quote }}
+          {{- end }}
+          {{- with $.Values.llmisvc.keepAliveSeconds }}
+          - name: VLLM_HTTP_TIMEOUT_KEEP_ALIVE
+            value: {{ . | quote }}
           {{- end }}
           {{- if $.Values.lmcache.enabled }}
           # Deterministic prefix hashing across vLLM processes and restarts

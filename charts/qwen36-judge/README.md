@@ -13,24 +13,22 @@ docs/RECIPE.md §9). Deployed 2026-10-07.
 
 ## How to use the model
 
-One endpoint — the gateway VIP `http://192.0.2.7` — serves BOTH
-models on this cluster. Pick a model by header or by path:
+One endpoint, the gateway VIP `http://192.0.2.7`, serves every model on
+this cluster. The `model` field of the request picks the model, and
+every request needs a tenant key from aigw-ui:
 
 ```bash
-# A. Header mode (any path, custom header selects the model):
 curl http://192.0.2.7/v1/chat/completions \
   -H 'content-type: application/json' \
-  -H 'x-ai-eg-model: judge' \
+  -H 'Authorization: Bearer <tenant key>' \
   -d '{"model":"judge","messages":[{"role":"user","content":"hi"}],"max_tokens":16}'
-
-# B. Path mode (no custom header — works with any OpenAI client):
-#    judge:   http://192.0.2.7/llm-judge/qwen36-judge/v1/chat/completions
-#    glm-5.3: http://192.0.2.7/llm-glm53/glm53-b200/v1/chat/completions
 ```
 
-For OpenAI-SDK clients: `base_url =
-http://192.0.2.7/llm-judge/qwen36-judge/v1` (SDK appends
-`/chat/completions`), `model = judge`.
+For OpenAI-SDK clients: `base_url = http://192.0.2.7/v1`, `model = judge`.
+
+The path form (`/llm-judge/qwen36-judge/v1/...`) is no longer served to
+clients. KServe's route for it is on the gateway's peer listener, which
+needs the fleet client certificate.
 
 Rules that bite:
 - The request must contain a **user-role message** — the gateway's EPP
@@ -38,41 +36,30 @@ Rules that bite:
 - Thinking is off server-side (`reasoning_tokens: 0`); the judge
   answers directly in `content`.
 
-## Why there are TWO HTTPRoutes (not a duplicate)
+## The routes in the namespace
 
-`kubectl -n llm-judge get httproutes` shows both — this is by design
-(glm53 has the same pair):
+`kubectl -n llm-judge get httproutes` shows three, all on the gateway's
+peer listener:
 
 | HTTPRoute | Created by | Purpose |
 |---|---|---|
-| `qwen36-judge` | this chart (`AIGatewayRoute`, Argo-managed) | Header routing: `x-ai-eg-model: judge` → direct `AIServiceBackend` (quota path); `publishers/llm-judge/...` → EPP → InferencePool |
-| `qwen36-judge-kserve-route` | KServe llmisvc-controller (from `spec.gates`) | Path routing: `/llm-judge/qwen36-judge/v1/...` and `/publishers/llm-judge/models/judge/v1/...` |
+| `qwen36-judge-peer` | this chart (`AIGatewayRoute`) | `x-ai-eg-model: judge` → scheduler (EPP) → InferencePool. The entry route sends requests here |
+| `qwen36-judge-peer-health` | this chart | `GET /healthz/judge` → vLLM `/health`, asked by the entry route's health check |
+| `qwen36-judge-kserve-route` | KServe llmisvc-controller | Path routing `/llm-judge/qwen36-judge/v1/...`. Unused; pinned to the peer listener so it is not a way past the entry route |
 
-They attach to the same shared Gateway but match on **non-overlapping
-conditions** (header vs. path prefixes) and both end at the same
-InferencePool → same vLLM pods. Two layers, two route objects. Deleting
-either one removes one of the two addressing modes.
+The route clients hit is not in this namespace. aigw-ui writes it
+(`fleet-judge` in `envoy-ai-gateway-system`) once the model's entry
+route is turned on in the hub.
 
-## Why `judge` routes DIRECT (the quota path)
+## Quotas
 
-Envoy AI Gateway `QuotaPolicy` — the object [aigw-ui](https://host.example.internal)
-renders for per-tenant token quotas — can only attach to an
-`AIServiceBackend`, never to an `InferencePool`. The judge's original
-single rule was pool-only, so aigw-ui listed the model as
-"no quota possible". Since chart 0.2.0 the route has two rules — the
-same pattern glm53-chart uses for its `anthropicBackend`:
-
-| model id clients send | rule | backend | quota |
-|---|---|---|---|
-| `judge` | `openai-direct` | `AIServiceBackend qwen36-judge-openai` → `Backend qwen36-judge-workload` → kserve workload svc `:8000` → vLLM | ✅ QuotaPolicy attaches here |
-| `publishers/llm-judge/models/judge` | `openai-epp` | `InferencePool` (EPP, queue-aware scheduling) | ❌ |
-
-Tradeoff: the short name bypasses the EPP — kube-proxy round-robins the
-workload svc (moot at 1 replica / TP2; revisit if scaling goes above 1).
-OpenAI passthrough, no extproc translation; vLLM natively serves
-`judge`, so no model rewrite. Disable with
-`--set openaiBackend.enabled=false` to restore the single pool-only
-rule (both names → InferencePool, nothing quota-managed).
+A `QuotaPolicy` attaches only to an `AIServiceBackend`, never to an
+`InferencePool`. Up to chart 0.2.x this chart kept a direct backend for
+that reason, and requests to it skipped the scheduler. aigw-ui's entry
+route has its own `AIServiceBackend`, so the quota is counted there and
+the request still goes through the scheduler. The old direct route is
+still in the chart, behind `aigatewayRoute.enabled` and
+`openaiBackend.enabled`, both off.
 
 ## Claude Code "auto mode guarded by the judge"
 
@@ -91,7 +78,7 @@ Wire it up on any host that can reach the VIP:
 ```bash
 mkdir -p ~/.claude/hooks
 cp hook/judge.py  ~/.claude/hooks/judge.py && chmod +x ~/.claude/hooks/judge.py
-cp hook/judge.json ~/.claude/judge.json      # endpoint, model, max_tokens, shadow
+cp hook/judge.json ~/.claude/judge.json      # endpoint, model, api_key, max_tokens, shadow
 # then merge into ~/.claude/settings.json:
 #   "permissions": {"defaultMode": "acceptEdits"},
 #   "hooks": {"PreToolUse": [{"matcher": "*",
@@ -99,6 +86,10 @@ cp hook/judge.json ~/.claude/judge.json      # endpoint, model, max_tokens, shad
 #                "command": "python3 $HOME/.claude/hooks/judge.py",
 #                "timeout": 20}]}]}
 ```
+
+Put a tenant key from aigw-ui into `api_key` in `~/.claude/judge.json`
+and `chmod 600` the file. The gateway answers 401 without a key, and
+the hook then asks for every tool call.
 
 Verdicts audit-log to `~/.claude/judge.log`. `"shadow": true` in
 judge.json observes without enforcing. Hooks load at session START —
@@ -113,17 +104,17 @@ svc-mgmt.
 2. **LLMInferenceService** (`qwen36-judge`) — vLLM, TP2 (2× L4 per
    replica), thinking off, prefix caching, `max_num_seqs 128`
    (Qwen3.6's Mamba layers cap concurrency on 24 GB cards).
-3. **AIGatewayRoute** (`qwen36-judge`) — the header-routing object
-   (two rules: `judge` → direct AIServiceBackend, publishers alias →
-   InferencePool).
-4. **Backend** (`qwen36-judge-workload`, Envoy Gateway) — FQDN
-   endpoint at the kserve workload svc `:8000` — and
-   **AIServiceBackend** (`qwen36-judge-openai`, schema OpenAI) — the
-   quota-attachable target for the `judge` model name.
+3. **AIGatewayRoute** (`qwen36-judge-peer`) on the gateway's peer
+   listener: `judge` → InferencePool (scheduler). Requests arrive
+   here from aigw-ui's entry route.
+4. **HTTPRoute** (`qwen36-judge-peer-health`) for the entry route's
+   health check, and a **BackendTrafficPolicy** that tries a check
+   again when it meets a connection vLLM is closing.
 
 The KServe controller additionally creates (not chart-managed):
 Deployment `qwen36-judge-kserve`, EPP router-scheduler, services,
-InferencePool, and the second HTTPRoute. `LLMInferenceService
+InferencePool, and its own HTTPRoute (`qwen36-judge-kserve-route`, on
+the peer listener). `LLMInferenceService
 READY=False WaitingForGateway` is a known cosmetic condition — glm53
 has shown it for days while serving fine; trust the VIP.
 

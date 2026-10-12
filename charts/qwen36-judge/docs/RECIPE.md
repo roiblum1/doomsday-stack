@@ -119,6 +119,12 @@ ServiceAccount** (`s3sa` → `judge-s3`) and injects `AWS_ACCESS_KEY_ID`/
 
 ## 5. Routing
 
+> Superseded. The model is now served on the gateway's peer listener and
+> reached through aigw-ui's entry route; the path routes and the direct
+> route described in this recipe are no longer on the client listener.
+> See the README, "How to use the model". The text below records the
+> first deployment.
+
 Same shared gateway as GLM-5.3 (VIP 192.0.2.7): one
 `AIGatewayRoute` rule matches header `x-ai-eg-model: judge` (the
 extproc also derives it from body `model`) → the judge's

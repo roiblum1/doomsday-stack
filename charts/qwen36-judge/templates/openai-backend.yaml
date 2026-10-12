@@ -1,4 +1,9 @@
 {{- if .Values.openaiBackend.enabled }}
+# OFF by default (openaiBackend.enabled: false) since the model is served by
+# templates/peer.yaml. What this file renders sits on the client listener
+# and skips aigw-ui's entry route. Kept for the migration and as a way
+# back; the comments below describe the old path.
+#
 # Direct OpenAI backend for the shared Envoy AI Gateway (VIP .145).
 #
 # WHY: Envoy AI Gateway QuotaPolicy -- what aigw-ui renders for

@@ -97,15 +97,29 @@ images:
 
 
 # --- gateways ---------------------------------------------------------------------
-# ONE shared Gateway for everything, same as glm53-chart: the VIP
-# 192.0.2.7. The AIGatewayRoute attaches to it (model-header rules)
-# AND the KServe router HTTPRoute attaches to it as well (path rules
-# /llm-judge/qwen36-judge/... and /publishers/llm-judge/...).
+# ONE Gateway for everything: the shared Envoy AI Gateway (VIP
+# 192.0.2.7), with two listeners.
+#   http  : what clients reach. Only aigw-ui's entry routes (fleet-<model>)
+#           belong on it: key check, quota, choice of site.
+#   peers : mTLS, reached only by an entry route. This chart's peer route,
+#           its health route and KServe's own path routes attach here.
+# There is NO per-model Gateway and no second VIP.
 gateway:
   aiGateway:
     name: envoy-ai-gateway
     namespace: envoy-ai-gateway-system
+    # The client listener. This chart puts a route on it only when
+    # aigatewayRoute.enabled is set, which is off.
     listener: http
+    # The peer listener: mTLS, reachable only with the fleet client
+    # certificate.
+    peerListener: peers
+    # Where KServe's own path routes (/<namespace>/<name>/v1/...) attach.
+    # KEEP AT peers: on the client listener they are a way to the model
+    # past the entry route. Empty puts them on both listeners, which is
+    # what the chart did before; use that only while clients still call
+    # the path form during the migration.
+    kserveRouteListener: peers
 
 # --- the LLMInferenceService -------------------------------------------------------
 llmisvc:
@@ -166,6 +180,12 @@ llmisvc:
     - "--limit-mm-per-prompt='{\"image\":0,\"video\":0}'"
     - --trust-remote-code
 
+  # How long vLLM keeps an idle HTTP connection open, in seconds. vLLM's
+  # own default is 5: Envoy then meets connections that are just being
+  # closed, and a health check or a request on one is answered 503. 75 is
+  # longer than any gap between health checks. 0 leaves vLLM's default.
+  # Changing this value restarts the model pods.
+  keepAliveSeconds: 75
   env:
     HF_HUB_OFFLINE: "1"
     TRANSFORMERS_OFFLINE: "1"
@@ -232,9 +252,33 @@ llmisvc:
         pollingInterval: 5
         cooldownPeriod: 30
 
-# --- Envoy AI Gateway route -------------------------------------------------------
-aigatewayRoute:
+# --- peer route: how the model is served ------------------------------------------
+# A request arrives on the gateway's client listener, where aigw-ui's entry
+# route (fleet-<model>, written by the hub once the model's entry route is
+# turned on there) checks the key, counts the quota and picks a site. From
+# there it goes over mTLS to the peer listener, to the scheduler (EPP), to
+# vLLM. Clients send model.name on /v1/chat/completions or on
+# /anthropic/v1/messages; the gateway translates Anthropic to OpenAI at the
+# entry, and with the patched.2 gateway build thinking survives that.
+peer:
   enabled: true
+  name: qwen36-judge-peer
+  # HTTPRoute for GET /healthz/<model.name>, and the retry policy on it.
+  healthName: qwen36-judge-peer-health
+  requestTimeout: 600s
+  # How often a health check is tried again when it meets a connection that
+  # vLLM is closing.
+  healthRetries: 2
+
+# --- direct route on the client listener (OFF) ------------------------------------
+# Before the peer route, this chart put its own route on the client
+# listener. Every rule in it skips aigw-ui's entry route: the direct backend
+# skips the scheduler, and the publishers/... name was never counted
+# against a quota. Keep it off. It stays in the chart for
+# the migration and as a way back. name and headerName below are still
+# used.
+aigatewayRoute:
+  enabled: false
   name: qwen36-judge
   headerName: x-ai-eg-model
   # Long thinking-free generations still finish in seconds; 600s covers
@@ -255,7 +299,10 @@ aigatewayRoute:
 # at 1 replica / TP2). The publishers/... model name keeps the EPP path
 # and is NOT quota-capable. Disable to restore the single pool-only
 # rule (both names -> InferencePool, nothing quota-managed).
+# OFF, together with aigatewayRoute above. The quota now attaches to
+# aigw-ui's entry route, so a direct backend is not needed for it. The
+# text above this note describes the old direct path.
 openaiBackend:
-  enabled: true
+  enabled: false
   name: qwen36-judge-openai        # AIServiceBackend (schema: OpenAI)
   backendName: qwen36-judge-workload  # Envoy Gateway Backend (FQDN endpoint)

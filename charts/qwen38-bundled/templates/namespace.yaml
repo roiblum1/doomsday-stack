@@ -4,6 +4,11 @@ metadata:
   name: {{ .Values.namespace }}
   labels:
     {{- include "qwen38.labels" . | nindent 4 }}
+    {{- if .Values.peer.enabled }}
+    # The gateway's peer listener accepts routes only from namespaces that
+    # carry this label.
+    aigw-ui.io/serving: "true"
+    {{- end }}
     # Lets the platform Prometheus (openshift-monitoring k8s instance, which
     # selects ServiceMonitors only from namespaces carrying this label --
     # hpc-observability does the same) scrape the LMCache engine's
