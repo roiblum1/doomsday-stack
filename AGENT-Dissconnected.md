@@ -159,6 +159,9 @@ Every research fact below has an id (`R12`) and a tag:
   as an option. A roadmap item built on it starts with the test.
 - `[MEMORY]`: general knowledge, not checked against a source. Treat as an open
   question unless a file confirms it.
+- `[OWNER]`: the owner said it, on the date given. It counts as evidence for what runs
+  on the real platform. The charts and values in the export were brought in line on
+  the same day; `live-cluster/` was not.
 
 If a file in the repos contradicts this pack, the file wins. Say so in
 `04-OPEN-QUESTIONS.md`. The ids are labels, not an order: R97 and later were added
@@ -185,6 +188,14 @@ So the current state in `00-CURRENT-STATE.md` is the migrated one: trace it from
 for what the migration did not touch (the pool, the scheduler config, the model server
 arguments, the gateway's own objects), and trace a request through the snapshot's old
 routes only where a finding needs the "before". Findings are about the current state.
+
+Five settings on the real platform are newer than the snapshot (R124, R129 and R130 in
+section 7). On GLM: the GPU memory share, the weight of the prefix scorer and a cap on
+prefill per step. On the gateway: the log format and the quota timeout. The charts and
+values in the export have them since 2026-10-13 and `live-cluster/` does not, so for
+these five the charts win over the snapshot. For GLM's other arguments the snapshot
+still wins, because `charts/glm53-bundled` is not the deployed branch. The model pods
+run vLLM v0.29.0, not v0.30.0 (section 5).
 
 ### 4.2 What changed against AGENT.md section 4
 
@@ -241,7 +252,7 @@ From the images in `live-cluster/` and the values in `gitops/app-of-apps/`.
 | Rate limit service | `envoyproxy/ratelimit:0482748e` | |
 | EPP | `llm-d-router-endpoint-picker:v0.10.0` | Repo `llm-d/llm-d-router`. Newest release is v0.11.0 (2026-09-27) |
 | KServe | v0.21.0-rc1 | |
-| vLLM | v0.30.0 | |
+| vLLM | v0.29.0 in the model pods | `[OWNER]` 2026-10-13: the model pods run the LMCache 0.5.5 build of vLLM, which is 0.29; `docs/ARCHITECTURE.md:361` says the same. The `vllm-openai:v0.30.0` in the export is the node-prep image and the image of `charts/glm53-bundled`, which is not the deployed branch. The vLLM facts of this pack (R24, R62, R90, R125) were read at tag v0.29.0. The LMCache v0.5.5 Dockerfile takes the vLLM version as a build argument, so the exact build is whatever the image holds |
 | LMCache | v0.5.5 | |
 | aigw-ui | 0.12.3 (`2ff0b01`) | |
 
@@ -419,13 +430,13 @@ reviewer both lean to no bounded load); what to do for header-less requests (R98
 
 ### Area 2. Capacity signal
 
-- R24. `[UPSTREAM]` vLLM v0.30.0 metrics a hub could read: `vllm:num_requests_running`,
+- R24. `[UPSTREAM]` vLLM v0.29.0 metrics a hub could read: `vllm:num_requests_running`,
   `vllm:num_requests_waiting`, `vllm:num_requests_waiting_by_reason`,
   `vllm:kv_cache_usage_perc`, `vllm:num_preemptions`, `vllm:prefix_cache_queries`,
   `vllm:prefix_cache_hits`, `vllm:external_prefix_cache_queries`,
   `vllm:external_prefix_cache_hits`, `vllm:prompt_tokens_cached`,
   `vllm:request_queue_time_seconds`, `vllm:time_to_first_token_seconds`,
-  `vllm:request_prefill_kv_computed_tokens`.
+  `vllm:request_prefill_kv_computed_tokens`, `vllm:request_prefill_time_seconds`.
 - R25. `[UPSTREAM]` EPP v0.10.0 serves `/metrics` on port 9090. Current names start with
   `llm_d_epp_`: `average_queue_size`, `average_running_requests`,
   `average_kv_cache_utilization`, `per_endpoint_queue_size`, `flow_control_queue_size`,
@@ -474,9 +485,9 @@ weight. Read the weight algorithm as coded first.
   port 8081), `quotaRateLimitTimeout: 5` (seconds), `quotaRateLimitFailureModeDeny: false`.
   So the path fails open by default, and **a rate limit service that hangs can hold a
   request for up to 5 seconds before it is let through**. The timeout is the failure
-  budget; it is a value, not code.
+  budget; it is a value, not code. The real platform sets 1 since 2026-10-13 (R130).
 - R33. `[FILE]` Upstream does not deploy the rate limit service. The wrapper chart does:
-  `charts/envoy-ai-gateway/values.yaml:317-360`. Its comments say every site and the hub
+  `charts/envoy-ai-gateway/values.yaml:321-364`. Its comments say every site and the hub
   must use the same Redis, and that while Redis is unreachable the rate limit pod is not
   ready and quotas are not enforced. `[LAB]` With the service down, requests were
   answered and not charged (`charts/llm-model/README.md:102-103`).
@@ -625,7 +636,7 @@ given R36 and R37. State the RTT cost with `INTER_SITE_RTT`.
   The gap AGENT.md calls "the most important on the platform" is closed by the
   migration, which the real cluster has finished (4.1).
 - R62. `[LAB]` `POST /anthropic/v1/messages/count_tokens` answers 422 on the entry path.
-  Claude Code finished a session without it. `[UPSTREAM]` vLLM v0.30.0 serves
+  Claude Code finished a session without it. `[UPSTREAM]` vLLM v0.29.0 serves
   `/v1/messages` and `/v1/messages/count_tokens` itself
   (`vllm/entrypoints/anthropic/api_router.py:51-101`). A gateway patch for it should
   report no usage, or a count is charged to the quota.
@@ -751,7 +762,7 @@ detector, and what the TTL is against the entry route's retry.
 
 - R94. `[FILE]` The key policy sets `sanitize: true` and `forwardClientIDHeader`
   (aigw-ui `internal/render/auth.go:39-48`). The header strip list is in
-  `charts/envoy-ai-gateway/templates/gateway.yaml:189`.
+  `charts/envoy-ai-gateway/templates/gateway.yaml:189-193`.
 - R95. `[FILE]` The peer listener checks only `caCertificateRefs`
   (`charts/envoy-ai-gateway/templates/peers.yaml:98-99`; live policy `peers`). Any
   certificate signed by the fleet CA is accepted. The CRD also offers `subjectAltNames`
@@ -840,9 +851,10 @@ name the upstream piece that could do it, or write the feature request.
 `charts/llm-model` (R84).
 
 **Benchmark findings nobody has acted on** (inputs for `01-GAPS.md`, not conclusions):
-repeated prompts were slower than fresh ones on GLM; the live GLM scheduler weighs
-`prefix-cache-scorer` 3, the same as `active-request-scorer`, while the chart in the
-export has 1. `[UPSTREAM]` The `approx-prefix-cache-producer` guesses which endpoint
+repeated prompts were slower than fresh ones on GLM. In the snapshot the GLM scheduler
+weighs `prefix-cache-scorer` 3, the same as `active-request-scorer`; the chart in the
+export has 1, and since 2026-10-13 so does the real platform (R124, R127).
+`[UPSTREAM]` The `approx-prefix-cache-producer` guesses which endpoint
 holds a prefix from what the EPP sent there (`autoTune` true, block size at least 64
 tokens, `lruCapacityPerServer` 31250, matches at most 131072 tokens). A
 `precise-prefix-cache-producer` that reads the model server's real cache events exists
@@ -852,6 +864,99 @@ causes to separate: the approximate producer sends the next turn to another rank
 the one that holds the prefix, or fetching from LMCache is slower than computing again
 at this chunk size. The test: one conversation at concurrency 1, with the prefix scorer
 on and off, and with LMCache on and off.
+
+**Settings changed on 2026-10-13, after the snapshot.**
+
+- R124. `[OWNER]` 2026-10-13. Three values of the GLM deployment changed together:
+  `--gpu-memory-utilization=0.92` (snapshot: 0.85), `prefix-cache-scorer` weight 1
+  (snapshot: 3) and a new argument, `--long-prefill-token-threshold=8192`. The model
+  runs with them, and a benchmark was running when this was written. `[FILE]`
+  `charts/glm53-bundled/values.yaml` has the three values since that day (`:266`,
+  `:284`, the weight at `:234`); `live-cluster/` does not, so do not quote it for them.
+  In its other arguments that chart is still not the deployed branch. The owner named
+  no other change, so those are the snapshot's (`--max-num-batched-tokens=32768`,
+  `--max-num-seqs=512`, two pods of 8 ranks) until a file says otherwise.
+- R125. `[UPSTREAM]` What the new argument does in vLLM v0.29.0: in one engine step a
+  request gets at most that many prompt tokens
+  (`vllm/v1/core/sched/scheduler.py:590-591`; the default 0 means no cap,
+  `vllm/config/scheduler.py:70-72`). The total of a step stays
+  `--max-num-batched-tokens`. `[COMPUTED]` With 32768 per step and a cap of 8192, up to
+  four long prompts on one rank move forward together, where before the first one took
+  the whole step. A long prompt that is alone on its rank gets 8192 per step, so a
+  100,000-token prompt needs 13 steps instead of 4. `[FILE]` The owner measured the
+  8192-per-step case on 2026-10-04, when 8192 was the total of a step: 100k-token
+  prompts had a median time to first token of 22.8 s, and the total was raised for that
+  reason (`charts/glm53-bundled/values.yaml:269-275`; the other arguments of that day
+  are not the ones that run now). So expect that short prompts wait less behind long
+  ones, and that a long prompt on a quiet rank starts later. `[NOT TESTED]` on the
+  build that runs.
+- R126. `[FILE]` The record on the GPU memory share. 0.93 crash-looped at engine start
+  with CUDA out of memory on 2026-10-04, at a step total of 16384
+  (`charts/glm53-bundled/values.yaml:257-265`). The rollout history of 2026-10-12 shows
+  0.96 at 10:05 and 10:14, 0.95 at 10:26 and 10:31, 0.90 at 12:04, then 0.85 from 13:39
+  on, together with `--max-num-seqs=512` and a step total of 32768
+  (`live-cluster/ns-llm-glm53/replicasets_apps.yaml`; it does not say why a value was
+  replaced). 0.92 starts (R124), so a failure at start is not the risk. Not known:
+  whether it holds at peak, with full steps on long contexts. Running out of memory
+  there stops a pod, which is 8 ranks and half of a site's GLM, and with `maxSurge: 0`
+  nothing takes its place while it loads again. What 0.92 buys is more KV cache on the
+  GPU. Whether that cache is what limits the platform is a question for
+  `vllm:kv_cache_usage_perc` and `vllm:num_preemptions` (R24) under the benchmark.
+- R127. `[UPSTREAM]` How the scheduler (v0.10.0) uses the weights. The total of an
+  endpoint is the sum of weight times score, each score between 0 and 1, and the
+  highest total is picked (`pkg/epp/scheduling/scheduler_profile.go:204-212`).
+  `active-request-scorer`: an endpoint with no running request scores 1; a busy one
+  scores `(max - count) / max`, where `max` is the count on the busiest endpoint, so
+  the busiest always scores 0
+  (`pkg/epp/framework/plugins/scheduling/scorer/activerequest/active_request.go:154-186`).
+  `prefix-cache-scorer`: matched blocks divided by the blocks of the prompt
+  (`.../scorer/prefix/plugin.go:157-166`). `token-load-scorer`: 1 minus the in-flight
+  tokens divided by 4,194,304, so one 100k-token request moves it by 0.024
+  (`.../scorer/tokenload/token_load.go:34,116-123`). The weights of these two load
+  scorers are 3 and 1. `[COMPUTED]` A conversation stays on the rank that holds its
+  prefix while 3 times the difference in the active score is less than the prefix
+  weight times the match. With weight 3 it stayed in almost every case; it left when
+  its rank was the busiest while another rank was idle. With weight 1 it leaves when
+  another rank's active score is about a third higher. Two cases with the busiest rank
+  at 4 requests: home at 3 and another at 2 is a difference of 0.25, and it stays under
+  both weights; home at 4 and another at 2 is a difference of 0.5, and it stayed with
+  weight 3 and leaves with weight 1.
+- R128. What R124 means for the open finding above. The weight change tests one of its
+  two candidate causes and makes the other worse. If repeated prompts were slow because
+  they queued on the rank that held the prefix, weight 1 helps. If they were slow
+  because a fetch from LMCache costs more than computing again, weight 1 sends more
+  turns to a rank without the prefix, so more of them take that path, and R125 makes
+  the prefill on such a rank slower when the rank is quiet. The three values went in
+  together, so a benchmark after the change cannot say which one moved a number. To
+  read one, compare before and after, per rank: `vllm:prefix_cache_hits /
+  vllm:prefix_cache_queries` (the cache on the GPU), `vllm:external_prefix_cache_hits /
+  vllm:external_prefix_cache_queries` (the cache behind the KV connector, here
+  LMCache), `vllm:request_prefill_time_seconds`, and the time to first token of
+  repeated against fresh prompts. A lower hit rate on the GPU with slower repeated
+  prompts points at the weight. A slower single long prompt with the same hit rate
+  points at R125. This is input for `01-GAPS.md` and for the tuning work; it is not a
+  gateway finding.
+- R129. `[OWNER]` 2026-10-13, `[FILE]`
+  `charts/envoy-ai-gateway/templates/gateway.yaml:58-92` and
+  `gateway.envoyProxy.accessLog.enabled: true` in that chart's `values.yaml:254-255`.
+  The gateway writes its own JSON log format, not Envoy Gateway's default, and the
+  format has two new fields: `request_tx_duration` and `response_duration`. The
+  field names are not the default ones, which the lab had: the request id is
+  `request_id` (default: `x-request-id`), and there is no `upstream_local_address`,
+  `x-forwarded-for`, `downstream_remote_address` or
+  `upstream_transport_failure_reason`. So a line no longer has the client's address
+  or the reason a connection to a peer failed. T1 in section 12 and its script read
+  both formats.
+- R130. `[OWNER]` 2026-10-13, `[FILE]` the site values of `envoy-ai`
+  (`gitops/app-of-apps/sites/site-a/prep/mces/cluster-mce-prep/cluster-llm-prep/envoy-ai/values.yaml`):
+  `ai-gateway.controller.quotaRateLimitTimeout: 1`. `[UPSTREAM]` The flag is whole
+  seconds, an int64 (`cmd/controller/main.go:280`), and becomes the timeout of the
+  rate limit filter (`internal/extensionserver/quota_ratelimit.go:261`). So a rate
+  limit service that hangs holds a request for 1 second, not 5 (R32), and then lets
+  it through uncounted: during a slow period the fail-open of R105 comes sooner and
+  for more requests, still with no alert (T3). The value is in the site layer, so
+  another site keeps 5 unless its own values say otherwise. By constraint 9 its place
+  is `gitops/app-of-apps/operators/envoy-ai/values.yaml`.
 
 ---
 
@@ -1020,12 +1125,17 @@ What the gateway's log can tell. `[LAB]`, on the same gateway versions:
 
 - Every request writes two lines in the proxy's log: one for the entry route
   (`route_name` contains `fleet-<slug>`) and one for the peer route (`<model>-peer`).
-  Both carry the same `x-request-id`. That is the join key.
-- Useful fields: `start_time`, `duration` (ms, the whole request, the stream included),
-  `bytes_received` (the size of the request body), `response_code`, `response_flags`,
-  `upstream_host`, `upstream_local_address`.
-- `x-envoy-upstream-service-time` is in the format and is empty. So the log does not
-  split the peer hop from the model server.
+  Both carry the same request id. That is the join key. Its field is `request_id` in
+  the gateway chart's own format, which the real platform writes since 2026-10-13
+  (R129), and `x-request-id` in Envoy Gateway's default format, which the lab had.
+- Useful fields in both formats: `start_time`, `duration` (ms, the whole request, the
+  stream included), `bytes_received` (the size of the request body), `response_code`,
+  `response_flags`, `upstream_host`. Only the default format has
+  `upstream_local_address`. Only the chart's format has `request_tx_duration` and
+  `response_duration`.
+- `x-envoy-upstream-service-time` is in the default format and is empty. So the
+  default format does not split the peer hop from the model server. The chart's
+  format does.
 - On the lab, for a request with an 80-byte body, the peer line started 19 ms after the
   entry line, and the entry line's `duration` was 20 ms longer than the peer line's.
 
@@ -1036,42 +1146,64 @@ A = peer.start_time - entry.start_time    time at the entry before the request r
                                            peer listener: body upload, key check, body parse,
                                            quota check, connection to the peer
 R = entry.duration - peer.duration - A     what the entry adds on the way back
-P = peer.duration                          peer listener + scheduler + model server; the log
-                                           does not split these
+P = peer.duration                          peer listener + scheduler + model server
+
+and on each line of the chart's format (R129):
+tx   = request_tx_duration                 from the start until the request is fully sent
+                                           upstream: body upload, this proxy's own work,
+                                           the connection
+wait = response_duration - tx              what the upstream took to send its first byte
 ```
+
+On the peer line, `tx` holds the second parse of the body and the scheduler's pick, and
+`wait` is the model server's time to first byte. On the entry line, `tx` holds the key
+check, the body parse and the first quota call, and `wait` is the whole peer hop. Both
+are durations on one clock, so they also hold for a request that crossed sites.
 
 Take the median and the 90th percentile of A and R in three groups of
 `bytes_received`: under 10 KB, 10 KB to 300 KB, over 300 KB. The proxy may run as
 several pods and a request's two lines can be in two of them, so read all pods
 together. A cross-site request has its two lines in two clusters with two clocks: use
-`duration` only there. This script does the join; it was run on the lab's lines:
+`duration`, `tx` and `wait` there, not A and R. This script does the join and reads both
+formats. `[LAB]` It was run on the lab's lines, which are in the default format.
+`[NOT TESTED]` Its part for the chart's format ran on made-up lines only:
 
 ```python
 # usage: <the proxy pods' logs, all pods together> | python3 hops.py
 import sys, json, datetime, collections
 def ms(s): return datetime.datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp() * 1000
+def num(r, k):
+    try: return float(r.get(k))
+    except (TypeError, ValueError): return None
 pairs = collections.defaultdict(dict)
 for line in sys.stdin:
     if not line.startswith("{"): continue
     try: r = json.loads(line)
     except ValueError: continue
-    if r.get("response_code") != 200 or not r.get("x-request-id"): continue
+    rid = r.get("request_id") or r.get("x-request-id")   # the chart's format, or the default
+    if str(r.get("response_code")) != "200" or not rid: continue
     route = r.get("route_name") or ""
     side = "entry" if ("/fleet-" in route or "/fleetbe-" in route) else ("peer" if "-peer/" in route else None)
-    if side: pairs[r["x-request-id"]][side] = r
-groups = collections.defaultdict(lambda: {"A": [], "R": []})
+    if side: pairs[rid][side] = r
+names = ["A", "R", "entry_tx", "entry_wait", "peer_tx", "peer_wait"]
+groups = collections.defaultdict(lambda: {n: [] for n in names})
 for p in pairs.values():
     if len(p) != 2: continue
     e, q = p["entry"], p["peer"]
     a = ms(q["start_time"]) - ms(e["start_time"])
-    size = e.get("bytes_received") or 0
+    size = num(e, "bytes_received") or 0
     g = "under 10 KB" if size < 10_000 else ("10-300 KB" if size < 300_000 else "over 300 KB")
-    key = (e["route_name"].split("/")[2], g)
-    groups[key]["A"].append(a); groups[key]["R"].append(e["duration"] - q["duration"] - a)
+    v = groups[(e["route_name"].split("/")[2], g)]
+    v["A"].append(a); v["R"].append(num(e, "duration") - num(q, "duration") - a)
+    for side, r in (("entry", e), ("peer", q)):
+        tx, rd = num(r, "request_tx_duration"), num(r, "response_duration")
+        if tx is not None and rd is not None:
+            v[side + "_tx"].append(tx); v[side + "_wait"].append(rd - tx)
 pct = lambda x, f: sorted(x)[min(len(x) - 1, int(len(x) * f))]
 for (route, g), v in sorted(groups.items()):
-    print("%-28s %-12s n=%-5d A p50=%.0f p90=%.0f ms   R p50=%.0f p90=%.0f ms" % (
-        route, g, len(v["A"]), pct(v["A"], .5), pct(v["A"], .9), pct(v["R"], .5), pct(v["R"], .9)))
+    print("%-28s %-12s n=%d" % (route, g, len(v["A"])))
+    for n in names:
+        if v[n]: print("    %-11s p50=%.0f p90=%.0f ms" % (n, pct(v[n], .5), pct(v[n], .9)))
 ```
 
 Then four numbers that are not per request:
@@ -1084,12 +1216,16 @@ Then four numbers that are not per request:
 | C: time to first token as the client saw it | The benchmark report. Ask the owner for it if you do not have it |
 
 `B = C - A - V` estimates the peer hop and the scheduler together. Compare it with S.
+With the chart's format the split is in the log itself: `peer_tx` is the peer listener
+and the scheduler, `peer_wait` is the model server, `entry_tx` is the entry before the
+request leaves. Then B is a cross-check only, and where the table below says "B large"
+read `peer_tx` for the scheduler rows and `peer_wait` for the model server row.
 
 What to do with each result:
 
 | Result | It means | Do |
 |---|---|---|
-| A is most of the floor, and about the same for small and large bodies | A fixed cost at the entry | Compare with Q. If Q is close to A, it is the quota call, which crosses to the hub's Redis: a finding in Area 3, ranked against `TARGETS`, and it decides the quota topology ADR. If Q is small, look at connection reuse to the peer: does the port in `upstream_local_address` of entry lines repeat across requests? All different means a new TLS connection per request; that is a finding in Area 8 |
+| A is most of the floor, and about the same for small and large bodies | A fixed cost at the entry | Compare with Q. If Q is close to A, it is the quota call, which crosses to the hub's Redis: a finding in Area 3, ranked against `TARGETS`, and it decides the quota topology ADR. If Q is small, look at connection reuse to the peer: does the port in `upstream_local_address` of entry lines repeat across requests? All different means a new TLS connection per request; that is a finding in Area 8. The chart's format does not have this field (R129): then write the check as an open question with the one line the format needs |
 | A grows with the body size | Upload and parsing of the body | Work out the ms per 100 KB. The lab measured about 2.4 ms more for 100 KB than for 2 KB on one hop (R65). Near that: not a finding. Far above: a finding in Area 8, and the open point of R65 (1 MB bodies) becomes the first experiment |
 | A and R small, B large, S large | The scheduler | Read `plugin_duration_seconds` per plugin. The prefix producer hashes up to 131072 tokens of a prompt (section 7), so long prompts cost CPU there; check the scheduler's CPU limit. A finding in Area 9 or Area 1. The fix is values, not code |
 | A and R small, B large, S small | The peer listener: the second parse of the body, or the connection to the model server | A finding in Area 8. It is the cost of the extra hop that R65 did not measure for large bodies |
@@ -1097,14 +1233,16 @@ What to do with each result:
 | A + R + B + V is far below C | Outside the platform: a client that opens a connection per request, DNS, the load balancer in front, or how the benchmark defines the first token (a thinking model's first content token comes after its thinking) | Not a platform finding. Write in `04-OPEN-QUESTIONS.md` how the benchmark should measure: reuse connections, run once from inside the cluster, state which event counts as the first token |
 | The numbers cannot be had (no access, the log is too short, metrics are not scraped) | Unknown | An open question with the commands for the owner, and the roadmap candidate below |
 
-Whatever the result, one roadmap candidate follows: today the log cannot split the
-hops. `[UPSTREAM]` Envoy 1.39.1 has the log fields `%REQUEST_TX_DURATION%` (from the
-start until the request is fully sent upstream) and `%RESPONSE_DURATION%` (from the
-start until the first byte from upstream). `[FILE]` Envoy Gateway takes a custom JSON
-log format in `EnvoyProxy.spec.telemetry.accessLog.settings[].format.json` (CRD
-`gateway.envoyproxy.io_envoyproxies.yaml` in the vendored chart). With both fields on
-both lines, every hop is split for every request. It is a value in the gateway chart,
-the same for every site. `[NOT TESTED]`.
+What was a roadmap candidate here is done: since 2026-10-13 the gateway chart writes
+both fields (R129). `[UPSTREAM]` In Envoy 1.39.1 `%REQUEST_TX_DURATION%` is the time
+from the start until the request is fully sent upstream, and `%RESPONSE_DURATION%` the
+time from the start until the first byte from upstream. What is left as a candidate
+is three more fields in the same format. `%REQUEST_DURATION%` (from the start until
+the request is fully received from the client) takes a slow upload out of `tx`.
+`%UPSTREAM_LOCAL_ADDRESS%` brings back the connection check of the first row.
+`%UPSTREAM_TRANSPORT_FAILURE_REASON%` says why a connection to a peer failed. Each is
+one line in `charts/envoy-ai-gateway/templates/gateway.yaml`, the same for every site.
+`[NOT TESTED]`.
 
 ### T2. A plan for the gateway patches (R110)
 
