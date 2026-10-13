@@ -117,7 +117,14 @@ last section). Steps 4 to 6 belong in one maintenance window.
 
 Each one is a client that has to change before step 6.
 
-**1. aigw-ui at commit `5b9c089` or later, then sync.**
+**1. aigw-ui built from `main` at `978d2be` or later, then sync.**
+The version number does not say whether a build has it: the chart reads
+0.12.2 before and after, and `deploy/offline/build-bundle.sh` tags the
+image `0.12.2` whatever commit it builds. The image CI built from that
+commit is `ghcr.io/roiblum1/aigw-ui:sha-978d2be46ccd`. It carries the
+health check fix (`5b9c089`) and two changes step 5 needs: a quota on a
+model that is served from a pool only (`10e233d`), and the self-test of
+such a model (`afbbed4`).
 Check: `BackendTrafficPolicy fleet-glm-5-3` shows `panicThreshold: 1` and
 a health check `interval: 3s`. No model restarts.
 Way back: the previous aigw-ui image.
@@ -204,6 +211,15 @@ that has the same route shape:
   `count_tokens` call.
 - **KServe's route on the peer listener**: `sectionName: peers` in the
   LLMInferenceService gave a KServe route on that listener only.
+- **A tenant key and its quota on the entry path**, with the lab
+  registered in an aigw-ui hub of the build in step 1 and a model that
+  is served from a pool only. Without a key or with a wrong one the
+  answer was 401 in both protocols. With a quota of 300 tokens a minute,
+  requests on `/v1/chat/completions` and `/anthropic/v1/messages` were
+  answered and counted in one counter on the entry backend, the next
+  ones were refused with 429 at the entry route, and the first request
+  of the next minute was answered. A request that named another tenant
+  in `x-aigw-client-id` was refused like the others.
 - **The 503 storm**, see below.
 
 On this repo:
@@ -221,8 +237,9 @@ Not tested:
 
 - Anything on the real cluster, and GLM-5.3 itself.
 - These three charts installed on a cluster.
-- A real tenant key and its quota counter on the new path, and the hub
-  moving a quota from a direct backend to an entry route (step 5).
+- The hub moving a quota from a direct backend to an entry route
+  (step 5). The lab's model had its entry route already.
+- aigw-ui's self-test on the new path.
 - Whether changing the KServe route's listener restarts the model pods.
   It is a router setting and should not; try it on the judge first.
 
