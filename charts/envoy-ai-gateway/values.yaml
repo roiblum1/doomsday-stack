@@ -247,8 +247,12 @@ gateway:
     # One JSON line per request with what is needed to follow a request from
     # the site a client entered to the site that served it. Off keeps Envoy
     # Gateway's default log.
+    # Two fields split a hop: request_tx_duration is the time from the start
+    # until the request is fully sent upstream, response_duration the time
+    # from the start until the first byte comes back. Their difference is
+    # what the upstream took to start answering.
     accessLog:
-      enabled: false
+      enabled: true
     resources:
       requests:
         cpu: 100m

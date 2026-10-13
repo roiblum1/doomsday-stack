@@ -71,6 +71,8 @@ spec:
               response_flags: "%RESPONSE_FLAGS%"
               response_code_details: "%RESPONSE_CODE_DETAILS%"
               duration: "%DURATION%"
+              request_tx_duration: "%REQUEST_TX_DURATION%"
+              response_duration: "%RESPONSE_DURATION%"
               bytes_received: "%BYTES_RECEIVED%"
               bytes_sent: "%BYTES_SENT%"
               upstream_host: "%UPSTREAM_HOST%"

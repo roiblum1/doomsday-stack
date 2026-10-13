@@ -254,12 +254,16 @@ llmisvc:
     - --all2all-backend=allgather_reducescatter
     # --- memory / KV ---
     - --kv-cache-dtype=fp8_e4m3
-    # KEEP AT 0.90 with --max-num-batched-tokens=16384: 0.93 was tried on
-    # 2026-10-04 and crash-looped at engine init with CUDA OOM -- the bigger
-    # chunk budget needs more activation/graph-capture headroom than 0.93
-    # leaves (only ~6.75 GiB free per GPU, a later +8 GiB alloc failed).
-    # The KV headroom goal is covered by kvCacheOffloading below instead.
-    - --gpu-memory-utilization=0.90
+    # 0.92 since 2026-10-13: it starts and serves on the deployed branch
+    # (`bundled`, vLLM 0.29 from the LMCache 0.5.5 image, step budget 32768).
+    # Not proven there yet: peak load with full steps on long contexts.
+    # Do not go higher without a test: 0.93 was tried on 2026-10-04 with
+    # --max-num-batched-tokens=16384 and crash-looped at engine init with
+    # CUDA OOM -- the bigger chunk budget needs more activation/graph-capture
+    # headroom than 0.93 leaves (only ~6.75 GiB free per GPU, a later +8 GiB
+    # alloc failed). 0.95 and 0.96 were each replaced within minutes on
+    # 2026-10-12.
+    - --gpu-memory-utilization=0.92
     - --max-model-len=262144
     - --max-num-seqs=64            # per DP rank -> 512 per node
     # Chunked-prefill budget per engine step. 8192 (vLLM default) forced a
@@ -270,6 +274,14 @@ llmisvc:
     # prompts measured p50 22.8s / aggregate 52.8k tok/s at 8192 (aiperf
     # 2026-10-04, /tmp/aiperf-ext-100k-v3). Try 32768 next if this helps.
     - --max-num-batched-tokens=16384
+    # Caps the prompt tokens ONE request gets per engine step (0, vLLM's
+    # default, is no cap). The step total stays --max-num-batched-tokens, so
+    # several long prompts on a rank advance side by side and a short prompt
+    # no longer waits behind a long one. The price: a long prompt that is
+    # alone on its rank is back at 8192 per step, the regime measured above
+    # (p50 22.8s to first token for 100k prompts). Added 2026-10-13 on the
+    # deployed branch.
+    - --long-prefill-token-threshold=8192
     - --enable-prefix-caching
     # --- observability ---
     # summary (not detailed): detailed appends unbounded per-step accepted/

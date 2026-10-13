@@ -15,6 +15,12 @@
 # the live data-plane pods are still assigned it and the controller needs
 # `use` on it to patch extproc-config-hash. The service stays a LoadBalancer
 # with client source IPs preserved.
+ai-gateway:
+  controller:
+    # Seconds a request waits for the quota rate limit service before it is
+    # let through uncounted (the gateway fails open). Whole seconds only;
+    # the chart's default is 5.
+    quotaRateLimitTimeout: 1
 gateway:
   envoyProxy:
     # 3 data-plane replicas: the chart default is 1, but the LoadBalancer
