@@ -102,6 +102,38 @@ README, with names substituted. Key points:
   (`lvremove vg1/llm-models vg1/llm-cache vg1/llm-l2`, drop the fstab
   lines) is the full wipe.
 
+## Flow control (off by default)
+
+`llmisvc.flowControl.enabled=true` turns on queueing in the scheduler. The
+template adds the `flowControl` feature gate, the `concurrency-detector`,
+`round-robin-fairness-policy` + `fcfs-ordering-policy` and a `flowControl`
+section to `llmisvc.scheduler.config.inline`; the scoring profile stays as it
+is. Requests then wait in the scheduler when the endpoints are full, are
+released by class (`InferenceObjective` priority; aigw-ui's `best-effort` is
+-1), and within a class tenant by tenant (`x-llm-d-inference-fairness-id`).
+Off, the render is unchanged.
+
+- `maxConcurrency` counts **per endpoint**, each InferencePool `targetPort`:
+  here one per pod (8000; vLLM balances its DP ranks behind one API
+  server). The pod runs `--max-num-seqs=32`. Keep it at or below `--max-num-seqs` per endpoint, or vLLM
+  queues first come first served and neither classes nor turns reach it.
+  Size it from aigw-ui's capacity measurement. No default: the render fails
+  without it when flow control is on.
+- `requestTTL: 300s`, `fairnessPolicy: round-robin-fairness-policy`,
+  `negativeBandMaxRequests`, `enableEviction`: as in `charts/llm-model`
+  0.2.0 (see its README for the lab result).
+- Needs a gateway with agent-router#2595 (patch 0003 of the
+  `v1.2.0-patched` images).
+- Turning it on rewrites the scheduler config, which restarts the scheduler,
+  and aigw-ui then marks the model's capacity measurement stale.
+
+        --set llmisvc.flowControl.enabled=true --set llmisvc.flowControl.maxConcurrency=<per pod>
+
+Checked without a cluster: the render with flow control off is unchanged;
+the on renders load through llm-d router v0.11.0's config loader with the
+existing plugins and each priority band on the intended policy, and pass a
+copy of aigw-ui's fairness check. Not tested on this model.
+
 ## Gotchas found while bringing this up (all verified live)
 
 - **`chunkSize` must be a multiple of 784**: `Qwen3_5`'s hybrid

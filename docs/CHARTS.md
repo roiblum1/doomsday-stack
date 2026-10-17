@@ -9,7 +9,7 @@ cluster/site vocabulary are defined in `GITOPS.md` §0. Registry prefixes are no
 | Chart | Version | Source dir (`charts/…`) | Deploys | Target namespace(s) |
 |---|---|---|---|---|
 | `glm53-bundled` | 0.1.0 (appVersion `glm-5.3`) | `glm53-bundled/` | GLM-5.3 serving bundle: storage prep, model pull, vLLM LLMInferenceService, gateway route | `llm-glm53` |
-| `qwen38-bundled` | 0.2.6 | `qwen38-bundled/` | Qwen3.8-27B-FP8 bundle incl. LMCacheEngine CR | `llm-qwen38` |
+| `qwen38-bundled` | 0.2.7 | `qwen38-bundled/` | Qwen3.8-27B-FP8 bundle incl. LMCacheEngine CR | `llm-qwen38` |
 | `qwen36-judge` | 0.2.2 | `qwen36-judge/` | judge model + OpenAI-quota route | `llm-judge` |
 | `generic-model` | 0.1.0 | `generic-model/` | unified model chart that supersedes the three above | any (values) |
 | `llm-model` | 0.1.0 | `llm-model/` | gateway-side objects for a model served by another chart | model's namespace |
@@ -54,6 +54,7 @@ template-by-template walk in §4.
 | storage | node-prep LVs `llm-models` 1200G + `llm-cache` 300G from VG `vg1`; static PVs 1200Gi/300Gi with nodeAffinity spanning both nodes; PVCs pinned via `volumeName` |
 | images | `vllm/vllm-openai:v0.30.0`, `s5cmd:v2.3.0` (registry-internal mirrors); storage-initializer comes from the kserve preset |
 | EPP scheduler | service `glm53-b200-epp-service:9002`; plugins single-profile-handler, approx-prefix-cache-producer, inflight-load-producer, prefix-cache-scorer, active-request-scorer, token-load-scorer, max-score-picker; scheduling profile weights: active-request-scorer **3**, token-load-scorer 1, prefix-cache-scorer 1 |
+| Flow control | `llmisvc.flowControl`, off: with `enabled=true` the template adds the feature gate, `concurrency-detector` (`maxConcurrency` required, **per rank endpoint**, ≤ `--max-num-seqs=64`), `requestTTL` 300s and `round-robin-fairness-policy` on the default (and negative) band to the profile above. Same block in `qwen38-bundled` |
 | InferencePool | selector on kserve workload labels, `targetPorts` 8000–8007 (one endpoint per pod-rank) |
 
 **Design choices** (each documented in the chart's README/values comments):
@@ -79,7 +80,7 @@ template-by-template walk in §4.
 - `s3Secret.create: false` — S3 credentials Secret is pre-created out-of-band.
 - `aiperf` benchmark Job disabled by default (token-level tuning knobs in values).
 
-### 2.2 `qwen38-bundled` 0.2.6 — Qwen3.8-27B-FP8 with LMCache
+### 2.2 `qwen38-bundled` 0.2.7 — Qwen3.8-27B-FP8 with LMCache
 
 Renders into `llm-qwen38`: namespace, SA, SCC (`qwen38-model-serving`), s3-secret,
 node-prep, local-storage, pull-jobs, `LLMInferenceService` `qwen38-l4`, `LMCacheEngine`
@@ -97,6 +98,7 @@ node-prep, local-storage, pull-jobs, `LLMInferenceService` `qwen38-l4`, `LMCache
 | LMCacheEngine | CR `qwen38-cache` (= CR + Service + `-metrics` job), engine image tag-for-tag with the model pod (both sides of the ZMQ/CUDA-IPC protocol must match), server ZMQ 5555 / http 8080 |
 | L1 tier | pinned RAM 200 GiB per node (pod request 205Gi / limit 307Gi), LRU eviction, watermark 0.8, ratio 0.2 |
 | L2 tier | 900 GiB capacity cap on a dedicated 1000Gi local-static PVC (`qwen38-cache-l2`, subdir `lmcache-l2`, backed by node-prep LV `vg1/llm-l2`), `shardDirs: true`, `persist: true`, LRU 0.9/0.1 |
+| flow control | `llmisvc.flowControl`, off; as in glm53 (one endpoint per pod here, `--max-num-seqs=32`) |
 | chunkSize | 1600 — TP4+MTP block alignment demanded by the connector (v0.2.5 crash note); changing it invalidates existing L2 chunk keys |
 | routing | `isolatedIPC: true` (driver-level CUDA IPC; no hostIPC), `priorityClassName: openshift-user-critical` |
 
@@ -451,7 +453,9 @@ ARTIFACTS/SUMMARY blocks for capture into CI logs.
 
 ### 4.12 `_helpers.tpl`
 
-Labels/name helpers (`glm53.fullname`, `glm53.labels`, selector labels) — standard.
+Labels/name helpers (`glm53.fullname`, `glm53.labels`, selector labels) — standard — and
+`glm53.schedulerWithFlowControl`, the scheduler block with flow control added when
+`llmisvc.flowControl.enabled` (mirrored as `qwen38.schedulerWithFlowControl`).
 
 **Resulting object set** (~29 objects, per the verification table in
 `generic-model/README.md`): 1 namespace, 1 SA, 1 SCC + Role + RoleBinding, 1 optional
