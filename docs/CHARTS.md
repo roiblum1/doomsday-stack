@@ -39,7 +39,7 @@ Registered by `operators/glm53` (chart repo pinned to branch `bundled`). Renders
 (per the verification table in `generic-model/README.md`) into `llm-glm53`. Full
 template-by-template walk in §4.
 
-**Key values** (`glm53-bundled/values.yaml`, 401 lines):
+**Key values** (`glm53-bundled/values.yaml`, 508 lines):
 
 | Concern | Value |
 |---|---|
@@ -47,6 +47,7 @@ template-by-template walk in §4.
 | replicas | 2 (one pod per B200 node; `nodes: [gpu-node-1, gpu-node-2]`) |
 | parallelism | DP8 × EP8: `--data-parallel-size=8 --data-parallel-size-local=8 --data-parallel-multi-port-external-lb --data-parallel-supervisor-port=8208 --enable-expert-parallel --all2all-backend=allgather_reducescatter` |
 | vLLM memory | `--kv-cache-dtype=fp8_e4m3 --gpu-memory-utilization=0.90 --max-model-len=262144 --max-num-seqs=64 --max-num-batched-tokens=16384 --enable-prefix-caching` |
+| gateway billing | `--enable-prompt-tokens-details --enable-force-include-usage`: cached prompt tokens and usage on streamed answers, for cached prices and aigw-ui's token counts (the live service had both; this copy of the chart lacked them until 2026-10-18) |
 | speculative decode | MTP: `--speculative-config.method=mtp --speculative-config.num_speculative_tokens=5`, parsers `glm47` |
 | per-pod resources | 8 × `nvidia.com/gpu`, CPU 96→192, memory 512Gi→2000Gi, `hugepages-1Gi: 16Gi`, dshm 600Gi |
 | placement | `runtimeClassName: performance-gpu-hpc-performanceprofile-extras-b200`, `maxSurge: 0` (no free GPUs for a surge pod) |
@@ -206,13 +207,14 @@ Thin OpenShift wrapper that adds the deployment-specific pieces around the **ups
 `ai-gateway-helm` v1.2.0** dependency (Chart.lock; the tgz is extracted in
 `upstream-subcharts/ai-gateway-helm-v1.2.0/`). Own templates: `gateway.yaml` (GatewayClass
 `envoy-ai-gateway-class`, `Gateway/envoy-ai-gateway`, EnvoyGateway, routes, ClientTrafficPolicy),
-`ratelimit.yaml` (ratelimit Deployment + Service + Redis-client Secret + PDB ≥2 replicas),
+`ratelimit.yaml` (ratelimit Deployment, 1 replica and no PDB, + Service + Redis-client Secret),
 `peers.yaml` (peers mTLS listener + certificate), `route.yaml`, `health.yaml`,
 `scc-rolebinding.yaml` (dataplane SCC), `_validate.tpl` (render-time guards).
 
-**Key values** (`envoy-ai-gateway/values.yaml`, 462 lines):
+**Key values** (`envoy-ai-gateway/values.yaml`, 493 lines):
 
-- Waves: CRDs -10 → SCC -5 → controller 0 → EnvoyGateway 1 → Gateway 2 → routes 3 → ratelimit 5.
+- Waves (`argocd.syncWave`): CRDs -10 → SCC -5 → controller, EnvoyProxy and ratelimit 0 → GatewayClass 1 →
+  Gateway, ClientTrafficPolicy (and the optional GatewayConfig) 2 → Route 3.
 - Images: controller/extproc default to upstream `docker.io/envoyproxy/ai-gateway-*`
   (`tag: ""` → appVersion v1.2.0); the **values repo pins a patched build**
   `v1.2.0-patched.1` (controller and extproc from one commit, else they reject each other's
@@ -220,7 +222,17 @@ Thin OpenShift wrapper that adds the deployment-specific pieces around the **ups
   `envoyproxy/ratelimit:0482748e`.
 - Data plane: `envoy:distroless-v1.39.1` digest-pinned (`…@sha256:eb2c01c13125d1629637cb4e4cce7207009fb7cc2c8027f9742758549d15b6f4`)
   so the mirror holds the exact Docker Hub bits.
-- ClientTrafficPolicy `bufferLimit: 50Mi` (upstream basic-usage value, kept).
+- ClientTrafficPolicy `bufferLimit: 50Mi` (upstream basic-usage value, kept). On the client
+  listener it removes a client's own copy of the scheduler and gateway headers by name
+  (`removeRequestHeaders`, `x-llm-d-inference-fairness-id` among them) and, since 2026-10-18,
+  every header starting with `x-aigw-` (`removeRequestHeaderPrefixes` →
+  `earlyRequestHeaders.removeOnMatch`): the tenant, key, client ID, budget and per-model amount
+  headers aigw-ui's token check writes (aigw-ui `docs/security.md`, "Defense in depth"). The
+  peer listener's policy removes none of them.
+- `gateway.gatewayConfig` (off): a `GatewayConfig` with `globalLLMRequestCosts`
+  `aigw_ui_input`/`aigw_ui_cached`/`aigw_ui_output`, named on the Gateway, so a route aigw-ui
+  does not render or mark still writes token counts (aigw-ui 0.30). Not needed while every
+  model is served behind the entry route.
 - Gateway listeners: `http` :80 with `allowedRoutes.from: All`; optional `peers` :8443 mTLS
   (Terminate, Secret `llm-peer-server`, allowedRoutes selector `aigw-ui.io/serving: "true"`)
   — **default off** in the archived values; the live cluster runs it (GITOPS.md §4.4).
@@ -266,6 +278,15 @@ Thin wrapper around **upstream `gateway-helm` v1.9.1** (extracted to
   helpers split image refs at the first `/` and prepend `imageRegistry`, so mirror paths must
   be given either as `imageRegistry` + upstream-shaped refs or as full refs — never both.
 - `deployment.replicas: 1`, resources 256Mi/1024Mi.
+- Global rate limiting (`config.envoyGateway.rateLimit`) is not in the chart: the Redis is a
+  site value. `cluster-llm-prep`'s site layer sets it since 2026-10-18 (the shared Redis,
+  `timeout: 1s`, TLS, CA and password from Secret `envoy-ai-quota-redis-client` through
+  `rateLimitDeployment` env and volumes), and the operators layer gives Envoy Gateway's own
+  rate limit service the image `ratelimit:0482748e` (the chart default would render with the
+  registry path doubled). aigw-ui needs it for budgets across models (0.22) and token counts
+  (0.30, on by default). Not verified on a cluster.
+- `XDSNameSchemeV2` (on by default from Envoy Gateway 1.10) needs no runtime flag: aigw-ui 0.29
+  and later write their retry patches for both route configuration names.
 
 **Upstream subchart** (`gateway-helm` v1.9.1) renders: EG Deployment, certgen Job (+RBAC),
 topology-injector webhook, HPA, PDB, Service, ServiceAccounts, infra-manager and

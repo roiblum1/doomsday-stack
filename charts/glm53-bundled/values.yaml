@@ -324,6 +324,12 @@ llmisvc:
     # deployed branch.
     - --long-prefill-token-threshold=8192
     - --enable-prefix-caching
+    # Gateway billing and aigw-ui's token counts: report cached prompt
+    # tokens, so a price can charge them less, and put usage on every
+    # streamed answer, so streamed answers are counted. The live service
+    # had both (snapshot of 2026-10-12); this copy of the chart did not.
+    - --enable-prompt-tokens-details
+    - --enable-force-include-usage
     # --- observability ---
     # summary (not detailed): detailed appends unbounded per-step accepted/
     # drafted lists to every response (~num_verify_steps entries x2).
