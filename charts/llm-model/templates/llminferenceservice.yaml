@@ -55,7 +55,11 @@ spec:
           {{- if $fc.enabled }}
           - type: concurrency-detector
             parameters:
-              maxConcurrency: {{ required "model.flowControl.maxConcurrency is required" $fc.maxConcurrency }}
+              maxConcurrency: {{ required "model.flowControl.maxConcurrency is required with flowControl.enabled: requests in flight per endpoint (InferencePool targetPort / DP rank), not per pod" $fc.maxConcurrency }}
+          {{- with $fc.fairnessPolicy }}
+          - type: {{ . }}
+          - type: fcfs-ordering-policy
+          {{- end }}
           {{- end }}
           schedulingProfiles:
           - name: default
@@ -74,9 +78,22 @@ spec:
             saturationDetector:
               pluginRef: concurrency-detector
             defaultRequestTTL: {{ $fc.requestTTL }}
+            {{- with $fc.fairnessPolicy }}
+            defaultPriorityBand:
+              fairnessPolicyRef: {{ . }}
+              orderingPolicyRef: fcfs-ordering-policy
+            {{- end }}
             {{- with $fc.negativeBandMaxRequests }}
             defaultNegativePriorityBand:
               maxRequests: {{ . | quote }}
+              {{- /* A negative band that is set but names no policy runs
+                     the scheduler's default (oldest first), not
+                     defaultPriorityBand's: so llm-d router v0.11.0's config
+                     loader resolves it. Not tested on the lab. */}}
+              {{- with $fc.fairnessPolicy }}
+              fairnessPolicyRef: {{ . }}
+              orderingPolicyRef: fcfs-ordering-policy
+              {{- end }}
             {{- end }}
             enableEviction: {{ $fc.enableEviction }}
           {{- end }}

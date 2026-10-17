@@ -150,7 +150,7 @@ the judge is never the agent grading itself. The hook artifacts (client-side `ju
 - The `scaling` block is left disabled: a spec.scaling block without KEDA+WVA makes the
   llmisvc-controller error-loop (verified live per values comment).
 
-### 2.4 `llm-model` 0.1.0 — gateway-side companion chart
+### 2.4 `llm-model` 0.2.0 — gateway-side companion chart
 
 For a model **served by another chart** (e.g. the kserve-rendered workload), renders only the
 gateway objects: `gateway-route.yaml` (AIGatewayRoute + optional direct AIServiceBackend),
@@ -158,12 +158,16 @@ gateway objects: `gateway-route.yaml` (AIGatewayRoute + optional direct AIServic
 model creation with aigw-ui capacity annotations), `objectives.yaml` (InferenceObjective),
 `alerts.yaml` (PrometheusRule), `namespace.yaml`.
 
-**Key values** (`llm-model/values.yaml`, 158 lines): `gateway.name: envoy-ai-gateway` /
+**Key values** (`llm-model/values.yaml`, 178 lines): `gateway.name: envoy-ai-gateway` /
 `namespace: envoy-ai-gateway-system`; listeners `client` (http) and `peer` (peers, for the
 aigw-ui fleet); `route.direct` (serve via AIServiceBackend instead of the EPP InferencePool
 — required for Anthropic passthrough and quota attachment); `internalKey` SecurityPolicy
 (API-key auth between gateway and model); traffic split via kserve `router.route` weights;
-flowControl (concurrency-detector plugin + maxConcurrency) for queue-aware routing;
+flowControl (concurrency-detector plugin + maxConcurrency) for queue-aware routing:
+`maxConcurrency` counts **per endpoint** (each InferencePool targetPort, one per DP rank),
+has no default and is required when flow control is on; `requestTTL` 300s; and
+`fairnessPolicy: round-robin-fairness-policy` on the default (and negative) priority band,
+so tenants (`x-llm-d-inference-fairness-id`) are served in turn rather than oldest first;
 `model.capacityPerInstance` / `maxModelLen` / `revision` annotations consumed by aigw-ui.
 
 **Design rationale** (README): billing/security-policy live on the route (not the workload),

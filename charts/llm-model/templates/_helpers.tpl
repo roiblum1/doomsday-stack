@@ -17,6 +17,9 @@
 {{- if and .Values.model.scheduler .Values.route.direct (not .Values.internalKey.value) (not .Values.internalKey.existingSecret) -}}
 {{- fail "set internalKey.value or internalKey.existingSecret: without it KServe's own route lets tenants use the model uncounted" -}}
 {{- end -}}
+{{- if not (has (.Values.model.flowControl.fairnessPolicy | default "") (list "" "round-robin-fairness-policy")) -}}
+{{- fail "model.flowControl.fairnessPolicy must be empty or round-robin-fairness-policy" -}}
+{{- end -}}
 {{- end -}}
 {{- define "model.pool" -}}
 {{- printf "%s-inference-pool" .Values.model.name -}}
