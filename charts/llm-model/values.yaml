@@ -41,16 +41,36 @@ model:
   # NEEDS a gateway with agent-router#2595 (not in 1.2.0): without it the
   # proxy calls the scheduler once per route match and every request times
   # out. Proven with the endpoint picker v0.10.0 that KServe 0.21 deploys.
+  # The settings below read the same in llm-d router v0.11.0.
   flowControl:
     enabled: false
-    # Requests one replica runs at once: vLLM's --max-num-seqs. Above it the
-    # queue is in vLLM, which knows no priority.
-    maxConcurrency: 64
+    # Requests in flight per endpoint before the scheduler holds any back.
+    # An endpoint is each port of the model's InferencePool (targetPorts),
+    # so one per data-parallel rank: a pod of 8 ranks is 8 endpoints, not 1.
+    # Never above each rank's --max-num-seqs: above it the queue is in vLLM,
+    # first come first served, and neither classes nor turns reach it.
+    # Size it from aigw-ui's capacity measurement: the most in flight one
+    # instance takes within the latency targets, divided by the instance's
+    # endpoints. 32 on a pod of 16 rank endpoints is 2.
+    # Required with enabled=true. Left out of the scheduler config it would
+    # be 100 per endpoint.
+    maxConcurrency: null
     # How long a request may wait for a free slot before it gets 429. Keep
-    # below route.timeout. 60s is what was tested. In a fleet a shorter wait
-    # sends best-effort work to the next site sooner, but a standard request
-    # that waits longer gets 429 as well, and the entry does not retry that.
-    requestTTL: 60s
+    # below route.timeout (600s). 0s means no limit: the client's own
+    # timeout ends the wait. 300s was tested on the lab on 2026-10-17. A
+    # short TTL sends best-effort work to the next site sooner, but standard
+    # requests that wait get 429 too, and the entry does not retry those. To
+    # refuse best-effort work at once instead of letting it wait, set
+    # negativeBandMaxRequests.
+    requestTTL: 300s
+    # How the scheduler picks the next request of a class.
+    # round-robin-fairness-policy: each tenant is queued on its own (the
+    # header x-llm-d-inference-fairness-id, which aigw-ui sets from the
+    # token) and the tenants are served in turn, so one tenant's backlog
+    # does not hold up the others. Empty leaves the scheduler's default,
+    # oldest request first whatever its tenant, and aigw-ui then warns on
+    # every sync of a best-effort model's cluster.
+    fairnessPolicy: round-robin-fairness-policy
     # Most requests of the classes below priority 0 (batch, best-effort) that
     # may wait at once. Above it they get 429 at once instead of waiting.
     # 0 keeps the scheduler's default (5000).

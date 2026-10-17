@@ -1,0 +1,24 @@
+{{- if and .Values.gateway.enabled .Values.gateway.gatewayConfig.enabled }}
+{{- $wave := dig "syncWave" dict (.Values.argocd | default dict) }}
+#
+# Request costs every route of the Gateway writes, for aigw-ui's token
+# counts (aigw-ui docs/deployment.md, "Token counts on every route"). The
+# key names are the ones its rate limit rules read; do not rename them.
+#
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: GatewayConfig
+metadata:
+  name: {{ .Values.gateway.gatewayConfig.name }}
+  namespace: {{ include "envoy-ai-gateway-openshift.gatewayNamespace" . }}
+  {{- include "envoy-ai-gateway-openshift.annotations" (dict "wave" $wave.gateway) | nindent 2 }}
+  labels:
+    {{- include "envoy-ai-gateway-openshift.labels" . | nindent 4 }}
+spec:
+  globalLLMRequestCosts:
+    - metadataKey: aigw_ui_input
+      type: InputToken
+    - metadataKey: aigw_ui_cached
+      type: CachedInputToken
+    - metadataKey: aigw_ui_output
+      type: OutputToken
+{{- end }}

@@ -9,7 +9,7 @@ cluster/site vocabulary are defined in `GITOPS.md` §0. Registry prefixes are no
 | Chart | Version | Source dir (`charts/…`) | Deploys | Target namespace(s) |
 |---|---|---|---|---|
 | `glm53-bundled` | 0.1.0 (appVersion `glm-5.3`) | `glm53-bundled/` | GLM-5.3 serving bundle: storage prep, model pull, vLLM LLMInferenceService, gateway route | `llm-glm53` |
-| `qwen38-bundled` | 0.2.6 | `qwen38-bundled/` | Qwen3.8-27B-FP8 bundle incl. LMCacheEngine CR | `llm-qwen38` |
+| `qwen38-bundled` | 0.2.7 | `qwen38-bundled/` | Qwen3.8-27B-FP8 bundle incl. LMCacheEngine CR | `llm-qwen38` |
 | `qwen36-judge` | 0.2.2 | `qwen36-judge/` | judge model + OpenAI-quota route | `llm-judge` |
 | `generic-model` | 0.1.0 | `generic-model/` | unified model chart that supersedes the three above | any (values) |
 | `llm-model` | 0.1.0 | `llm-model/` | gateway-side objects for a model served by another chart | model's namespace |
@@ -39,7 +39,7 @@ Registered by `operators/glm53` (chart repo pinned to branch `bundled`). Renders
 (per the verification table in `generic-model/README.md`) into `llm-glm53`. Full
 template-by-template walk in §4.
 
-**Key values** (`glm53-bundled/values.yaml`, 401 lines):
+**Key values** (`glm53-bundled/values.yaml`, 508 lines):
 
 | Concern | Value |
 |---|---|
@@ -47,6 +47,7 @@ template-by-template walk in §4.
 | replicas | 2 (one pod per B200 node; `nodes: [gpu-node-1, gpu-node-2]`) |
 | parallelism | DP8 × EP8: `--data-parallel-size=8 --data-parallel-size-local=8 --data-parallel-multi-port-external-lb --data-parallel-supervisor-port=8208 --enable-expert-parallel --all2all-backend=allgather_reducescatter` |
 | vLLM memory | `--kv-cache-dtype=fp8_e4m3 --gpu-memory-utilization=0.90 --max-model-len=262144 --max-num-seqs=64 --max-num-batched-tokens=16384 --enable-prefix-caching` |
+| gateway billing | `--enable-prompt-tokens-details --enable-force-include-usage`: cached prompt tokens and usage on streamed answers, for cached prices and aigw-ui's token counts (the live service had both; this copy of the chart lacked them until 2026-10-18) |
 | speculative decode | MTP: `--speculative-config.method=mtp --speculative-config.num_speculative_tokens=5`, parsers `glm47` |
 | per-pod resources | 8 × `nvidia.com/gpu`, CPU 96→192, memory 512Gi→2000Gi, `hugepages-1Gi: 16Gi`, dshm 600Gi |
 | placement | `runtimeClassName: performance-gpu-hpc-performanceprofile-extras-b200`, `maxSurge: 0` (no free GPUs for a surge pod) |
@@ -54,6 +55,7 @@ template-by-template walk in §4.
 | storage | node-prep LVs `llm-models` 1200G + `llm-cache` 300G from VG `vg1`; static PVs 1200Gi/300Gi with nodeAffinity spanning both nodes; PVCs pinned via `volumeName` |
 | images | `vllm/vllm-openai:v0.30.0`, `s5cmd:v2.3.0` (registry-internal mirrors); storage-initializer comes from the kserve preset |
 | EPP scheduler | service `glm53-b200-epp-service:9002`; plugins single-profile-handler, approx-prefix-cache-producer, inflight-load-producer, prefix-cache-scorer, active-request-scorer, token-load-scorer, max-score-picker; scheduling profile weights: active-request-scorer **3**, token-load-scorer 1, prefix-cache-scorer 1 |
+| Flow control | `llmisvc.flowControl`, off: with `enabled=true` the template adds the feature gate, `concurrency-detector` (`maxConcurrency` required, **per rank endpoint**, ≤ `--max-num-seqs=64`), `requestTTL` 300s and `round-robin-fairness-policy` on the default (and negative) band to the profile above. Same block in `qwen38-bundled` |
 | InferencePool | selector on kserve workload labels, `targetPorts` 8000–8007 (one endpoint per pod-rank) |
 
 **Design choices** (each documented in the chart's README/values comments):
@@ -79,7 +81,7 @@ template-by-template walk in §4.
 - `s3Secret.create: false` — S3 credentials Secret is pre-created out-of-band.
 - `aiperf` benchmark Job disabled by default (token-level tuning knobs in values).
 
-### 2.2 `qwen38-bundled` 0.2.6 — Qwen3.8-27B-FP8 with LMCache
+### 2.2 `qwen38-bundled` 0.2.7 — Qwen3.8-27B-FP8 with LMCache
 
 Renders into `llm-qwen38`: namespace, SA, SCC (`qwen38-model-serving`), s3-secret,
 node-prep, local-storage, pull-jobs, `LLMInferenceService` `qwen38-l4`, `LMCacheEngine`
@@ -97,6 +99,7 @@ node-prep, local-storage, pull-jobs, `LLMInferenceService` `qwen38-l4`, `LMCache
 | LMCacheEngine | CR `qwen38-cache` (= CR + Service + `-metrics` job), engine image tag-for-tag with the model pod (both sides of the ZMQ/CUDA-IPC protocol must match), server ZMQ 5555 / http 8080 |
 | L1 tier | pinned RAM 200 GiB per node (pod request 205Gi / limit 307Gi), LRU eviction, watermark 0.8, ratio 0.2 |
 | L2 tier | 900 GiB capacity cap on a dedicated 1000Gi local-static PVC (`qwen38-cache-l2`, subdir `lmcache-l2`, backed by node-prep LV `vg1/llm-l2`), `shardDirs: true`, `persist: true`, LRU 0.9/0.1 |
+| flow control | `llmisvc.flowControl`, off; as in glm53 (one endpoint per pod here, `--max-num-seqs=32`) |
 | chunkSize | 1600 — TP4+MTP block alignment demanded by the connector (v0.2.5 crash note); changing it invalidates existing L2 chunk keys |
 | routing | `isolatedIPC: true` (driver-level CUDA IPC; no hostIPC), `priorityClassName: openshift-user-critical` |
 
@@ -150,7 +153,7 @@ the judge is never the agent grading itself. The hook artifacts (client-side `ju
 - The `scaling` block is left disabled: a spec.scaling block without KEDA+WVA makes the
   llmisvc-controller error-loop (verified live per values comment).
 
-### 2.4 `llm-model` 0.1.0 — gateway-side companion chart
+### 2.4 `llm-model` 0.2.0 — gateway-side companion chart
 
 For a model **served by another chart** (e.g. the kserve-rendered workload), renders only the
 gateway objects: `gateway-route.yaml` (AIGatewayRoute + optional direct AIServiceBackend),
@@ -158,12 +161,16 @@ gateway objects: `gateway-route.yaml` (AIGatewayRoute + optional direct AIServic
 model creation with aigw-ui capacity annotations), `objectives.yaml` (InferenceObjective),
 `alerts.yaml` (PrometheusRule), `namespace.yaml`.
 
-**Key values** (`llm-model/values.yaml`, 158 lines): `gateway.name: envoy-ai-gateway` /
+**Key values** (`llm-model/values.yaml`, 178 lines): `gateway.name: envoy-ai-gateway` /
 `namespace: envoy-ai-gateway-system`; listeners `client` (http) and `peer` (peers, for the
 aigw-ui fleet); `route.direct` (serve via AIServiceBackend instead of the EPP InferencePool
 — required for Anthropic passthrough and quota attachment); `internalKey` SecurityPolicy
 (API-key auth between gateway and model); traffic split via kserve `router.route` weights;
-flowControl (concurrency-detector plugin + maxConcurrency) for queue-aware routing;
+flowControl (concurrency-detector plugin + maxConcurrency) for queue-aware routing:
+`maxConcurrency` counts **per endpoint** (each InferencePool targetPort, one per DP rank),
+has no default and is required when flow control is on; `requestTTL` 300s; and
+`fairnessPolicy: round-robin-fairness-policy` on the default (and negative) priority band,
+so tenants (`x-llm-d-inference-fairness-id`) are served in turn rather than oldest first;
 `model.capacityPerInstance` / `maxModelLen` / `revision` annotations consumed by aigw-ui.
 
 **Design rationale** (README): billing/security-policy live on the route (not the workload),
@@ -200,13 +207,14 @@ Thin OpenShift wrapper that adds the deployment-specific pieces around the **ups
 `ai-gateway-helm` v1.2.0** dependency (Chart.lock; the tgz is extracted in
 `upstream-subcharts/ai-gateway-helm-v1.2.0/`). Own templates: `gateway.yaml` (GatewayClass
 `envoy-ai-gateway-class`, `Gateway/envoy-ai-gateway`, EnvoyGateway, routes, ClientTrafficPolicy),
-`ratelimit.yaml` (ratelimit Deployment + Service + Redis-client Secret + PDB ≥2 replicas),
+`ratelimit.yaml` (ratelimit Deployment, 1 replica and no PDB, + Service + Redis-client Secret),
 `peers.yaml` (peers mTLS listener + certificate), `route.yaml`, `health.yaml`,
 `scc-rolebinding.yaml` (dataplane SCC), `_validate.tpl` (render-time guards).
 
-**Key values** (`envoy-ai-gateway/values.yaml`, 462 lines):
+**Key values** (`envoy-ai-gateway/values.yaml`, 493 lines):
 
-- Waves: CRDs -10 → SCC -5 → controller 0 → EnvoyGateway 1 → Gateway 2 → routes 3 → ratelimit 5.
+- Waves (`argocd.syncWave`): CRDs -10 → SCC -5 → controller, EnvoyProxy and ratelimit 0 → GatewayClass 1 →
+  Gateway, ClientTrafficPolicy (and the optional GatewayConfig) 2 → Route 3.
 - Images: controller/extproc default to upstream `docker.io/envoyproxy/ai-gateway-*`
   (`tag: ""` → appVersion v1.2.0); the **values repo pins a patched build**
   `v1.2.0-patched.1` (controller and extproc from one commit, else they reject each other's
@@ -214,7 +222,17 @@ Thin OpenShift wrapper that adds the deployment-specific pieces around the **ups
   `envoyproxy/ratelimit:0482748e`.
 - Data plane: `envoy:distroless-v1.39.1` digest-pinned (`…@sha256:eb2c01c13125d1629637cb4e4cce7207009fb7cc2c8027f9742758549d15b6f4`)
   so the mirror holds the exact Docker Hub bits.
-- ClientTrafficPolicy `bufferLimit: 50Mi` (upstream basic-usage value, kept).
+- ClientTrafficPolicy `bufferLimit: 50Mi` (upstream basic-usage value, kept). On the client
+  listener it removes a client's own copy of the scheduler and gateway headers by name
+  (`removeRequestHeaders`, `x-llm-d-inference-fairness-id` among them) and, since 2026-10-18,
+  every header starting with `x-aigw-` (`removeRequestHeaderPrefixes` →
+  `earlyRequestHeaders.removeOnMatch`): the tenant, key, client ID, budget and per-model amount
+  headers aigw-ui's token check writes (aigw-ui `docs/security.md`, "Defense in depth"). The
+  peer listener's policy removes none of them.
+- `gateway.gatewayConfig` (off): a `GatewayConfig` with `globalLLMRequestCosts`
+  `aigw_ui_input`/`aigw_ui_cached`/`aigw_ui_output`, named on the Gateway, so a route aigw-ui
+  does not render or mark still writes token counts (aigw-ui 0.30). Not needed while every
+  model is served behind the entry route.
 - Gateway listeners: `http` :80 with `allowedRoutes.from: All`; optional `peers` :8443 mTLS
   (Terminate, Secret `llm-peer-server`, allowedRoutes selector `aigw-ui.io/serving: "true"`)
   — **default off** in the archived values; the live cluster runs it (GITOPS.md §4.4).
@@ -260,6 +278,15 @@ Thin wrapper around **upstream `gateway-helm` v1.9.1** (extracted to
   helpers split image refs at the first `/` and prepend `imageRegistry`, so mirror paths must
   be given either as `imageRegistry` + upstream-shaped refs or as full refs — never both.
 - `deployment.replicas: 1`, resources 256Mi/1024Mi.
+- Global rate limiting (`config.envoyGateway.rateLimit`) is not in the chart: the Redis is a
+  site value. `cluster-llm-prep`'s site layer sets it since 2026-10-18 (the shared Redis,
+  `timeout: 1s`, TLS, CA and password from Secret `envoy-ai-quota-redis-client` through
+  `rateLimitDeployment` env and volumes), and the operators layer gives Envoy Gateway's own
+  rate limit service the image `ratelimit:0482748e` (the chart default would render with the
+  registry path doubled). aigw-ui needs it for budgets across models (0.22) and token counts
+  (0.30, on by default). Not verified on a cluster.
+- `XDSNameSchemeV2` (on by default from Envoy Gateway 1.10) needs no runtime flag: aigw-ui 0.29
+  and later write their retry patches for both route configuration names.
 
 **Upstream subchart** (`gateway-helm` v1.9.1) renders: EG Deployment, certgen Job (+RBAC),
 topology-injector webhook, HPA, PDB, Service, ServiceAccounts, infra-manager and
@@ -447,7 +474,9 @@ ARTIFACTS/SUMMARY blocks for capture into CI logs.
 
 ### 4.12 `_helpers.tpl`
 
-Labels/name helpers (`glm53.fullname`, `glm53.labels`, selector labels) — standard.
+Labels/name helpers (`glm53.fullname`, `glm53.labels`, selector labels) — standard — and
+`glm53.schedulerWithFlowControl`, the scheduler block with flow control added when
+`llmisvc.flowControl.enabled` (mirrored as `qwen38.schedulerWithFlowControl`).
 
 **Resulting object set** (~29 objects, per the verification table in
 `generic-model/README.md`): 1 namespace, 1 SA, 1 SCC + Role + RoleBinding, 1 optional

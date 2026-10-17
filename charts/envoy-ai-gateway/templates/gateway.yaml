@@ -131,7 +131,11 @@ kind: Gateway
 metadata:
   name: {{ .Values.gateway.name }}
   namespace: {{ $gwNs }}
-  {{- include "envoy-ai-gateway-openshift.annotations" (dict "wave" $wave.gateway) | nindent 2 }}
+  {{- $gwAnn := dict }}
+  {{- if .Values.gateway.gatewayConfig.enabled }}
+  {{- $_ := set $gwAnn "aigateway.envoyproxy.io/gateway-config" .Values.gateway.gatewayConfig.name }}
+  {{- end }}
+  {{- include "envoy-ai-gateway-openshift.annotations" (dict "wave" $wave.gateway "extra" $gwAnn) | nindent 2 }}
   labels:
     {{- include "envoy-ai-gateway-openshift.labels" . | nindent 4 }}
 spec:
@@ -186,11 +190,21 @@ spec:
       {{- if .Values.gateway.peers.enabled }}
       sectionName: {{ .Values.gateway.listener.name }}
       {{- end }}
-  {{- with .Values.gateway.clientTrafficPolicy.removeRequestHeaders }}
+  {{- $ctp := .Values.gateway.clientTrafficPolicy }}
+  {{- if or $ctp.removeRequestHeaders $ctp.removeRequestHeaderPrefixes }}
   headers:
     earlyRequestHeaders:
+      {{- with $ctp.removeRequestHeaders }}
       remove:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $ctp.removeRequestHeaderPrefixes }}
+      removeOnMatch:
+        {{- range . }}
+        - type: Prefix
+          value: {{ . }}
+        {{- end }}
+      {{- end }}
   {{- end }}
   connection:
     bufferLimit: {{ .Values.gateway.clientTrafficPolicy.bufferLimit }}

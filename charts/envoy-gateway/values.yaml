@@ -137,7 +137,25 @@ envoy-gateway:
         # Required by Envoy AI Gateway: it routes to AI providers via Backend.
         enableBackend: true
         # Recommended by upstream for forward/backward compatibility.
+        # Required by aigw-ui: its entry routes carry an EnvoyPatchPolicy
+        # (fleet-<model>-retry). Let no other account write those.
         enableEnvoyPatchPolicy: true
+
+      # Global rate limiting (rateLimit:) is off in this chart: it needs the
+      # Redis every site and aigw-ui share, which is a site value. Set it in
+      # the cluster's GitOps layer (sites/.../<cluster>/envoy-gateway/
+      # values.yaml shows how). aigw-ui needs it on every cluster whose
+      # tenants are on tokens: its BackendTrafficPolicy
+      # aigw-ui-tenant-budgets holds the budgets across models (0.22) and,
+      # with its redis.tokenCounts on (the default since 0.30), four rules
+      # that count each tenant's tokens. Without it that policy is not
+      # accepted and nothing in it is counted or held.
+      #
+      # xDS names (XDSNameSchemeV2): leave runtimeFlags unset. Off up to
+      # 1.9, on by default from 1.10; it renames the client listener's
+      # route configuration to http-<port>. aigw-ui 0.29 and later write
+      # their retry patches for both names, so no flag is needed. After an
+      # upgrade to 1.10, sync the cluster in aigw-ui and run its self-test.
 
       # Envoy AI Gateway registers as an xDS translation hook. These values must
       # match the AI Gateway controller Service created by the

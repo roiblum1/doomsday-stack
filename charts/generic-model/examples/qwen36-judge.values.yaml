@@ -127,6 +127,10 @@ llmisvc:
     - --reasoning-parser=qwen3
     # Judge calls always send the same system prompt + policy first.
     - --enable-prefix-caching
+    # Gateway billing and aigw-ui's token counts: cached prompt tokens and
+    # usage on streamed answers (as glm53-bundled, qwen38-bundled, qwen36-judge).
+    - --enable-prompt-tokens-details
+    - --enable-force-include-usage
     # Thinking OFF: the judge must answer in a fixed schema.
     - "--default-chat-template-kwargs='{\"enable_thinking\": false}'"
     # Text-only judge: refuse any multimodal input paths.

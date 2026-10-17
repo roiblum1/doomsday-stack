@@ -233,6 +233,47 @@ llmisvc:
               - pluginRef: prefix-cache-scorer
                 weight: 1
               - pluginRef: max-score-picker
+  # --- Flow control in the scheduler (off) -------------------------------------
+  # With enabled=true the template adds to scheduler.config.inline above the
+  # flowControl feature gate, the concurrency-detector, the fairness and
+  # ordering policies and a flowControl section; the scoring profile stays as
+  # it is. Requests then wait in the scheduler when the endpoints are full
+  # and are released by class (InferenceObjective priority; aigw-ui's
+  # best-effort is -1) and, within a class, tenant by tenant. Off, the render
+  # is unchanged. Needs a gateway with agent-router#2595 (patch 0003 of the
+  # v1.2.0-patched images). The same settings as charts/llm-model 0.2.0,
+  # read against llm-d router v0.11.0; not tested on this model.
+  flowControl:
+    enabled: false
+    # Requests in flight per endpoint before the scheduler holds any back.
+    # An endpoint is one rank port (targetPorts above): 8 per pod, 16 in the
+    # pool at replicas 2. Not above each rank's --max-num-seqs (64, below):
+    # above it the queue is in vLLM, first come first served, and neither
+    # classes nor turns reach it. Size it from aigw-ui's capacity
+    # measurement: the most in flight one pod takes within the latency
+    # targets, divided by 8. Required with enabled=true; left out of the
+    # scheduler config it would be 100 per rank.
+    maxConcurrency: null
+    # How long a request may wait in the scheduler before it gets 429. 0s
+    # means no limit: the client's own timeout ends the wait. 300s was
+    # tested on the lab on 2026-10-17. A short TTL sends best-effort work to
+    # the next site sooner, but standard requests that wait get 429 too, and
+    # the entry does not retry those. While the pool has no ready endpoint
+    # the same limit applies (noEndpointRequestTTL follows it).
+    requestTTL: 300s
+    # round-robin-fairness-policy: each tenant (x-llm-d-inference-fairness-id,
+    # which aigw-ui sets from the token) is queued on its own and the tenants
+    # are served in turn, in every class. Empty leaves the scheduler's
+    # default, oldest request first whatever its tenant, and aigw-ui then
+    # warns on every sync of a cluster that serves a best-effort model.
+    fairnessPolicy: round-robin-fairness-policy
+    # Most requests below priority 0 (batch, aigw-ui's best-effort) that may
+    # wait at once; above it they get 429 at once. 0 keeps the scheduler's
+    # default (5000).
+    negativeBandMaxRequests: 0
+    # DO NOT flip without a test: true cancels running best-effort answers
+    # when standard requests wait.
+    enableEviction: false
   # Merged on the base preset kserve-config-llm-template which runs
   # `vllm serve /mnt/models ... "$@"` (bash eval) -> single tokens only.
   args:
@@ -283,6 +324,12 @@ llmisvc:
     # deployed branch.
     - --long-prefill-token-threshold=8192
     - --enable-prefix-caching
+    # Gateway billing and aigw-ui's token counts: report cached prompt
+    # tokens, so a price can charge them less, and put usage on every
+    # streamed answer, so streamed answers are counted. The live service
+    # had both (snapshot of 2026-10-12); this copy of the chart did not.
+    - --enable-prompt-tokens-details
+    - --enable-force-include-usage
     # --- observability ---
     # summary (not detailed): detailed appends unbounded per-step accepted/
     # drafted lists to every response (~num_verify_steps entries x2).

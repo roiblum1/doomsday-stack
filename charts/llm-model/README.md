@@ -156,6 +156,9 @@ hub is given cluster-admin kubeconfigs; that was decided earlier.
 | `gateway.clientListener` | Pins the direct route and KServe's route to the client listener |
 | `model.revision`, `model.capacityPerInstance`, `model.maxModelLen` | The three annotations aigw-ui reads. `maxModelLen` also renders `--max-model-len` |
 | `model.scoring.weights` (`prefix`, `queue`, `kvCache`, `noHitLru`), `model.scoring.custom` | The scheduler's weights, 3 : 2 : 2 : 2 as before. Always used with flow control; `custom=true` uses them without it. Tested on the lab with queue 5, with and without flow control: the scheduler started with the new weights and answered. The effect on latency and cache hits is not measured |
+| `model.flowControl.maxConcurrency` | Requests in flight **per endpoint** before the scheduler holds any back. An endpoint is each `targetPorts` port of the model's InferencePool, so one per data-parallel rank (a pod of 8 ranks is 8). No default: required with `flowControl.enabled`. Not above each rank's `--max-num-seqs`; size it from aigw-ui's capacity measurement (most in flight per instance within the latency targets ÷ the instance's endpoints) |
+| `model.flowControl.requestTTL` | How long a request may wait in the scheduler before it gets 429. 300s; keep below `route.timeout`; `0s` is no limit, and the client's timeout ends the wait |
+| `model.flowControl.fairnessPolicy` | `round-robin-fairness-policy` (default): each tenant (`x-llm-d-inference-fairness-id`, set by aigw-ui from the token) is queued on its own and served in turn, in every class. Empty: the scheduler's default, oldest request first whatever its tenant, and aigw-ui warns |
 | `model.flowControl.negativeBandMaxRequests`, `.enableEviction` | How many requests below priority 0 may wait; above it they get 429 at once |
 | `namespace.create` | The Namespace with the label the peer listener asks for |
 | `alerts.enabled` | A `PrometheusRule` on the scheduler's queue. Rendered, not tested |
@@ -180,9 +183,13 @@ Moving a model without a gap:
 - **The scheduler settings are the ones that were proven** (the concurrency
   detector), not the brief's. With the default detector, flow control did not
   put standard before best-effort on this stack.
-- **`requestTTL` stays 60s.** With the brief's 5s a standard request that
-  waits 5 seconds gets 429 as well, and the entry does not try another site
-  for a standard request on 429.
+- **`requestTTL` is 300s** (60s until chart 0.2.0). A short TTL hurts
+  standard requests too: with the brief's 5s a standard request that waits
+  5 seconds gets 429, and the entry does not try another site for a standard
+  request on 429. On the lab single waits already reached 45 to 48 s on one
+  CPU replica, and a 100k-token prompt can wait longer. 300s was tested on
+  the lab on 2026-10-17 together with the fairness policy (see "Tenants in
+  turn" below).
 - **The health route needs a retry.** vLLM closes a connection that was idle
   for 5 seconds and the hub checks every 5 seconds. 17 of 109 checks got 503
   (connection closed), and three in a row took the only site out: clients got
@@ -211,7 +218,8 @@ next to the running release, not by upgrading it.
   at 5 s, `negativeBandMaxRequests=4`): 13 of 14 standard answered. Of the 6
   best-effort, 2 got 429 within a second (`rejected-saturated`) and 4 after
   60 s (`rejected-ttl-expired`). None was served before a standard request.
-  One standard request waited 60 s and got 429 too.
+  One standard request waited 60 s and got 429 too (`requestTTL` was 60s
+  then).
 
 Not tested: two sites (the entry's retry to another site), TLS on the client
 listener, the disruption budget, drain time and access log (accepted by the
@@ -220,3 +228,52 @@ API server in a dry run only), the alerts, more than one proxy pod.
 Seen once and not reproduced in two tries: the first five requests of a new
 tenant were answered and not counted. Its quota was added seconds before the
 model was switched to best-effort.
+
+## Tenants in turn, 2026-10-17
+
+Within a class the scheduler queues each tenant on its own, by
+`x-llm-d-inference-fairness-id`, which aigw-ui writes from the token. Which
+tenant is served next is the band's fairness policy. The scheduler's default,
+`global-strict-fairness-policy`, ignores the tenants and serves the oldest
+request first, so one tenant's backlog holds up everyone else. aigw-ui warns
+about it on every sync of a cluster that serves a best-effort model.
+
+Since 0.2.0, with flow control on, the chart declares
+`round-robin-fairness-policy` and `fcfs-ordering-policy` and names them on
+`defaultPriorityBand`, and on `defaultNegativePriorityBand` when
+`negativeBandMaxRequests` renders it. Without the names there, a negative band
+that is set runs the default policy again, not the one of
+`defaultPriorityBand`. llm-d router v0.11.0's config loader resolves it that
+way, and this chart's render, loaded through it, gives each band the policy
+above.
+
+Tested on the lab with `qwen-tiny`, one CPU replica (one endpoint),
+`maxConcurrency: 2`. The LLMInferenceService was patched by hand to the same
+settings, not rendered from this chart, and restored afterwards. A tenant
+sent one request while another tenant had six waiting:
+
+| Scheduler config | The lone tenant's request (two runs) |
+|---|---|
+| The scheduler's default policy | No effect: 44.1 s and 28.0 s, behind the other's six |
+| `round-robin-fairness-policy` + `fcfs-ordering-policy` on `defaultPriorityBand`, `defaultRequestTTL: 300s` | 25.9 s and 14.7 s, the first request served from the queue |
+
+Best-effort still ranked below the regular tenants, and aigw-ui's warning
+went away. Not tested: the policy names on the negative band, more than one
+endpoint, a GPU pool.
+
+## Upgrading
+
+### To 0.2.0
+
+- A release with `model.flowControl.enabled=true` must now set
+  `model.flowControl.maxConcurrency`; the render fails without it. The old
+  default of 64 was meant per pod but is counted per endpoint: on a pool of
+  16 rank endpoints it let about 1,024 requests through before the scheduler
+  held any back, so classes and turns never applied.
+- On such a release the new defaults (`requestTTL: 300s`, the round-robin
+  fairness policy) rewrite the LLMInferenceService's scheduler config, which
+  restarts the scheduler. Set `requestTTL: 60s` and `fairnessPolicy: ""` to
+  keep the old config apart from `maxConcurrency`.
+- aigw-ui's spec hash of the LLMInferenceService covers the scheduler config,
+  so it then marks the model's capacity measurement stale. Measure again.
+- With flow control off the chart renders exactly as 0.1.0.
