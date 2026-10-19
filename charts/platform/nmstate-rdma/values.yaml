@@ -88,8 +88,28 @@ infiniband:
 #     - ipFrom: 192.0.2.4/32
 #       priority: 1000
 #       routeTable: 200
+#
+# RoCE LAG (both ports of one card as one 802.3ad bond): give the NIC entry a bond name
+# and a `bond` block. The NNCP then makes the bond, puts the IP, rule and routes on it,
+# and the driver exposes the card as one RDMA device (mlx5_bond_N) over both ports.
+#   - name: bond-rail0
+#     bond:
+#       ports: [ens32f0np0, ens32f1np1]   # exactly the two ports of the same card
+#       # mode / options override roce.bond below
+#     ip: 192.0.2.4/31
+#     gateway: 192.0.2.5
 roce:
   mtu: 9000
+  # Defaults for every NIC entry that has `bond`. 802.3ad, active-backup and balance-xor
+  # are the modes both OpenShift and RoCE LAG support. layer3+4 hashes RoCEv2 on the UDP
+  # source port, which differs per QP, so QPs spread over both ports; one QP stays on one
+  # port (100G), so the full 200G needs NCCL_IB_QPS_PER_CONNECTION >= 2.
+  bond:
+    mode: 802.3ad
+    options:
+      miimon: "100"
+      lacp_rate: fast
+      xmit_hash_policy: layer3+4
   nodes: []             # override per-cluster with node/NIC/IP/route fabric plan
   # nodes:
   #   - name: cluster-hypershift-h200
