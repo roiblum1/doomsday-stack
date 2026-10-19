@@ -220,7 +220,24 @@ llmisvc:
           - type: approx-prefix-cache-producer
           - type: inflight-load-producer
           - type: prefix-cache-scorer
+          # maxBusyScore 0.5, in the chart since 2026-10-13. With the default,
+          # 1.0, a busy rank is scored against the BUSIEST rank only --
+          # (max - count) / max -- so one hot rank made a rank that holds the
+          # prefix keep winning over an idle one (benchmark run 3: repeated
+          # prompts slower than fresh ones). With 0.5 an idle rank always
+          # wins: the best a busy holder reaches is 3*0.5 + 1 + 1 = 3.5, an
+          # idle rank scores 3 + ~1. The condition is
+          #   active weight * maxBusyScore + prefix weight < active weight
+          # so anything below 0.66 at the weights 3 and 1 below.
+          # Not 0: once every one of the 16 ranks has a request, all of them
+          # would score 0 and this weight-3 scorer would say nothing. Only the
+          # prefix score and the nearly flat token load would be left, and
+          # requests would pile onto the rank that holds their prefix.
+          # requestTimeout is ignored since llm-d-router v0.10.0 and
+          # idleThreshold 0 is the default, so neither is set.
           - type: active-request-scorer
+            parameters:
+              maxBusyScore: 0.5
           - type: token-load-scorer
           - type: max-score-picker
         schedulingProfiles:

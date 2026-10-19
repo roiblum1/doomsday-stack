@@ -27,9 +27,10 @@ TENANT_SCALE    = <<tenants today / in 12 months; API keys per tenant>>
 TRAFFIC_SHAPE   = <<e.g. "mostly agentic 100k-context sessions; peak 20-30 concurrent users per big site">>
 PAIN_TODAY      = <<the 3-5 things that hurt most, in the owner's words>>
 HORIZON         = <<e.g. "12 months, +2 sites">>
-REAL_STATE      = finished, the GLM branch `bundled` included (owner, 2026-10-13). Every request
-                  goes through the entry route. The owner was not asked separately whether
-                  that branch carries `healthRetries` and `keepAliveSeconds`: see R92
+REAL_STATE      = finished (owner, 2026-10-13). Every request goes through the entry route.
+                  Since that day the GLM app deploys the chart repo's branch `main`, which
+                  holds what `bundled` held (R131). The owner was not asked separately
+                  whether it carries `healthRetries` and `keepAliveSeconds`: see R92
 PRIORITIES      = <<the owner's order when goals conflict. A reviewer proposed:
                   Claude Code user experience > quota correctness > operability > tenant scale>>
 TARGETS         = <<what "good" means, to rank findings against. A reviewer proposed these;
@@ -159,9 +160,12 @@ Every research fact below has an id (`R12`) and a tag:
   as an option. A roadmap item built on it starts with the test.
 - `[MEMORY]`: general knowledge, not checked against a source. Treat as an open
   question unless a file confirms it.
-- `[OWNER]`: the owner said it, on the date given. It counts as evidence for what runs
-  on the real platform. The charts and values in the export were brought in line on
-  the same day; `live-cluster/` was not.
+- `[OWNER]`: the owner said it, on the date given. It is evidence for what the owner
+  changed in git. It is evidence for what runs only where the fact says the change is
+  live: a change in git runs after its Argo CD app has synced. Where a fact says
+  "measured", the offline agent read it on the platform, and that wins over what was
+  said. The charts and values in the export were brought in line on the same day;
+  `live-cluster/` was not.
 
 If a file in the repos contradicts this pack, the file wins. Say so in
 `04-OPEN-QUESTIONS.md`. The ids are labels, not an order: R97 and later were added
@@ -189,13 +193,16 @@ for what the migration did not touch (the pool, the scheduler config, the model 
 arguments, the gateway's own objects), and trace a request through the snapshot's old
 routes only where a finding needs the "before". Findings are about the current state.
 
-Five settings on the real platform are newer than the snapshot (R124, R129 and R130 in
-section 7). On GLM: the GPU memory share, the weight of the prefix scorer and a cap on
-prefill per step. On the gateway: the log format and the quota timeout. The charts and
-values in the export have them since 2026-10-13 and `live-cluster/` does not, so for
-these five the charts win over the snapshot. For GLM's other arguments the snapshot
-still wins, because `charts/glm53-bundled` is not the deployed branch. The model pods
-run vLLM v0.29.0, not v0.30.0 (section 5).
+Six settings are newer than the snapshot (R124, R129, R130 and R132 in section 7). Five
+are live since 2026-10-13. On GLM: the GPU memory share, the weight of the prefix scorer
+and a cap on prefill per step. On the gateway: the log format and the quota timeout,
+since the `envoy-ai` app synced at about 18:15Z that day (measured). The sixth, the
+scheduler's `maxBusyScore: 0.5`, was applied on 2026-10-14 together with scheduler
+v0.11.0 (owner; R132, R133). The charts and values in the export have all six and
+`live-cluster/` has none. For these six the charts win over the snapshot. For
+GLM's other arguments the snapshot still wins, because the export's copy of the GLM
+chart is older than the `main` that runs (R131). The model pods run vLLM v0.29.0, not
+v0.30.0 (section 5).
 
 ### 4.2 What changed against AGENT.md section 4
 
@@ -250,9 +257,9 @@ From the images in `live-cluster/` and the values in `gitops/app-of-apps/`.
 | Envoy proxy | distroless-v1.39.1 | |
 | Envoy AI Gateway | Snapshot: v1.2.0-patched.1. Target: v1.2.0-patched.2 | Upstream moved to `theagentrouter/agent-router`. v1.2.0 (2026-10-07) is the newest release. See R30 |
 | Rate limit service | `envoyproxy/ratelimit:0482748e` | |
-| EPP | `llm-d-router-endpoint-picker:v0.10.0` | Repo `llm-d/llm-d-router`. Newest release is v0.11.0 (2026-09-27) |
+| EPP | `llm-d-router-endpoint-picker:v0.11.0` since 2026-10-14, v0.10.0 before | `[OWNER]` 2026-10-14: applied to all three models through KServe's preset `kserve-config-llm-scheduler` (R133). `live-cluster/` still shows v0.10.0. Repo `llm-d/llm-d-router`; v0.11.0 (2026-09-27) is its newest release. The scheduler facts of this pack were read at v0.10.0; R133 says which of them v0.11.0 changes |
 | KServe | v0.21.0-rc1 | |
-| vLLM | v0.29.0 in the model pods | `[OWNER]` 2026-10-13: the model pods run the LMCache 0.5.5 build of vLLM, which is 0.29; `docs/ARCHITECTURE.md:361` says the same. The `vllm-openai:v0.30.0` in the export is the node-prep image and the image of `charts/glm53-bundled`, which is not the deployed branch. The vLLM facts of this pack (R24, R62, R90, R125) were read at tag v0.29.0. The LMCache v0.5.5 Dockerfile takes the vLLM version as a build argument, so the exact build is whatever the image holds |
+| vLLM | v0.29.0 in the model pods | `[OWNER]` 2026-10-13: the model pods run the LMCache 0.5.5 build of vLLM, which is 0.29; `docs/ARCHITECTURE.md:361` says the same. The `vllm-openai:v0.30.0` in the export is the node-prep image and the image of `charts/glm53-bundled`, which is not what is deployed (R131). The vLLM facts of this pack (R24, R62, R90, R125) were read at tag v0.29.0. The LMCache v0.5.5 Dockerfile takes the vLLM version as a build argument, so the exact build is whatever the image holds |
 | LMCache | v0.5.5 | |
 | aigw-ui | 0.12.3 (`2ff0b01`) | |
 
@@ -442,7 +449,8 @@ reviewer both lean to no bounded load); what to do for header-less requests (R98
   `average_kv_cache_utilization`, `per_endpoint_queue_size`, `flow_control_queue_size`,
   `flow_control_pool_saturation`, `flow_control_requests_total`. The old prefixes
   `inference_pool_`, `inference_extension_` and `inference_objective_` are deprecated
-  and still emitted.
+  and still emitted in v0.10.0. v0.11.0, which runs since 2026-10-14, removes them
+  (R133).
 - R26. Three ways to get a measured signal, all within constraint 1: the hub reads
   metrics and changes weights (hub code, control plane); bounded load in the proxy (R10,
   no code, relative, per proxy); the multi-cluster EPP (R22, not ready).
@@ -485,7 +493,7 @@ weight. Read the weight algorithm as coded first.
   port 8081), `quotaRateLimitTimeout: 5` (seconds), `quotaRateLimitFailureModeDeny: false`.
   So the path fails open by default, and **a rate limit service that hangs can hold a
   request for up to 5 seconds before it is let through**. The timeout is the failure
-  budget; it is a value, not code. The real platform sets 1 since 2026-10-13 (R130).
+  budget; it is a value, not code. The real platform runs 1 since 2026-10-13 (R130).
 - R33. `[FILE]` Upstream does not deploy the rate limit service. The wrapper chart does:
   `charts/envoy-ai-gateway/values.yaml:321-364`. Its comments say every site and the hub
   must use the same Redis, and that while Redis is unreachable the rate limit pod is not
@@ -839,9 +847,10 @@ name the upstream piece that could do it, or write the feature request.
   aigw-ui 0.12.3 (interval 3s, `panicThreshold: 1`; `fleet_policy.go:58-82`); a retry on
   the chart's health route (`healthRetries: 2`); `llmisvc.keepAliveSeconds: 75`. All
   three model charts in the export have the last two. The GLM chart that is really
-  deployed is the branch `bundled`, which is not in the export. The owner confirmed on
-  2026-10-13 that this branch is migrated, and was not asked about these two values.
-  If you can see the branch, check them; if not, ask. A soak with no 503 is the proof.
+  deployed is the chart repo's `main` (the branch `bundled` until 2026-10-13, R131),
+  which is newer than the export's copy. The owner confirmed on 2026-10-13 that it is
+  migrated, and was not asked about these two values. If you can see the branch, check
+  them; if not, ask. A soak with no 503 is the proof.
 - R93. `[NOT TESTED]` A fourth option the CRD offers:
   `healthCheck.active.http.retriableStatuses: [503]` in the hub's policy. It would make
   the threshold of 3 real for a 503.
@@ -871,9 +880,9 @@ on and off, and with LMCache on and off.
   `--gpu-memory-utilization=0.92` (snapshot: 0.85), `prefix-cache-scorer` weight 1
   (snapshot: 3) and a new argument, `--long-prefill-token-threshold=8192`. The model
   runs with them, and a benchmark was running when this was written. `[FILE]`
-  `charts/glm53-bundled/values.yaml` has the three values since that day (`:266`,
-  `:284`, the weight at `:234`); `live-cluster/` does not, so do not quote it for them.
-  In its other arguments that chart is still not the deployed branch. The owner named
+  `charts/glm53-bundled/values.yaml` has the three values since that day (`:283`,
+  `:301`, the weight at `:251`); `live-cluster/` does not, so do not quote it for them.
+  In its other arguments that chart is still not what is deployed (R131). The owner named
   no other change, so those are the snapshot's (`--max-num-batched-tokens=32768`,
   `--max-num-seqs=512`, two pods of 8 ranks) until a file says otherwise.
 - R125. `[UPSTREAM]` What the new argument does in vLLM v0.29.0: in one engine step a
@@ -886,13 +895,13 @@ on and off, and with LMCache on and off.
   100,000-token prompt needs 13 steps instead of 4. `[FILE]` The owner measured the
   8192-per-step case on 2026-10-04, when 8192 was the total of a step: 100k-token
   prompts had a median time to first token of 22.8 s, and the total was raised for that
-  reason (`charts/glm53-bundled/values.yaml:269-275`; the other arguments of that day
+  reason (`charts/glm53-bundled/values.yaml:286-292`; the other arguments of that day
   are not the ones that run now). So expect that short prompts wait less behind long
   ones, and that a long prompt on a quiet rank starts later. `[NOT TESTED]` on the
   build that runs.
 - R126. `[FILE]` The record on the GPU memory share. 0.93 crash-looped at engine start
   with CUDA out of memory on 2026-10-04, at a step total of 16384
-  (`charts/glm53-bundled/values.yaml:257-265`). The rollout history of 2026-10-12 shows
+  (`charts/glm53-bundled/values.yaml:274-282`). The rollout history of 2026-10-12 shows
   0.96 at 10:05 and 10:14, 0.95 at 10:26 and 10:31, 0.90 at 12:04, then 0.85 from 13:39
   on, together with `--max-num-seqs=512` and a step total of 32768
   (`live-cluster/ns-llm-glm53/replicasets_apps.yaml`; it does not say why a value was
@@ -920,7 +929,9 @@ on and off, and with LMCache on and off.
   another rank's active score is about a third higher. Two cases with the busiest rank
   at 4 requests: home at 3 and another at 2 is a difference of 0.25, and it stays under
   both weights; home at 4 and another at 2 is a difference of 0.5, and it stayed with
-  weight 3 and leaves with weight 1.
+  weight 3 and leaves with weight 1. This paragraph is the rule for the scorer's
+  default. The chart has `maxBusyScore: 0.5` since 2026-10-13 and the owner applied it
+  on 2026-10-14, so the rule that holds is the one in R132.
 - R128. What R124 means for the open finding above. The weight change tests one of its
   two candidate causes and makes the other worse. If repeated prompts were slow because
   they queued on the rank that held the prefix, weight 1 helps. If they were slow
@@ -939,24 +950,284 @@ on and off, and with LMCache on and off.
 - R129. `[OWNER]` 2026-10-13, `[FILE]`
   `charts/envoy-ai-gateway/templates/gateway.yaml:58-92` and
   `gateway.envoyProxy.accessLog.enabled: true` in that chart's `values.yaml:254-255`.
-  The gateway writes its own JSON log format, not Envoy Gateway's default, and the
-  format has two new fields: `request_tx_duration` and `response_duration`. The
+  The gateway chart writes its own JSON log format, not Envoy Gateway's default, and
+  the format has two new fields: `request_tx_duration` and `response_duration`.
+  Live since the `envoy-ai` app synced at about 18:15Z on 2026-10-13: the offline agent
+  measured it that day (the log lines carry `request_id` and the two new fields).
+  Before the sync the proxies wrote the default format. One line of the proxy's log
+  says which format runs: `request_id` is the chart's, `x-request-id` the default.
+  The
   field names are not the default ones, which the lab had: the request id is
   `request_id` (default: `x-request-id`), and there is no `upstream_local_address`,
   `x-forwarded-for`, `downstream_remote_address` or
-  `upstream_transport_failure_reason`. So a line no longer has the client's address
+  `upstream_transport_failure_reason`. So after the sync a line no longer has the client's address
   or the reason a connection to a peer failed. T1 in section 12 and its script read
   both formats.
 - R130. `[OWNER]` 2026-10-13, `[FILE]` the site values of `envoy-ai`
   (`gitops/app-of-apps/sites/site-a/prep/mces/cluster-mce-prep/cluster-llm-prep/envoy-ai/values.yaml`):
-  `ai-gateway.controller.quotaRateLimitTimeout: 1`. `[UPSTREAM]` The flag is whole
+  `ai-gateway.controller.quotaRateLimitTimeout: 1`. Live since the same sync (R129):
+  the offline agent measured `--quotaRateLimitTimeout=1` in the controller
+  Deployment's arguments on 2026-10-13. No such argument would mean 5.
+  `[UPSTREAM]` The flag is whole
   seconds, an int64 (`cmd/controller/main.go:280`), and becomes the timeout of the
-  rate limit filter (`internal/extensionserver/quota_ratelimit.go:261`). So a rate
-  limit service that hangs holds a request for 1 second, not 5 (R32), and then lets
+  rate limit filter (`internal/extensionserver/quota_ratelimit.go:261`). So a
+  rate limit service that hangs holds a request for 1 second, not 5 (R32), and then lets
   it through uncounted: during a slow period the fail-open of R105 comes sooner and
   for more requests, still with no alert (T3). The value is in the site layer, so
   another site keeps 5 unless its own values say otherwise. By constraint 9 its place
   is `gitops/app-of-apps/operators/envoy-ai/values.yaml`.
+- R131. `[OWNER]` 2026-10-13. The GLM app deploys the chart repo's branch `main`, no
+  longer `bundled`: the owner moved the tuned bundle to `main`. No model app syncs by
+  itself (measured by the offline agent), so a commit on `main` runs only after the
+  owner syncs the app. `[FILE]` `gitops/app-of-apps/operators/glm53/glm53.yaml` has
+  `targetRevision: main` since that day. The export's `charts/glm53-bundled` is an
+  older `main` with the settings of R124 and R132 written in. In its other arguments
+  it is not what runs: it has no LMCache, a step budget of 16384 and the 0.30 image.
+- R132. `[OWNER]` 2026-10-13, in git on `main`. **Not live when measured that day**: the
+  deployed `--config-text` had no `parameters` block and the GLM app was out of sync
+  (offline agent). Applied on 2026-10-14 together with scheduler v0.11.0 (owner, R133).
+  `[FILE]`
+  `charts/glm53-bundled/values.yaml:223-240`. The scheduler's `active-request-scorer`
+  has one parameter, `maxBusyScore: 0.5`.
+  `[UPSTREAM]` v0.10.0,
+  `pkg/epp/framework/plugins/scheduling/scorer/activerequest/active_request.go:173-183`:
+  an endpoint with no request in flight scores 1; a busy one scores
+  `(max - count) / max * maxBusyScore`. `requestTimeout` is deprecated and ignored
+  (`:23-25`, `:77-80`), and `idleThreshold: 0` is the default, so neither is set.
+  `[COMPUTED]` With the weights 3 (active), 1 (token load) and 1 (prefix):
+  - An idle rank without the prefix scores about 3.95 to 3.99. The best a busy rank
+    that holds the prefix can reach is 1.5 + 1 + 1 = 3.5. So **an idle rank always
+    beats a busy holder**. The condition is `active weight * maxBusyScore + prefix
+    weight < active weight`: below 0.66 at these weights.
+  - Among busy ranks, the holder keeps a conversation while
+    `1.5 * (its count - the other's count) / max` is less than the match. With a full
+    match that is a lead of two thirds of the busiest rank's count. With the default
+    it was one third (R127), so under full load the holder is stickier than before.
+    Active weight 6 with `maxBusyScore: 0.5` would give one third again.
+  - Why not 0, which KServe's sample uses
+    (`docs/samples/llmisvc/precise-prefix-kv-cache-routing/` at v0.21.0-rc1): once each
+    of the 16 ranks has a request, every rank scores 0 and this scorer says nothing.
+    The sample also has a queue scorer and a KV-utilization scorer; this profile does
+    not, because they read one rank of eight (R113).
+  `[UPSTREAM]` Two limits that the value does not remove. The `max-score-picker` of
+  v0.10.0 breaks ties by a random shuffle
+  (`pkg/epp/framework/plugins/scheduling/picker/maxscore/picker.go:91-92`), and the
+  in-flight count rises after the decision, so two requests of one burst can still pick
+  the same idle rank. v0.11.0 takes turns among equal top scores (pull requests 2515
+  and 2709 of `llm-d/llm-d-router`); its scorer formula is the same as v0.10.0's.
+  And requests in flight at the same time with the same `x-request-id` leave a rank's
+  count too high until the scheduler restarts (issue 3142, fixed on the main branch
+  after v0.11.0). `[NOT TESTED]` The benchmark's check of this change (the prefix
+  phases against the control, and the burst at 64) had not reported when this was
+  written.
+- R133. `[OWNER]` 2026-10-14. The scheduler runs v0.11.0 on all three models. The owner
+  changed it in KServe's preset `kserve-config-llm-scheduler` (an
+  `LLMInferenceServiceConfig` in the kserve chart, which is not in the export), not per
+  model, and applied `maxBusyScore: 0.5` (R132) with it. The owner reports better
+  performance. The numbers are not in this pack, and it is not known whether the two
+  changes were measured apart; if not, the gain belongs to the pair.
+  `[UPSTREAM]` What v0.11.0 changes for this platform's configs, read in the source of
+  both tags:
+  - The `max-score-picker` lets equal top scores take turns; v0.10.0 shuffled them at
+    random (`pkg/epp/framework/plugins/scheduling/picker/maxscore/picker.go`). With
+    R132 all idle ranks without the prefix tie, so this decides where a burst goes.
+  - Unchanged: the formulas of `active-request-scorer`, `token-load-scorer` and
+    `prefix-cache-scorer` (R127 and R132 hold); the metric reader, which still takes
+    one series per family (R113); the command-line flags (three added, none removed);
+    the `InferenceObjective` definition; the permissions the scheduler needs.
+  - Removed, and a config that uses one fails at startup: the plugins
+    `pd-profile-handler`, `precise-prefix-cache-scorer`, `by-label`,
+    `by-label-selector` and `tokenizer`; the top-level fields `saturationDetector` and
+    `parser` (`flowControl.saturationDetector` stays, and that is the one
+    `charts/llm-model` uses, R84); the parameter `outputRatio` of
+    `inflight-load-producer`. No chart in the export uses any of them.
+  - Metrics: the old families are gone (R25). The `llm_d_epp_*` names stay, among them
+    `llm_d_epp_inflight_requests` per `endpoint_name`.
+  - Logs and spans: the JSON log field `msg` is now `body`. With tracing on, spans go
+    to an OTLP collector by default; `OTEL_TRACES_EXPORTER=console` on the scheduler
+    container prints them on stdout as before
+    (`pkg/common/observability/tracing/telemetry.go:189-222`).
+  - Not fixed in v0.11.0: the leaked count of issue 3142 (R132), and requests with the
+    same prefix that arrive together, which still all see the holder as idle.
+  `[UPSTREAM]` KServe v0.21.0 reads the scheduler's version from the annotation
+  `app.kubernetes.io/version`, not from the image tag, in two places.
+  `pkg/controller/v1alpha2/llmisvc/scheduler.go:1436` reads it on the scheduler's pod
+  template and from 0.11.0 strips three removed plugin names (`:1527-1537`).
+  `config_merge.go:151-164` reads it on the preset itself: from 0.11.0 a model with no
+  scheduler config of its own gets the preset
+  `kserve-config-llm-scheduler-eppconfig-default` in place of the old built-in text.
+  In the snapshot the judge is such a model; GLM and qwen38 have their own config.
+  `[NOT TESTED]` Four things to read on the platform, because the change went in through
+  the preset:
+  - The annotation in the preset. `0.11.0`: KServe knows the version. Still `0.10.0`:
+    image and annotation disagree. That works for these configs today; set the
+    annotation so that KServe's migrations for 0.11.0 apply.
+  - The judge's deployed `--config-text`. With `queue-scorer`,
+    `kv-cache-utilization-scorer` and `no-hit-lru-scorer` it is the old built-in text.
+    With `prefix-cache-affinity-filter` and `token-load-scorer` its scheduling changed
+    with the upgrade; say so wherever the judge's behaviour is described.
+  - Spans on the scheduler's stdout. None: the default moved to OTLP, set the variable
+    above.
+  - `llm_d_epp_inflight_requests`, summed by `endpoint_name`, when there is no traffic.
+    Above 0 on a rank: a leaked count. A scheduler restart clears it.
+- R134. Benchmark run 4 (2026-10-14, after R132 and R133) and its three proposals.
+  Reported by the offline agent, in no file: against a comparison stack with a thin
+  proxy and sticky routing, time to first token on a repeated 31.5k-token prefix is
+  801 ms against 314 ms; in the burst phase the median is 488 ms against 275 ms; the
+  burst's 99th percentile went from 673 ms (run 3) to 1,562 ms (run 4); loading that
+  prefix from LMCache took 445 to 472 ms. The proposals were: lower a "chain floor"
+  of about 330 ms by connection pooling or TLS session reuse on the hairpin; raise
+  `maxBusyScore` from 0.5 to about 0.7 so that a burst goes to warm ranks; tune the
+  LMCache load. What the source says about each:
+  - `maxBusyScore: 0.7`. `[COMPUTED]` from R132's formula, which v0.11.0 keeps
+    (`.../scorer/activerequest/active_request.go:192-198`), at the weights 3, 1, 1.
+    A busy rank that holds the prefix beats an empty rank when
+    `2.1 * (1 - count/max) + 1 > 3`, so when its count is under 1/21 of the busiest
+    rank's: with one request in flight, another rank needs more than 21. That does
+    not happen while empty ranks take the load, so against empty ranks 0.7 behaves
+    like 0.5. When every rank is busy, the holder keeps a conversation up to a lead of
+    `1 / (3 * 0.7)` = 48 % of the busiest count; at 0.5 it is 67 % (R132). So 0.7
+    spreads **more** under full load. It does not send a burst to warm ranks.
+  - The parameter that does that is `idleThreshold`. `[UPSTREAM]` same file, `:192`: a
+    rank with `count <= idleThreshold` scores 1.0, the same as an empty one. `[COMPUTED]`
+    With `idleThreshold: 2` a holder with up to 2 requests in flight scores 3 + 1 and
+    beats an empty rank without the prefix (3 + 0); at 3 in flight it is busy and
+    loses. So a warm rank takes at most `idleThreshold + 1` requests of a prefix
+    before the next one goes elsewhere. The limit holds only as far as the counts are
+    fresh: they rise after the decision (R132), so requests that arrive in the same
+    instant can overshoot it. `[NOT TESTED]`
+  - The chain floor. `[LAB]` On the same gateway versions the hop from the entry
+    route to the peer listener cost about 20 ms and the whole chain 29 ms (R67, T1),
+    and the peer line of the log shows `HTTP/2`: the requests share one kept
+    connection and the TLS handshake is per connection, not per request. `[UPSTREAM]`
+    Envoy Gateway v1.9.2, `internal/xds/translator/cluster.go:283-302` and
+    `:1204-1210`: a backend with TLS gets Envoy's automatic choice between HTTP/1.1
+    and HTTP/2. So pooling and session reuse have nothing left to save on that hop.
+    The same agent measured on 2026-10-13, for a light request, 185 to 190 ms with a
+    prompt never sent before and 369 to 372 ms with a repeated one; the difference is
+    LMCache loading one 256-token chunk on a rank that does not hold it, which takes
+    longer than computing it (LMCache v0.5.5 has no minimum load size,
+    `lmcache/integration/vllm/lmcache_mp_connector.py:1078`). A floor measured with a
+    repeated prompt contains that load. Measure it both ways before naming the gateway.
+  - The LMCache load. `[UPSTREAM]` One option exists in v0.5.5:
+    `lmcache.mp.eager_prefetch`, off by default (same file, `:465-466`, `:1092-1109`).
+    It sends the lookup when a request enters the rank's waiting queue, not when the
+    scheduler first reaches it; vLLM v0.29.0 calls that hook
+    (`vllm/v1/core/sched/scheduler.py:2412-2413`). It gains only where requests wait
+    in a rank's queue, and a lookup locks its chunks. `[NOT TESTED]` It would go into
+    the connector's extra config, which the chart's template builds
+    (`charts/qwen38-bundled/templates/_helpers.tpl:35-44` in the sibling chart).
+  - Storage is per node: one LMCache engine and one disk on each of the two nodes
+    (offline agent, measured 2026-10-13). A prefix stored on one node is a miss on the
+    other, and the scheduler's prefix score is per rank and knows nothing of nodes.
+  `[NOT TESTED]` Read these for the burst before changing a value:
+
+  | Read | Result | Do |
+  |---|---|---|
+  | The burst five times, nothing changed | Its 99th percentile moves by as much as run 3 differs from run 4 | Noise: with 128 requests that percentile is the second slowest request. Tune nothing on it |
+  | Requests per rank in the burst, and `vllm:prompt_tokens_by_source` per rank | Spread over all ranks, most cached tokens from `external_kv_transfer` | The warm ranks are skipped. Try `idleThreshold: 1`, then `2`; the prefix phases must stay as they are |
+  | The slowest requests' entry line, `request_tx_duration` (R129) | Far above the same field outside the burst | The entry: new connections or the quota call. A gateway finding, T1 |
+  | `vllm:request_queue_time_seconds` on their ranks | High | The rank's own batch: several prefills at once against the token budget and the prefill cap (R124). Not the scheduler |
+  | The floor with a new prompt each time, and with one repeated | About 190 ms and about 370 ms | The gap is the one-chunk load above, not the gateway |
+- R135. Measured by the offline agent on 2026-10-14, after R134: idle platform, one
+  request at a time, sent straight to a rank port. It confirms R134 on the floor and
+  on the burst.
+
+  | The rank | Time to first token | Tokens by source |
+  |---|---|---|
+  | holds the prompt in its GPU memory | 139 to 142 ms | `local_cache_hit` |
+  | does not, and neither does its node's LMCache | 209 to 211 ms (404 tokens) | `local_compute` |
+  | does not, its node's LMCache does | 391 ms | 256 `external_kv_transfer` |
+
+  The slow case does not stay with a rank: the rank that took 391 ms took 139 ms on
+  the next identical request. A rank on the other node computed the prompt: storage is
+  per node. A prompt of about 2,560 tokens took 385 ms computed and 374 ms loaded
+  (ten chunks). So a load costs about 230 ms whatever its size, plus about 2 ms a
+  chunk, and on an idle rank computing is faster below about 2,500 tokens.
+  - A rank that holds the prompt can still pay it. The 2,560-token prompt again on the
+    same rank: 371 ms, 2,496 tokens `local_cache_hit` and 64 `external_kv_transfer`.
+    `[UPSTREAM]` Why: GLM runs with `--speculative-config.method=mtp`
+    (`live-cluster/ns-llm-glm53/llminferenceservices_serving_kserve_io.yaml:111`,
+    `charts/glm53-bundled/values.yaml:314`). vLLM v0.29.0 treats MTP like EAGLE
+    (`vllm/config/speculative.py:1843-1847`) and then cuts the last unit off every
+    local hit, because the draft head needs those tokens recomputed
+    (`vllm/v1/core/single_type_kv_cache_manager.py:774-779`,
+    `vllm/v1/core/kv_cache_coordinator.py:115-125`). `[COMPUTED]` Both measurements fit
+    a unit of 64 tokens: 404 tokens give 384 aligned, less 64 is the 320 measured; the
+    longer prompt gives 2,560, less 64 is 2,496. LMCache holds whole 256-token chunks,
+    and the connector loads whatever LMCache has beyond the local hit
+    (`lmcache/integration/vllm/lmcache_mp_connector.py:1078`). So a repeat on a warm
+    rank loads 64 tokens, and pays the fixed cost, when the prompt's token count is 0
+    to 64 past a multiple of 256: about one prompt in four. The cut is needed for MTP;
+    it is not a setting.
+  - Where the fixed cost is. `[UPSTREAM]` vLLM v0.29.0 counts a request that waits for a
+    load as queued: it is parked without the `SCHEDULED` event
+    (`vllm/v1/core/sched/scheduler.py:1128-1157`) and gets that event only when it
+    runs (`:1163-1166`). The agent read 68 ms more queue time on requests with a load.
+    So LMCache's lookup and load together take about 68 ms, and about 160 ms of the
+    cost is not in the queue. `[NOT TESTED]` Read, for one request with a load and one
+    without, the differences of `vllm:request_prefill_time_seconds_sum` and
+    `vllm:time_to_first_token_seconds_sum`:
+
+    | Result | It is | Look at |
+    |---|---|---|
+    | Prefill time is about 160 ms longer | In the engine's step right after a load | The worker side of the connector: `start_load_kv` and `wait_for_save` (`:742`, `:829`) |
+    | Prefill the same, vLLM's first-token time about 230 ms longer | Before the request is queued | The API server process and its hand-over to the engine |
+    | vLLM's first-token time only about 68 ms longer | After vLLM's own clock | How the client measures the first token, and the stream's first chunk |
+  - The smallest fix. `[NOT TESTED]` In the connector, after `:1078`, treat a load
+    below a minimum as no load (`need_to_load = 0`). A full local hit already takes
+    that path, and `update_state_after_alloc` then frees the chunks the lookup locked
+    (`:1157-1175`). 2,048 tokens is a starting value: the break-even above was
+    measured on an idle rank, and computing gets slower under load. It removes the
+    one-chunk load on a cold rank and the 64-token load on a warm one. It is a carried
+    patch in the vLLM image; LMCache v0.5.5 and its `dev` branch have no such setting.
+  - The burst, five identical runs: the 99th percentile was 650 to 730 ms. The 1,562 ms
+    of run 4 did not come back; there it was 14 requests in one stall of 0.6 s. Every
+    rank served 7 to 10 requests, the queue time on the rank (240 to 460 ms) was the
+    largest part, and the entry's own work was 55 ms at the 99th percentile. Nothing
+    to change in the gateway or the scheduler for it.
+- R136. `[UPSTREAM]` LMCache (`LMCache/LMCache`, default branch `dev`), read on
+  2026-10-14.
+  - The minimum load size of R135 is not in the mode this platform runs. The older
+    in-process integration has it since February 2026 (`min_retrieve_tokens`, pull
+    request 2484, `lmcache/integration/vllm/vllm_v1_adapter.py`). The multiprocess
+    connector does not, in v0.5.5 or on `dev`: `dev` still returns
+    `max(0, ret - num_computed_tokens)` unchanged
+    (`lmcache/integration/vllm/lmcache_mp_connector.py:1357-1378` on `dev`).
+    It was never removed from that connector; it was never in it. The connector is
+    separate code that LMCache added on 2026-05-13 (pull request 3235), three months
+    after the option went into the in-process integration, and the in-process mode
+    was marked deprecated on 2026-07-01 (pull request 3963). No issue, pull request
+    or commit gives a reason for leaving the option out.
+  - Pull request 5536 (open, opened 2026-10-07) adds a pluggable policy in the LMCache
+    server that decides, before the lookup, whether to load or let the engine
+    compute. Its text says it does not see the hit length and leaves that case for
+    later ("a second hook inside the prefetch controller"), and that the in-process
+    connectors keep their own `min_retrieve_tokens`. So it does not give the rule of
+    R135. A maintainer wrote "LGTM in general" on it on 2026-10-13, so it is likely
+    to merge, and it shows where the maintainers want this decision: in the server.
+  - The owner has a fork with that rule as the connector option
+    `lmcache.mp.min_retrieve_tokens` (default 0, which changes nothing): branch
+    `mp-min-retrieve-tokens`, one commit on `dev`. No pull request is open; the owner
+    decides when. `[NOT TESTED]` Its tests were written and not run. The same two
+    hunks fit the connector of v0.5.5.
+  - **Check this on qwen38.** Two fixes for wrong output with the multiprocess
+    connector on hybrid Qwen3.x models were merged after v0.5.5 was cut (2026-09-12),
+    so v0.5.5 does not have them: pull request 5004 (2026-09-23, MTP) and 4253
+    (2026-09-28, the KV layout of vLLM 0.26 and later). Issue 4984 reports, for
+    Qwen3.8 with this connector, garbage text on a prompt loaded back from LMCache.
+    qwen38 here is a hybrid Qwen3.8 with MTP
+    (`live-cluster/ns-llm-qwen38/llminferenceservices_serving_kserve_io.yaml:93-94`)
+    on LMCache v0.5.5. `[NOT TESTED]` Whether it is hit is not known. The check is
+    the one of that issue: send a prompt of several chunks at temperature 0 and keep
+    the answer; wait 30 s; make the rank forget it (`POST /reset_prefix_cache`, which
+    needs vLLM's dev mode, or restart the pod); send the same prompt again.
+
+    | Result | It means | Do |
+    |---|---|---|
+    | Same text, and `external_kv_transfer` rose | A load from LMCache gives correct output here | Nothing |
+    | Different or garbage text, and `external_kv_transfer` rose | The reported defect | Tell the owner at once. Turn LMCache off for qwen38 until it runs a release with both fixes: v0.5.6rc5 (2026-10-12) has them, v0.5.6 final was not out on 2026-10-14 |
+    | `external_kv_transfer` did not rise | Nothing was loaded, so nothing was tested | Check that the chunk size matches what vLLM logs as its attention block size with MTP on; a wrong size turns the cache off silently |
 
 ---
 
@@ -1126,8 +1397,9 @@ What the gateway's log can tell. `[LAB]`, on the same gateway versions:
 - Every request writes two lines in the proxy's log: one for the entry route
   (`route_name` contains `fleet-<slug>`) and one for the peer route (`<model>-peer`).
   Both carry the same request id. That is the join key. Its field is `request_id` in
-  the gateway chart's own format, which the real platform writes since 2026-10-13
-  (R129), and `x-request-id` in Envoy Gateway's default format, which the lab had.
+  the gateway chart's own format, which the real platform writes since the `envoy-ai`
+  app synced on 2026-10-13 (R129), and `x-request-id` in Envoy Gateway's default
+  format, which the lab had.
 - Useful fields in both formats: `start_time`, `duration` (ms, the whole request, the
   stream included), `bytes_received` (the size of the request body), `response_code`,
   `response_flags`, `upstream_host`. Only the default format has
@@ -1233,8 +1505,8 @@ What to do with each result:
 | A + R + B + V is far below C | Outside the platform: a client that opens a connection per request, DNS, the load balancer in front, or how the benchmark defines the first token (a thinking model's first content token comes after its thinking) | Not a platform finding. Write in `04-OPEN-QUESTIONS.md` how the benchmark should measure: reuse connections, run once from inside the cluster, state which event counts as the first token |
 | The numbers cannot be had (no access, the log is too short, metrics are not scraped) | Unknown | An open question with the commands for the owner, and the roadmap candidate below |
 
-What was a roadmap candidate here is done: since 2026-10-13 the gateway chart writes
-both fields (R129). `[UPSTREAM]` In Envoy 1.39.1 `%REQUEST_TX_DURATION%` is the time
+What was a roadmap candidate here is done: since 2026-10-13 the gateway writes both
+fields (R129). `[UPSTREAM]` In Envoy 1.39.1 `%REQUEST_TX_DURATION%` is the time
 from the start until the request is fully sent upstream, and `%RESPONSE_DURATION%` the
 time from the start until the first byte from upstream. What is left as a candidate
 is three more fields in the same format. `%REQUEST_DURATION%` (from the start until
