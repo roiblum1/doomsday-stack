@@ -193,6 +193,10 @@ llmisvc:
     - --max-num-seqs=64            # per DP rank -> 512 per node
     - --max-num-batched-tokens=16384
     - --enable-prefix-caching
+    # Gateway billing and aigw-ui's token counts: cached prompt tokens and
+    # usage on streamed answers (as glm53-bundled, qwen38-bundled, qwen36-judge).
+    - --enable-prompt-tokens-details
+    - --enable-force-include-usage
     - --per-request-spec-decode-metrics=summary
     - --kv-cache-metrics
     - --speculative-config.method=mtp

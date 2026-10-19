@@ -12,6 +12,6 @@ description: >-
   (Claude Code /anthropic/v1/messages passthrough; see
   aigatewayRoute/anthropicBackend values).
 type: application
-version: 0.2.6
+version: 0.2.7
 appVersion: "qwen3.8-27b-fp8"
 kubeVersion: ">=1.29.0-0"

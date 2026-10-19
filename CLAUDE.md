@@ -15,13 +15,37 @@ It is a snapshot kept in git, not the source of truth. The real sources are per-
 - **Do not "fix" sanitizer artifacts.** `REDACTED`, `REDACTED-B64`, `REDACTED-ENV`, `REDACTED-HEX` and `REDACTED-PEM-BLOCK` appear inside templates and values (for example `type: REDACTED`, `kind: REDACTED`). They are not bugs to guess at.
 - **Do not run `helm dependency build/update`** (needs the network and rewrites files).
 
+## Architecture knowledge base (shared with aigw-ui)
+
+The ecosystem's architecture knowledge lives outside this repo, in `../../architure-learning/` (`/Users/roiblum/Downloads/scripts/architure-learning/`). It covers this serving site and the hub `aigw-ui` (`../../envoy-ai-UI`).
+
+**Before** designing a feature, read:
+- `README.md` (the index)
+- `01-ecosystem-overview.md` (the request path and the fleet contract)
+- `03-serving-site.md`
+- `09-best-practice-review.md` (KServe, llm-d, Envoy AI Gateway and Envoy Gateway findings for this site)
+- `10-open-risks.md`
+
+Its facts were checked against `live-cluster/`. It is more reliable than this repo's `docs/`, but less reliable than the YAML.
+
+**When you create or change a feature here (chart, values, serving or gateway config), update the knowledge base in the same piece of work:**
+
+1. **Topic file:** edit `03-serving-site.md` in place for what changed. `01-ecosystem-overview.md#fleet-contract` gets the update if names, listeners, headers, annotations or ownership with the hub change.
+2. **`LOG.md`:** add an entry at the top: date, chart/app and version, outcome; what changed and why; invariants; what was verified (`helm lint`/`template`) and what was not; the files touched.
+3. **Decisions:** a design choice with a reason gets a row in `06-decisions.md`.
+4. **Risks:** new risks or limits go in `10-open-risks.md`. A best-practice item from `09` that you fix gets marked done, with a LOG entry.
+5. **Stale docs:** a stale doc in this repo that you find or fix goes in `08-doc-drift.md` (or comes out of it).
+6. **Hub impact:** if the change affects what the hub assumes (see the section "aigw-ui" below), also update `../../envoy-ai-UI/CLAUDE.md` or tell the user that the hub needs a change.
+
+The hard rules above apply to the knowledge base too: **sanitized placeholders only**, and no host, IP, user or key inferred from this export.
+
 ## What to trust
 
 Precedence when sources disagree: `live-cluster/` YAML > `gitops/app-of-apps/` > `charts/` > `docs/`.
 
 - **`docs/` is unreliable.** `ARCHITECTURE.md`, `LIVE_STATE.md`, `GITOPS.md` and `CHARTS.md` contradict each other and the files (route tables, quota schema and limits, sync options, API versions, layer order). Verify any doc claim against YAML before repeating it.
 - **Doc path aliases:** `cluster/…` means `live-cluster/…`; `argocd/…` means `gitops/app-of-apps/…`.
-- **Exported charts are not the deployed revisions** for glm53, envoy-ai and envoy-gateway. `charts/glm53-bundled` is the `main` branch; live runs branch `bundled` (LMCache, peer route, different vLLM args). Its "KEEP AT 0.90" comment is superseded. Do not copy values from it as if live.
+- **Exported charts are not the deployed revisions** for glm53, envoy-ai and envoy-gateway. `charts/glm53-bundled` is the chart repo's `main` branch as it was on 2026-10-12, with the settings the owner reported since written in (GPU memory share, prefill cap, scorer weights and `maxBusyScore`). The snapshot ran branch `bundled` (LMCache, peer route, different vLLM args); since 2026-10-13 the app deploys `main`, which now holds that bundle and is newer than this copy. Do not copy its other values as if live.
 - **`gitops/platform-repo/` is an older checkout** of the same values repo. Use `gitops/app-of-apps/`.
 - **Chart READMEs and comments are stale in places** (qwen38 still says TP2xDP3 and chunk 1568; values are TP4/DP1 and 1600).
 - **Not in this export:** the kserve and lmcache charts (the root README wrongly lists them under `charts/platform/`), the `glm53-anthropic-alias` chart, the ApplicationSet chain and `deploy` chart, the values that enable the live `peers` listener, PerformanceProfiles (file is empty), and every `scripts/` directory or `_validate.tpl` under `generic-model` that the docs cite.
@@ -64,6 +88,7 @@ A Go hub service (React UI, Postgres) that writes gateway objects directly to cl
 - It owns everything labelled `app.kubernetes.io/managed-by: aigw-ui`: `fleet-<slug>` (AIGatewayRoute, AIServiceBackend, Backend, BackendTrafficPolicy), `fleet-<slug>-retry` (EnvoyPatchPolicy), `fleetbe-<slug>`, QuotaPolicies, InferenceObjective `best-effort`, Secret `aigw-ui-api-keys`, SecurityPolicy `aigw-ui-api-key-auth`.
 - **Never template, hand-edit or GitOps-manage those objects, and never put that label on a chart object.** The hub force-applies every 5 minutes and prunes by label.
 - It also stamps annotation `gateway.envoyproxy.io/aigw-ui-quota-revision` on chart-owned AIGatewayRoutes. Charts must not strip it.
+- It reads, and never writes: each LLMInferenceService's `InferencePool` `targetPorts`, to aim capacity measurements (keep them the ports the model server answers on, one per data-parallel rank, as glm53's 8000–8007); the `Deployment` or `LeaderWorkerSet` KServe names in `status.workloads`, for ready counts; `status.router.gateways[].listeners`, and it warns when a model's KServe route is on the client listener (keep `kserveRouteListener: peers`); the HTTPRoutes Envoy Gateway names when their own SecurityPolicy replaces the hub's on the client listener, to leave out a route that forwards nothing, such as this gateway chart's health check (`health.enabled`). Without get on HTTPRoutes in the gateway namespace, a site with the health check on gets that warning on every sync (aigw-ui 0.29.0). From aigw-ui 0.29.0 a token also carries the tenant to the scheduler in `x-llm-d-inference-fairness-id` (keep it in the client listener's `removeRequestHeaders` and out of the peer listener's), and each sync warns when best-effort would not rank below regular tenants on a pool that serves a best-effort model: keep flow control on in that `LLMInferenceService`'s scheduler config (`featureGates: [flowControl]`, `concurrency-detector`), keep the model's own class `standard` at 0 or more and above `best-effort` (−1), and give each such pool a namespace of its own (one `best-effort` per namespace, and the scheduler takes only a class whose `poolRef` is its pool). From aigw-ui 0.29.0 it writes its retry patches for both RouteConfiguration names, so Envoy Gateway 1.10's `XDSNameSchemeV2` needs no flag change. From aigw-ui 0.30.0: with its `redis.tokenCounts` on (the default) the hub's BackendTrafficPolicy `aigw-ui-tenant-budgets` is on the client listener even without budgets, with four counting rules, so Envoy Gateway's global rate limiting must be on wherever tenants use tokens; the hub's sync warns when a best-effort model's scheduler has flow control but serves priority 0 oldest first: give that band `fairnessPolicyRef: round-robin-fairness-policy` (declare the plugin) so one tenant's backlog does not hold up the others (aigw-ui `docs/optimization.md#tenants-in-turn`). Optional: a `GatewayConfig` (annotation `aigateway.envoyproxy.io/gateway-config` on the Gateway, same namespace) with `globalLLMRequestCosts` keys `aigw_ui_input` (InputToken), `aigw_ui_cached` (CachedInputToken), `aigw_ui_output` (OutputToken), for token counts on routes the hub does not touch.
 - **Names are quota counter keys.** Renaming the gateway namespace, an AIServiceBackend or a model silently splits or resets budgets.
 - Charts must provide what it assumes: both listeners, ConfigMap `llm-peer-ca`, Secret `llm-peer-client`, a peer-listener route serving the model and answering `/healthz/<model>`, `enableEnvoyPatchPolicy: true`, and the ClientTrafficPolicy header strip list.
 - In that repo: `make test`; single test `go test ./internal/render/ -run <Name> -count=1 -v`. CI gates on `gofmt`, `go vet`, `hack/check-duplication.sh`, `hack/check-chart.sh` and `hack/check-release-note.sh` (chart `version` = `appVersion`, with a matching `docs/release-notes/v<version>.md` listed in its README). Commit subjects are plain outcome sentences, releases prefixed `0.12.1: …`. `hack/deploy-hub.sh` and `hack/seed-demo.py` touch live systems; do not run them.

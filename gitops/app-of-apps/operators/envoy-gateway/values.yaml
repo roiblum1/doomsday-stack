@@ -10,6 +10,13 @@ envoy-gateway:
   global:
     imageRegistry: registry-internal/kserve
     images:
+      # Envoy Gateway's own rate limit service (envoy-ratelimit), which runs
+      # once a cluster turns on global rate limiting (rateLimit:, in the
+      # site layer). The chart's default is a full mirror reference, which
+      # imageRegistry would double. This is the build the live config named
+      # and the AI gateway's quota service runs, so the mirror has it.
+      ratelimit:
+        image: docker.io/envoyproxy/ratelimit:0482748e
       envoyProxy:
         # Data-plane image, digest-pinned to what Docker Hub published, so
         # the mirror holds the same bits. Rewritten to the path above.

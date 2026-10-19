@@ -57,7 +57,15 @@ spec:
           sectionName: {{ . }}
           {{- end }}
     route: {}
-    {{- with .Values.llmisvc.scheduler }}
+    {{- $fc := .Values.llmisvc.flowControl | default (dict) }}
+    {{- if not (has ($fc.fairnessPolicy | default "") (list "" "round-robin-fairness-policy")) }}
+    {{- fail "llmisvc.flowControl.fairnessPolicy must be empty or round-robin-fairness-policy" }}
+    {{- end }}
+    {{- $sched := .Values.llmisvc.scheduler }}
+    {{- if $fc.enabled }}
+    {{- $sched = include "glm53.schedulerWithFlowControl" . | fromYaml }}
+    {{- end }}
+    {{- with $sched }}
     scheduler:
       # Pin the EPP to the chart's ServiceAccount instead of letting kserve
       # mint its own <name>-epp-sa. Unpinned, the controller deep-copies the

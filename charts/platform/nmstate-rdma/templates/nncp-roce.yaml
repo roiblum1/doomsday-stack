@@ -5,8 +5,14 @@ cannot carry a different IP per node). Per NIC: static IPv4 + routes, optionally
 across a per-NIC routing table (table-id) with source-based route-rules for deterministic
 NIC selection (NCCL_CROSS_NIC=0 enforced host-side).
 Schema: nmstate.io ethernet interface + top-level routes.config[] + route-rules.config[].
+
+RoCE LAG: when a NIC entry has `bond`, its `name` is a bond over bond.ports (both ports of
+one dual-port card, and only them: that is what makes the mlx5 driver merge the card into
+one RDMA device, mlx5_bond_N). The IP, route-rule and routes then sit on the bond; the
+ports carry only the MTU.
 */}}
 {{- if eq .Values.mode "roce" }}
+{{- $bondDefaults := .Values.roce.bond | default dict }}
 {{- range $node := .Values.roce.nodes }}
 {{- range $nicIdx, $nic := $node.nics }}
 {{- $parts := splitList "/" $nic.ip }}
@@ -27,10 +33,38 @@ spec:
     kubernetes.io/hostname: {{ $node.name }}
   desiredState:
     interfaces:
+      {{- if $nic.bond }}
+      {{- if ne (len $nic.bond.ports) 2 }}
+      {{- fail (printf "roce.nodes[%s].nics[%s].bond.ports must list exactly the two ports of one card (RoCE LAG)" $node.name $nic.name) }}
+      {{- end }}
+      {{- range $port := $nic.bond.ports }}
+      - name: {{ $port }}
+        type: ethernet
+        state: up
+        mtu: {{ $.Values.roce.mtu }}
+        ipv4:
+          enabled: false
+        ipv6:
+          enabled: false
+      {{- end }}
+      - name: {{ $nic.name }}
+        type: bond
+        state: up
+        mtu: {{ $.Values.roce.mtu }}
+        link-aggregation:
+          mode: {{ $nic.bond.mode | default $bondDefaults.mode | default "802.3ad" }}
+          options:
+            {{- toYaml (mergeOverwrite (deepCopy ($bondDefaults.options | default (dict))) (deepCopy ($nic.bond.options | default (dict)))) | nindent 12 }}
+          port:
+            {{- range $port := $nic.bond.ports }}
+            - {{ $port }}
+            {{- end }}
+      {{- else }}
       - name: {{ $nic.name }}
         type: ethernet
         state: up
         mtu: {{ $.Values.roce.mtu }}
+      {{- end }}
         ipv4:
           enabled: true
           dhcp: false

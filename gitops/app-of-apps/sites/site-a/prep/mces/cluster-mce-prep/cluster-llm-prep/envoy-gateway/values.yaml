@@ -1,0 +1,73 @@
+# Site layer for envoy-gateway on cluster-llm-prep.
+#
+# Global rate limiting, for aigw-ui (docs/deployment.md, "Before the first
+# budget across models"). Its BackendTrafficPolicy aigw-ui-tenant-budgets
+# holds each tenant's budget across models and, from aigw-ui 0.30, counts
+# each tenant's tokens by model; both are global rate limits. Without this
+# block the policy is not accepted and nothing in it is counted or held.
+#
+# Envoy Gateway then runs its own rate limit service, envoy-ratelimit, next
+# to the AI gateway's envoy-ai-gateway-ratelimit. Both count in the same
+# Redis, the one aigw-ui reads: the URL and the Secret are the envoy-ai site
+# layer's. Envoy Gateway 1.9 cannot mount only a CA for Redis TLS (its
+# rateLimit.backend.redis.tls takes a client certificate), so TLS, the CA
+# and the password are passed as the AI gateway's rate limit service gets
+# them: REDIS_TLS, REDIS_TLS_CACERT and REDIS_AUTH, from the hand-made Secret
+# envoy-ai-quota-redis-client (keys password, ca.crt) in envoy-gateway-system.
+#
+# Not verified on a cluster. After the sync: envoy-ratelimit is Ready, the
+# policy aigw-ui-tenant-budgets is Accepted, and aigw-ui's self-test passes
+# "The tenant's requests and tokens are counted by model" (and, with a
+# budget, "A budget across models is counted and refuses").
+envoy-gateway:
+  config:
+    envoyGateway:
+      rateLimit:
+        backend:
+          type: Redis
+          redis:
+            url: host.example.internal:443
+        # How long a request waits for the rate limit service before it is
+        # let through uncounted. Envoy Gateway's default, 20ms, is shorter
+        # than a round trip to a Redis across the network, so every request
+        # would pass unheld. The same as the AI gateway's
+        # quotaRateLimitTimeout (envoy-ai site layer), so both fail open
+        # alike.
+        timeout: 1s
+      provider:
+        kubernetes:
+          rateLimitDeployment:
+            container:
+              env:
+                - name: REDIS_TLS
+                  value: "true"
+                - name: REDIS_TLS_CACERT
+                  value: /etc/envoy-ratelimit-redis/ca.crt
+                - name: REDIS_AUTH
+                  valueFrom:
+                    secretKeyRef:
+                      name: envoy-ai-quota-redis-client
+                      key: password
+              volumeMounts:
+                - name: redis-ca
+                  mountPath: /etc/envoy-ratelimit-redis
+                  readOnly: true
+            pod:
+              volumes:
+                - name: redis-ca
+                  secret:
+                    secretName: envoy-ai-quota-redis-client
+                    items:
+                      - key: ca.crt
+                        path: ca.crt
+  deployment:
+    pod:
+      annotations:
+        # Envoy Gateway 1.9 reloads its configuration file when the
+        # ConfigMap changes, once the kubelet has updated the file (up to
+        # about a minute); a file that fails validation is logged and the
+        # old configuration stays. aigw-ui's guide restarts the controller
+        # instead. Changing this value with the rateLimit block above makes
+        # the sync do that, so a bad configuration shows as a pod that
+        # does not start.
+        config-revision/rate-limit: "1"

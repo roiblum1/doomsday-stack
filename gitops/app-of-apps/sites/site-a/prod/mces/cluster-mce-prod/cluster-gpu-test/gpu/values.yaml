@@ -1,6 +1,6 @@
 # Per-cluster overrides for gpu on cluster-gpu-test.
 #
-# Cluster has 4 B300 GPU nodes that stay standalone (no RoCE) and 4 new H200 RoCE nodes.
+# Cluster has 4 B300 GPU nodes that stay standalone (no RoCE) and 2 H200 RoCE nodes.
 # The H200 nodes get an RDMA-enabled NVIDIA driver via the NVIDIADriver CRD; the existing
 # B300 nodes (and any future B200 standalone GPU nodes) keep a standard non-RDMA driver.
 #

@@ -12,6 +12,15 @@
 # this cluster only the h200-roce pool is defined; adding a future b200-roce pool only requires
 # adding another list entry and expanding nicClusterPolicy.nodeAffinity to match b200-roce.
 
+# RoCE LAG (2026-10-19): nmstate-rdma bonds each card's two ports (bond-rail0..7) and the
+# driver merges the card into one RDMA device, mlx5_bond_N. Nothing below changes for it:
+#   - rdmaSharedDevicePlugin.ifNames keeps the f0np0 names. The plugin selects a PCI
+#     function by its netdev name and hands out that function's RDMA devices; mlx5_bond_N
+#     belongs to the card's first function (f0), and f1 has no RDMA device left.
+#   - nicConfigurationTemplates.pciAddresses names each card by its f0 address; the NIC
+#     Configuration Operator configures the whole card, and roceOptimized sets both ports
+#     (nvconfig *_P1 and *_P2; DSCP trust and PFC on each PF).
+
 # Keep RoCE fabric (inherits from operators/network/values.yaml; repeated here for clarity).
 fabric: roce
 

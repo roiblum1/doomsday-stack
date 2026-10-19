@@ -185,6 +185,22 @@ gateway:
     enabled: false
     path: /healthz/gateway
 
+  # ---- Token counts on routes aigw-ui does not touch (aigw-ui 0.30) --------
+  # aigw-ui counts each tenant's input, cached and output tokens by model,
+  # from metadata keys a route writes. The routes it renders and the ones it
+  # marks carry the keys already. A GatewayConfig gives them to every other
+  # route of this Gateway too, and the Gateway names it in the annotation
+  # aigateway.envoyproxy.io/gateway-config. A route's own key of the same
+  # name wins. Off is fine while every model is served on the peer listener
+  # behind aigw-ui's entry route, as the model charts do: the entry route
+  # carries the keys. Turn it on for a route of this cluster's own on the
+  # client listener, or a tenant's page shows its requests there with no
+  # tokens. The AI gateway controller then writes a hash of the config onto
+  # the Gateway (aigateway.envoyproxy.io/gateway-config-hash).
+  gatewayConfig:
+    enabled: false
+    name: envoy-ai-gateway
+
   # How much of a request Envoy may buffer on a client connection.
   #
   # ADDED by this wrapper, and needed for real prompts. Envoy Gateway's default
@@ -216,6 +232,17 @@ gateway:
       - x-llm-d-model-name-rewrite
       - x-gateway-model-name-rewrite
       - x-site-pin
+    # DO NOT REMOVE: every header whose name starts with one of these is
+    # removed too. aigw-ui's token check writes x-aigw-tenant, x-aigw-key,
+    # x-aigw-client-id, x-aigw-budget and one x-aigw-quota-<model> per model
+    # (aigw-ui 0.18 to 0.24) and its rate limit rules count by them. Envoy
+    # 1.39 removes a client's own copy only on requests the token check
+    # runs on (aigw-ui docs/security.md, "Defense in depth"); this covers
+    # the rest, the headers of models added later included. Client
+    # listener only: the peer listener keeps them, since the serving site
+    # counts the request by its tenant.
+    removeRequestHeaderPrefixes:
+      - x-aigw-
     # A streamed answer may be silent for a long time while the model thinks.
     idleTimeout: 3600s
     http2:

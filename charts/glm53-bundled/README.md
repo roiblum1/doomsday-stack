@@ -88,6 +88,38 @@ thinking mode consumes the output budget as reasoning tokens — pass
 `chat_template_kwargs: {"reasoning_effort": "low"}` for content-bearing
 responses.
 
+## Flow control (off by default)
+
+`llmisvc.flowControl.enabled=true` turns on queueing in the scheduler. The
+template adds the `flowControl` feature gate, the `concurrency-detector`,
+`round-robin-fairness-policy` + `fcfs-ordering-policy` and a `flowControl`
+section to `llmisvc.scheduler.config.inline`; the scoring profile stays as it
+is. Requests then wait in the scheduler when the endpoints are full, are
+released by class (`InferenceObjective` priority; aigw-ui's `best-effort` is
+-1), and within a class tenant by tenant (`x-llm-d-inference-fairness-id`).
+Off, the render is unchanged.
+
+- `maxConcurrency` counts **per endpoint**, each InferencePool `targetPort`:
+  one per rank port, 8 per pod and 16 in the pool at `replicas: 2`. Each
+  rank runs `--max-num-seqs=64`. Keep it at or below `--max-num-seqs` per endpoint, or vLLM
+  queues first come first served and neither classes nor turns reach it.
+  Size it from aigw-ui's capacity measurement. No default: the render fails
+  without it when flow control is on.
+- `requestTTL: 300s`, `fairnessPolicy: round-robin-fairness-policy`,
+  `negativeBandMaxRequests`, `enableEviction`: as in `charts/llm-model`
+  0.2.0 (see its README for the lab result).
+- Needs a gateway with agent-router#2595 (patch 0003 of the
+  `v1.2.0-patched` images).
+- Turning it on rewrites the scheduler config, which restarts the scheduler,
+  and aigw-ui then marks the model's capacity measurement stale.
+
+        --set llmisvc.flowControl.enabled=true --set llmisvc.flowControl.maxConcurrency=<per rank>
+
+Checked without a cluster: the render with flow control off is unchanged;
+the on renders load through llm-d router v0.11.0's config loader with the
+existing plugins and each priority band on the intended policy, and pass a
+copy of aigw-ui's fairness check. Not tested on this model.
+
 ## Known cosmetic issue
 
 The isvc shows `InferencePoolReady=False` ("no Gateway controller has

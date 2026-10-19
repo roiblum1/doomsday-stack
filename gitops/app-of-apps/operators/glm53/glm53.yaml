@@ -1,14 +1,13 @@
 name: glm53
 projectNamespace: llm-glm53
 repourl: 'https://git.example.internal/popai/helm-charts/glm53-chart.git'
-# Pinned to the `bundled` branch of the old glm53-bundled chart: main now
-# carries the generic llm-model chart, which cannot express this deployment
-# (CR name glm53-b200 serving glm-5.3, runtimeClassName, the DP8-tuned EPP
-# profile, the 8-rank-port pool, LMCache, the node-prep storage layer,
-# maxSurge 0). Migrating to llm-model needs chart extensions first (9-knob
-# list in the 2026-10-11 deep-scan); until then this app renders the tuned
-# bundle from `bundled` (fdd21bd + the vLLM billing flags, 2026-10-12).
-targetRevision: bundled
+# `main` since 2026-10-13: the tuned bundle (CR name glm53-b200 serving
+# glm-5.3, runtimeClassName, the DP8-tuned EPP profile, the 8-rank-port pool,
+# LMCache, the node-prep storage layer, maxSurge 0) was moved to `main` and
+# is deployed from there. Until then this app was pinned to the `bundled`
+# branch (fdd21bd + the vLLM billing flags, 2026-10-12), because `main`
+# carried the generic llm-model chart, which cannot express this deployment.
+targetRevision: main
 preserveResourcesOnDeletion: true
 syncPolicy:
   syncOptions:
