@@ -64,9 +64,14 @@ spec:
             path:
               type: ReplaceFullPath
               replaceFullPath: /health
+      # Written out as the API server defaults them, so Argo CD sees no
+      # difference.
       backendRefs:
-        - name: {{ $name }}-kserve-workload-svc
+        - group: ""
+          kind: Service
+          name: {{ $name }}-kserve-workload-svc
           port: 8000
+          weight: 1
 ---
 # A health check that meets a connection vLLM is closing is answered 503,
 # and Envoy takes an endpoint out on one such answer. It is tried again on
