@@ -13,11 +13,8 @@ namespace: llm-glm53
 nameOverride: glm53
 
 # --- target nodes ---------------------------------------------------------
-nodes:
-  gpuProduct: NVIDIA-B200
-  hostnames:
-    - gpu-node-x
-    - gpu-node-x
+# Per cluster, in sites/.../<cluster>/glm53/values.yaml: nodes.gpuProduct
+# and nodes.hostnames (the nodes that hold the weights).
 
 # --- node storage ----------------------------------------------------------
 nodePrep:
@@ -128,8 +125,6 @@ llmisvc:
   # Root with IPC_LOCK (the chart's SCC, scc.create).
   ipcLock: true
   name: glm53-b200
-  replicas: 2                  # one pod per node (one full node each)
-  runtimeClassName: performance-gpu-hpc-performanceprofile-extras-b200
   schedulerName: default-scheduler
   terminationGracePeriodSeconds: 300
   rolloutStrategy:
@@ -140,31 +135,9 @@ llmisvc:
   # /metrics-based scorers: with DP8 every metric family is exposed 8x
   # (engine="0".."7") and the EPP takes ONE sample per family. See the
   # glm53-chart git history for the full rationale.
+  # The scheduler's pool of one port per data-parallel rank comes from the
+  # cluster's llmisvc.dataParallelExternalLB.
   scheduler:
-    pool:
-      spec:
-        appProtocol: http
-        endpointPickerRef:
-          failureMode: FailOpen
-          group: ""
-          kind: Service
-          name: glm53-b200-epp-service
-          port:
-            number: 9002
-        selector:
-          matchLabels:
-            app.kubernetes.io/name: glm53-b200
-            app.kubernetes.io/part-of: llminferenceservice
-            kserve.io/component: workload
-        targetPorts:
-          - number: 8000
-          - number: 8001
-          - number: 8002
-          - number: 8003
-          - number: 8004
-          - number: 8005
-          - number: 8006
-          - number: 8007
     config:
       inline:
         apiVersion: llm-d.ai/v1alpha1
@@ -187,17 +160,10 @@ llmisvc:
               - pluginRef: prefix-cache-scorer
                 weight: 1
               - pluginRef: max-score-picker
-  # --- parallelism: DP8 x EP8 inside the node ---
-  # Multi-port external LB: one API server per DP rank on ports 8000-8007,
-  # supervisor serves aggregated /health + /readyz on 8208 (probes below
-  # point there). Each rank is its own InferencePool endpoint.
+  # The model's flags. The shape's (data, tensor and expert parallel) are
+  # the cluster's: llmisvc.dataParallelExternalLB, llmisvc.parallelism,
+  # llmisvc.extraArgs in sites/.../<cluster>/glm53/values.yaml.
   args:
-    - --data-parallel-size=8
-    - --data-parallel-size-local=8
-    - --data-parallel-multi-port-external-lb
-    - --data-parallel-supervisor-port=8208
-    - --enable-expert-parallel
-    - --all2all-backend=allgather_reducescatter
     - --kv-cache-dtype=fp8_e4m3
     - --gpu-memory-utilization=0.90
     - --max-model-len=262144
@@ -233,34 +199,18 @@ llmisvc:
     TORCHINDUCTOR_CACHE_DIR: /cache/inductor
     TORCHINDUCTOR_FX_GRAPH_CACHE: "1"
     HF_HOME: /cache/hf
-  resources:
-    requests:
-      cpu: "96"
-      memory: 512Gi
-      nvidia.com/gpu: "8"
-      hugepages-1Gi: 16Gi
-    limits:
-      cpu: "192"
-      memory: 2000Gi
-      nvidia.com/gpu: "8"
-      hugepages-1Gi: 16Gi
-  volumes:
-    # /dev/shm: NCCL psm windows plus headroom for the LMCacheMPConnector's
-    # local buffers. Memory-backed emptyDir: tmpfs, only consumes what is
-    # written.
-    dshmSize: 600Gi
-    hugepagesSize: 16Gi
+  # GPUs, CPU, memory, /dev/shm and hugepages are the cluster's.
   probes:
-    # DP supervisor (multi-port external LB mode): aggregated child health,
-    # /readyz reflecting all per-rank API servers.
-    port: 8208
+    # The API server on 8000. With data parallel over ports the chart moves
+    # them to the supervisor (aggregated /health, /readyz for all ranks).
+    port: 8000
     startup:
       path: /health
       periodSeconds: 10
       failureThreshold: 180     # cold boot: load + DeepGEMM JIT + graph capture
       timeoutSeconds: 5
     readiness:
-      path: /readyz
+      path: /health
       periodSeconds: 10
       failureThreshold: 5
       timeoutSeconds: 5

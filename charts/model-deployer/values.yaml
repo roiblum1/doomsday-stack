@@ -250,11 +250,45 @@ llmisvc:
       keda:
         pollingInterval: 5
         cooldownPeriod: 30
-  # Parallelism via the CRD field: the base preset renders
-  # --tensor-parallel-size from spec.parallelism.tensor. Do NOT also pass
-  # --tensor-parallel-size in args (duplicate flag). Omitted when unset.
+  # Parallelism through the CRD fields; KServe renders the flags from them.
+  # Do NOT also pass these flags in args.
+  #   tensor            --tensor-parallel-size (one node: H200 TP8)
+  #   data, dataLocal   data-parallel ranks in all and per pod; with
+  #                     multiNode, data / dataLocal pods per replica
+  #   expert            --enable-expert-parallel (over data x tensor GPUs)
+  #   pipeline, dataRPCPort
+  # Zero or false leaves a field out.
   parallelism:
     tensor: 0
+    data: 0
+    dataLocal: 0
+    expert: false
+  # Multi-node: KServe runs each replica as a LeaderWorkerSet (a leader and
+  # data/dataLocal - 1 workers, one pod per node); its worker preset passes
+  # the leader's address and each pod's start rank. The workers run the same
+  # container (image, flags, env, resources, volumes) without probes. Set
+  # parallelism.data and dataLocal with it (2 x H200: data 8, dataLocal 4,
+  # tensor 2, expert true = DP8 TP2 EP16).
+  multiNode: false
+  # RoCE between the nodes: KServe's launcher finds the active HCAs and the
+  # GID index (KSERVE_INFER_ROCE). Give the pods the RDMA network with
+  # podAnnotations and the RDMA resource in resources.
+  roce: false
+  # Annotations of the model's pods (spec.annotations), e.g.
+  # k8s.v1.cni.cncf.io/networks for the RoCE rails.
+  podAnnotations: {}
+  # Data parallel with one port per rank on one node (GLM-5.3 on B200/B300:
+  # ranks 8): the chart adds the vLLM flags (--data-parallel-size,
+  # -size-local, --data-parallel-multi-port-external-lb, -supervisor-port),
+  # gives the scheduler a pool of ports 8000..8000+ranks-1 (unless
+  # llmisvc.scheduler.pool is set) and points the probes at the supervisor,
+  # which answers for all ranks. aigw-ui measures every port.
+  dataParallelExternalLB:
+    ranks: 0
+    supervisorPort: 8208
+  # Prefill/decode: spec.prefill, verbatim (its own replicas, parallelism,
+  # template, worker). Not tested with this chart.
+  prefill: {}
   # KServe storage-initializer override (s3:// or hf:// model URIs): renders
   # the initContainers block overriding the controller-injected
   # storage-initializer's image, resources and HOME (the controller merges:
@@ -295,8 +329,13 @@ llmisvc:
     enableEviction: false
   # Free-form vLLM args list, copied verbatim (single tokens only: the
   # kserve preset launcher evals `vllm serve ... "$@"`). Spaces, quotes,
-  # braces and shell characters fail the render.
+  # braces and shell characters fail the render; --option='value' (JSON
+  # inside single quotes) is one token. The model's flags: in the recipe.
   args: []
+  # More flags, rendered before args: a cluster's own (the shape's, e.g.
+  # --enable-expert-parallel), so that a cluster does not repeat the
+  # recipe's list (Helm replaces lists, it does not merge them).
+  extraArgs: []
   env: {}
   # vLLM closes a connection after this many idle seconds. With vLLM's 5
   # the 3-second health checks met closing connections and took the only

@@ -38,7 +38,7 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
 {{- if and $v.modelCache.enabled $v.model.subPath }}{{ fail "values: modelCache and model.subPath exclude each other (cache downloads model.uri; subPath reads the node-prep PVC)" }}{{ end -}}
 {{- if and $v.modelCache.enabled (not (regexMatch "^(hf|s3)://" $v.model.uri)) }}{{ fail "values: modelCache needs model.uri hf://... or s3://..." }}{{ end -}}
 {{- if and (not $v.model.subPath) (not $v.model.uri) }}{{ fail "values: set model.subPath (the node-prep PVC) or model.uri (hf://, s3://, pvc://)" }}{{ end -}}
-{{- range $v.llmisvc.args -}}
+{{- range (concat ($v.llmisvc.args | default list) ($v.llmisvc.extraArgs | default list)) -}}
 {{- if not (or (regexMatch "^[^\\s'\"$`\\\\;&|<>(){}*?\\[\\]!#~]+$" (toString .)) (regexMatch "^--[A-Za-z0-9._-]+='[^']*'$" (toString .))) }}{{ fail (printf "llmisvc.args: %q is not one plain token or --option='value' (KServe runs the arguments through bash eval)" (toString .)) }}{{ end -}}
 {{- if regexMatch "^--kv[-_]transfer[-_]config" (toString .) }}{{ fail "llmisvc.args: --kv-transfer-config is appended by the chart when lmcache.enabled" }}{{ end -}}
 {{- if and $v.model.maxModelLen (regexMatch "^--max[-_]model[-_]len" (toString .)) }}{{ fail "llmisvc.args: --max-model-len is set from model.maxModelLen; set it in one place" }}{{ end -}}

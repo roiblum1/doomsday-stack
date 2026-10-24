@@ -54,6 +54,25 @@ Not rendered any more: the client-listener `AIGatewayRoute` and the direct
 backends of `generic-model` (`aigatewayRoute`, `directBackend`). Every
 request takes aigw-ui's entry route.
 
+## One model, a shape per cluster
+
+The recipe holds what is the model's (weights, image, its vLLM and LMCache
+flags); each cluster's own file holds its shape. `shapes/` has three, each
+rendered with glm53's recipe:
+
+| File | Shape | What it sets |
+|---|---|---|
+| `shapes/b300-dp8.yaml` | whole B300 nodes, DP8 with EP inside the node | `llmisvc.dataParallelExternalLB.ranks: 8` (the DP flags, a pool of ports 8000-8007, supervisor probes), `extraArgs: [--enable-expert-parallel]` |
+| `shapes/h200-tp8.yaml` | whole H200 nodes, TP8 | `llmisvc.parallelism.tensor: 8` |
+| `shapes/h200x2-roce-dp8-tp2-ep16.yaml` | one replica over 2 H200 nodes on RoCE, DP8 TP2 EP16 | `llmisvc.multiNode: true` (KServe's LeaderWorkerSet), `parallelism: {data: 8, dataLocal: 4, tensor: 2, expert: true}`, `roce: true`, the RDMA network in `podAnnotations`, the RDMA resource, and NCCL settings that replace the recipe's single-node ones (maps merge) |
+
+`cluster-llm-prep`'s `glm53/values.yaml` is the B200 DP8 shape, moved out of
+the recipe; recipe and shape together render exactly what the recipe alone
+rendered before the move.
+
+A cluster adds flags with `llmisvc.extraArgs` (rendered before the recipe's
+`args`): Helm replaces lists, so a cluster that sets `args` repeats them all.
+
 ## Rules
 
 - Nothing on the client listener; the peer route's match stays `Exact`.
@@ -102,4 +121,5 @@ On the lab (OpenShift 4.22, KServe 0.21, Envoy Gateway 1.9.2, AI Gateway
 server-side dry run against the lab's CRDs accepted them; the download Job
 filled the PVC from `hf://` in 7 s; qwen-tiny served from the PVC
 (`max_model_len` 8192, cached-token details in `usage`). The GPU recipes
-were rendered, linted and compared with the old charts only.
+and the three shapes were rendered, linted and compared with the old charts
+only; none ran on GPUs (multi-node and RoCE included).
