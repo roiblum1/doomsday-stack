@@ -16,7 +16,8 @@
 # A new directory becomes an Application within requeueAfterSeconds; a
 # changed file reaches its Application at Argo CD's next refresh (3 min, at
 # once with a webhook). Removing a directory deletes the Application and,
-# through the finalizer, what it deployed.
+# through the finalizer, what it deployed: with namespaceCreate (the
+# chart's default) the namespace too, and the weights PVC in it.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:

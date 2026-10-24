@@ -13,7 +13,9 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
     # Kept when the deployment is deleted with Argo CD's cascade: the
-    # weights take long to download again. Delete it by hand.
+    # weights take long to download again. Delete it by hand. Only while
+    # the namespace is not the app's (namespaceCreate: false): an app that
+    # owns its namespace deletes the namespace, and the PVC with it.
     argocd.argoproj.io/sync-options: Delete=false
     helm.sh/resource-policy: keep
 spec:
