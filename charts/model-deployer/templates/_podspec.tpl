@@ -223,5 +223,8 @@ volumes:
 {{- if ($l.flowControl | default dict).enabled -}}
 {{- $sched = include "md.schedulerWithFlowControl" (dict "Values" (dict "llmisvc" (merge (dict "scheduler" $sched) $l))) | fromYaml -}}
 {{- end -}}
+{{- with .Values.serviceAccount.name -}}
+{{- $_ := set $sched "template" (merge (dict "serviceAccountName" .) ($sched.template | default dict)) -}}
+{{- end -}}
 {{- toYaml $sched -}}
 {{- end -}}

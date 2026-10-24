@@ -300,11 +300,20 @@ llmisvc:
     # OpenShift's random user ID (hf:// models).
     home: ""
     resources: {}
-  # --- EPP (router scheduler) config -------------------------------------------
-  # Rendered verbatim by the kserve controller into the EPP deployment's
-  # --config-text (EndpointPickerConfig). Optional: without it the EPP
-  # template only pins the serviceAccountName. When set, the block is
-  # copied verbatim into spec.router.scheduler (pool spec + config).
+  # --- the llm-d scheduler (endpoint picker, EPP) -------------------------------
+  # Copied into spec.router.scheduler, so every field KServe takes works:
+  #   config.inline   the EndpointPickerConfig: plugins and their parameters
+  #                   (prefix-cache-scorer, active-request-scorer
+  #                   maxBusyScore, ...), schedulingProfiles with their
+  #                   weights. Empty: KServe's default config
+  #                   (kserve-config-llm-scheduler).
+  #   pool.spec       the InferencePool (targetPorts, endpointPickerRef);
+  #                   built from llmisvc.dataParallelExternalLB when unset.
+  #   template        the picker's pod (image, resources, env), merged by
+  #                   KServe onto its preset; the chart adds the
+  #                   ServiceAccount.
+  # Flow control (llmisvc.flowControl) is merged into config.inline. The
+  # aigw-ui page edits the weights, flow control and config.inline.
   scheduler: {}
   # Flow control, added to the scheduler config above (which must have
   # config.inline): requests wait in the scheduler when the replicas are

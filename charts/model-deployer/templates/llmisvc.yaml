@@ -111,19 +111,15 @@ spec:
           {{- end }}
     route: {}
     {{- $sched := include "md.scheduler" . | fromYaml }}
+    {{- with $sched }}
+    # The endpoint picker (llm-d): its pool, its config (plugins, scorers,
+    # profiles, flow control) and its pod (template), as the model's values
+    # give them. The chart pins its pod to the chart's ServiceAccount: left
+    # to itself, KServe copies the workload SA into <name>-epp-sa, dragging
+    # OpenShift's rotating dockercfg secret along, which OCM then fights over.
     scheduler:
-      {{- with .Values.serviceAccount.name }}
-      # Pin the EPP to the chart's ServiceAccount instead of letting kserve
-      # mint its own <name>-epp-sa. Unpinned, the controller deep-copies the
-      # WORKLOAD SA into the epp-sa -- dragging along OpenShift's rotating
-      # dockercfg secret (s3sa-dockercfg-*), which OCM then re-adopts onto
-      # the copy, fighting the original SA's owner for it every few seconds.
-      template:
-        serviceAccountName: {{ . }}
-      {{- end }}
-      {{- with $sched }}
       {{- toYaml . | nindent 6 }}
-      {{- end }}
+    {{- end }}
   template:
     {{- include "md.podSpec" (dict "ctx" . "worker" false) | nindent 4 }}
   {{- if .Values.llmisvc.multiNode }}
