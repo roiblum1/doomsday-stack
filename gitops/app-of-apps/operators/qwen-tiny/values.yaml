@@ -1,0 +1,73 @@
+# qwen-tiny: Qwen2.5-0.5B on vLLM's CPU image, the lab's test model. One
+# replica, two requests at a time, the weights on a Ceph PVC (the lab's
+# control-plane disk is near its eviction limit, so nothing is downloaded
+# into the node). No GPU, no LMCache, no node preparation, no SCC.
+namespace: vllm-lab
+# vllm-lab holds more than this model (aigw-ui's capacity Jobs): the app
+# must not own the namespace. It carries aigw-ui.io/serving=true already.
+namespaceCreate: false
+model:
+  name: qwen-tiny
+  uri: hf://Qwen/Qwen2.5-0.5B-Instruct
+  revision: qwen2.5-0.5b-lab
+  maxModelLen: 8192
+modelCache:
+  enabled: true
+  size: 5Gi
+  image: docker.io/kserve/storage-initializer:v0.21.0-rc1
+# Nothing from S3: the pods run under the namespace's default account.
+serviceAccount:
+  name: ""
+images:
+  vllm: public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.29.0
+llmisvc:
+  replicas: 1
+  # CPU: a surge pod is fine, and keeps the model answering while the new
+  # pod loads (about 8 minutes on the lab).
+  rolloutStrategy: null
+  schedulerName: null
+  terminationGracePeriodSeconds: null
+  # KServe's own probes.
+  probes: null
+  args:
+    - --enable-prompt-tokens-details
+    - --enable-force-include-usage
+    - --dtype=bfloat16
+  env:
+    # GiB of host memory for the KV cache.
+    VLLM_CPU_KVCACHE_SPACE: "4"
+  resources:
+    requests: {cpu: "4", memory: 8Gi}
+    limits: {cpu: "8", memory: 12Gi}
+  # The endpoint picker KServe 0.21 deploys (v0.10.0) and its scorers, as
+  # proven on the lab; flow control is added to it.
+  scheduler:
+    config:
+      inline:
+        apiVersion: llm-d.ai/v1alpha1
+        kind: EndpointPickerConfig
+        plugins:
+          - type: single-profile-handler
+          - type: queue-scorer
+          - type: kv-cache-utilization-scorer
+          - type: prefix-cache-scorer
+          - type: no-hit-lru-scorer
+          - type: max-score-picker
+        schedulingProfiles:
+          - name: default
+            plugins:
+              - pluginRef: queue-scorer
+                weight: 2
+              - pluginRef: kv-cache-utilization-scorer
+                weight: 2
+              - pluginRef: prefix-cache-scorer
+                weight: 3
+              - pluginRef: no-hit-lru-scorer
+                weight: 2
+              - pluginRef: max-score-picker
+  flowControl:
+    enabled: true
+    maxConcurrency: 2
+    negativeBandMaxRequests: 4
+peer:
+  maxParallelRequests: 8

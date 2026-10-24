@@ -1,0 +1,16 @@
+# A cluster's own values: whole H200 nodes, one pod per node, the model split
+# over the node's 8 GPUs (tensor parallel 8). One scheduler endpoint per pod.
+nodes:
+  gpuProduct: NVIDIA-H200
+  hostnames: [h200-node-a]
+llmisvc:
+  replicas: 1
+  parallelism:
+    tensor: 8
+  extraArgs:
+    - --enable-expert-parallel
+  resources:
+    requests: {cpu: "64", memory: 512Gi, nvidia.com/gpu: "8"}
+    limits: {cpu: "128", memory: 1500Gi, nvidia.com/gpu: "8"}
+  volumes:
+    dshmSize: 128Gi

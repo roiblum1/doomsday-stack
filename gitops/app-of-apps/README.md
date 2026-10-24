@@ -38,9 +38,10 @@ sites/<site>/<env>/mces/<mce>/<cluster>/<name>/values.yaml   # per-cluster helm 
 | kserve | `popai/helm-charts/kserve-chart.git` | kserve | (no OLM; CRDs + controller + cert-manager webhooks) |
 | envoy-gateway | `popai/helm-charts/envoy-gateway-chart.git` | envoy-gateway-system | (no OLM) |
 | envoy-ai | `popai/helm-charts/envoy-ai-chart.git` | envoy-ai-gateway-system | (no OLM) |
-| glm53 | `popai/helm-charts/glm53-chart.git` | llm-glm53 | (no OLM; the GLM-5.3 model bundle) |
-| qwen36-judge | `popai/helm-charts/qwen36-judge-chart.git` | llm-judge | (no OLM; the Qwen3.6 judge model bundle) |
-| qwen38 | `popai/helm-charts/qwen38-chart.git` | llm-qwen38 | (no OLM; the Qwen 3.8 model bundle) |
+| glm53 | `popai/helm-charts/model-deployer-chart.git` | llm-glm53 | (no OLM; the model-deployer chart, recipe in `operators/glm53/values.yaml`) |
+| qwen36-judge | `popai/helm-charts/model-deployer-chart.git` | llm-judge | (no OLM; the model-deployer chart, recipe in `operators/qwen36-judge/values.yaml`) |
+| qwen38 | `popai/helm-charts/model-deployer-chart.git` | llm-qwen38 | (no OLM; the model-deployer chart, recipe in `operators/qwen38/values.yaml`) |
+| qwen-tiny | this repository, `charts/model-deployer` | vllm-lab | (the lab's CPU test model; deployed by the lab's ApplicationSet, `gitops/aigw-ui/bootstrap`) |
 
 ## Clusters
 
@@ -48,11 +49,20 @@ sites/<site>/<env>/mces/<mce>/<cluster>/<name>/values.yaml   # per-cluster helm 
 |---|---|---|---|
 | cluster-gpu-test | cluster-mce-prod | site-a / prod | 4.22.8 |
 | cluster-llm-prep | cluster-mce-prep | site-a / prep | 4.22.8 |
+| lab | mce-lab | site-lab / lab | 4.22 (a standalone lab cluster, not hosted; only `qwen-tiny`) |
 
 Operator selection is **directory-driven**: an operator deploys to a hosted cluster iff a
 directory exists at `sites/<site>/<env>/mces/<mce>/<cluster>/<operator>/`. Adding a new
 cluster = creating its directory tree under the right MCE; adding an operator to an
 existing cluster = adding its directory with a `values.yaml`.
+
+## Models (aigw-ui)
+
+The models (glm53, qwen38, qwen36-judge, qwen-tiny) share one chart,
+`model-deployer`. A model's recipe is `operators/<model>/values.yaml`; a
+cluster's own values are `sites/…/<cluster>/<model>/values.yaml`. aigw-ui's
+Deployments page writes both (see `gitops/aigw-ui/README.md`), one commit per
+save, and reads them back.
 
 ## How it wires up
 

@@ -1,0 +1,32 @@
+# A cluster's own values: one replica over 2 H200 nodes joined by RoCE. 8
+# data-parallel ranks of tensor parallel 2 (16 GPUs), the experts spread
+# over all 16 (EP16). KServe runs it as a LeaderWorkerSet (llmisvc.multiNode):
+# 4 ranks per pod (dataLocal), one pod per node; its worker preset passes
+# the leader's address and each pod's start rank, and with roce finds the
+# active HCAs and the GID index (NCCL_IB_HCA, NVSHMEM_HCA_LIST, UCX).
+nodes:
+  gpuProduct: NVIDIA-H200
+  hostnames: [h200-roce-a, h200-roce-b]
+llmisvc:
+  replicas: 1
+  multiNode: true
+  parallelism:
+    data: 8
+    dataLocal: 4
+    tensor: 2
+    expert: true
+  roce: true
+  # The RDMA network of the nodes' RoCE ports (the site's NetworkAttachment).
+  podAnnotations:
+    k8s.v1.cni.cncf.io/networks: roce-rail-0,roce-rail-1,roce-rail-2,roce-rail-3
+  # Maps merge: these replace the recipe's single-node NCCL settings only.
+  env:
+    NCCL_IB_DISABLE: "0"
+    NCCL_P2P_LEVEL: NVL
+    NVSHMEM_REMOTE_TRANSPORT: ibgda
+    NVSHMEM_IB_ENABLE_IBGDA: "1"
+  resources:
+    requests: {cpu: "96", memory: 512Gi, nvidia.com/gpu: "8", rdma/roce: "4"}
+    limits: {cpu: "192", memory: 1500Gi, nvidia.com/gpu: "8", rdma/roce: "4"}
+  volumes:
+    dshmSize: 256Gi

@@ -1,0 +1,115 @@
+{{- if .Values.peer.enabled }}
+{{- $name := include "md.llmisvcName" . -}}
+{{- $gw := .Values.gateway.aiGateway -}}
+{{- $parent := dict "group" "gateway.networking.k8s.io" "kind" "Gateway" "name" $gw.name "namespace" $gw.namespace "sectionName" $gw.peerListener -}}
+{{- $peer := .Values.peer.name | default (printf "%s-peer" $name) -}}
+{{- $health := .Values.peer.healthName | default (printf "%s-health" $name) -}}
+# The only way to the model.
+#
+# Clients reach the gateway's client listener. There aigw-ui's entry route
+# (fleet-<model>, written by the hub) checks the key, counts the quota and
+# picks a site. It then calls that site's peer listener over mTLS, and the
+# routes below answer there: gateway -> scheduler (EPP) -> vLLM. Nothing
+# in this file is on the client listener.
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIGatewayRoute
+metadata:
+  name: {{ $peer }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "md.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    # DO NOT REMOVE sectionName: without it the route is also on the
+    # listener clients reach, where it skips keys and quotas.
+    - {{- toYaml $parent | nindent 6 }}
+  rules:
+    # Exact match on the name clients send. aigw-ui finds the model on this
+    # site by this match; it does not read a regular expression.
+    - name: serve
+      matches:
+        - headers:
+            - type: Exact
+              name: x-ai-eg-model
+              value: {{ .Values.model.name | quote }}
+      backendRefs:
+        - group: inference.networking.k8s.io
+          kind: InferencePool
+          name: {{ include "md.pool" . }}
+      timeouts:
+        request: {{ .Values.peer.requestTimeout }}
+      modelsOwnedBy: {{ .Values.namespace }}
+---
+# What the entry route's health check asks: GET /healthz/<model name>.
+# It goes straight to vLLM and not through the scheduler or the shed limit,
+# so a busy site still answers and is not taken for a dead one.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $health }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "md.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - {{- toYaml $parent | nindent 6 }}
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /healthz/{{ .Values.model.name }}
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: /health
+      backendRefs:
+        - name: {{ $name }}-kserve-workload-svc
+          port: 8000
+---
+# A health check that meets a connection vLLM is closing is answered 503,
+# and Envoy takes an endpoint out on one such answer. It is tried again on
+# a new connection instead.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: {{ $health }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "md.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ $health }}
+  retry:
+    numRetries: {{ .Values.peer.healthRetries }}
+    retryOn:
+      triggers: ["reset", "connect-failure"]
+{{- if .Values.peer.maxParallelRequests }}
+---
+# The site's shed limit: above it the site answers 503 at once and the
+# entry tries the next site. The HTTPRoute the gateway generates from the
+# AIGatewayRoute has its name.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: {{ $peer }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "md.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ $peer }}
+  circuitBreaker:
+    maxParallelRequests: {{ .Values.peer.maxParallelRequests }}
+    maxPendingRequests: {{ .Values.peer.maxParallelRequests }}
+    maxConnections: 100000
+  timeout:
+    http:
+      requestTimeout: {{ .Values.peer.requestTimeout }}
+{{- end }}
+{{- end }}

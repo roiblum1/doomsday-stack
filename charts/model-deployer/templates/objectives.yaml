@@ -1,0 +1,18 @@
+{{- range $class, $priority := .Values.objectives }}
+# DO NOT REMOVE: a request that names a class the namespace does not have
+# runs at priority 0 without any error. best-effort is aigw-ui's.
+apiVersion: llm-d.ai/v1alpha2
+kind: InferenceObjective
+metadata:
+  name: {{ $class }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- include "md.labels" $ | nindent 4 }}
+spec:
+  priority: {{ $priority }}
+  poolRef:
+    group: inference.networking.k8s.io
+    kind: InferencePool
+    name: {{ include "md.pool" $ }}
+---
+{{- end }}

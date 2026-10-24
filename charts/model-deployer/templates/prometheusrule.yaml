@@ -1,0 +1,95 @@
+{{- if and .Values.lmcache.enabled .Values.lmcache.prometheus.enabled .Values.lmcache.prometheus.rules.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Values.lmcache.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "md.labels" . | nindent 4 }}
+spec:
+  groups:
+    # Derived from fullname (<nameOverride>): one group per chart instance.
+    # (The per-model charts hardcoded their own prefix here; migrating a
+    # model renames the group once, then it is stable.)
+    - name: {{ include "md.fullname" . }}-lmcache.rules
+      rules:
+        # The engine DaemonSet runs one pod per GPU node behind the metrics
+        # Service. A single down target means that node lost its engine
+        # (crash, OOM, drain) and every vLLM pod is now running without
+        # cache on it -- vLLM keeps serving, just slower.
+        - alert: LMCacheEngineTargetDown
+          expr: up{namespace="{{ .Values.namespace }}", job="{{ .Values.lmcache.name }}-metrics"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "LMCache engine down ({{`{{ $labels.pod }}`}})"
+            description: >-
+              Prometheus has failed to scrape engine target {{`{{ $labels.pod }}`}}
+              for 5 minutes. vLLM on that node serves uncached (slower) until
+              the engine returns.
+        # Fires when ALL targets vanish: the ServiceMonitor, metrics Service,
+        # or discovery RBAC (templates/monitoring-rbac.yaml) broke -- or the
+        # whole DaemonSet is gone. Distinct from a single pod being down.
+        - alert: LMCacheEngineNoTargets
+          expr: absent(up{namespace="{{ .Values.namespace }}", job="{{ .Values.lmcache.name }}-metrics"})
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "LMCache engine metrics gone entirely"
+            description: >-
+              No up{job="{{ .Values.lmcache.name }}-metrics"} series exists.
+              The scrape path broke (ServiceMonitor / Service / discovery
+              Role) or the engine DaemonSet is gone. Check
+              `oc -n {{ .Values.namespace }} get pods -l app.kubernetes.io/instance={{ .Values.lmcache.name }}`.
+        # The L2 adapter's internal trigger watermark is 0.9 of
+        # maxCapacityGB; sustained usage above it means eviction cannot keep
+        # up with writes (usually: burst of new unique prefixes, or the
+        # watermark churns). Info-level, self-heals once the eviction loop
+        # catches up.
+        - alert: LMCacheL2UsageHigh
+          expr: max by (pod) (lmcache_mp_l2_usage_bytes{namespace="{{ .Values.namespace }}"}) > {{ .Values.lmcache.l2.maxCapacityGB }} * 1024 * 1024 * 1024 * 0.9
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "LMCache L2 near capacity on {{`{{ $labels.pod }}`}}"
+            description: >-
+              L2 disk-tier usage has been above 90% of the
+              {{ .Values.lmcache.l2.maxCapacityGB }}Gi cap for 30 minutes.
+              Normal at steady state under heavy unique-prefix load (LRU
+              eviction cycles); investigate only if hit rates drop.
+        # L1 trigger watermark is 0.8; sustained >0.95 means the eviction
+        # loop is falling behind the write rate.
+        - alert: LMCacheL1EvictionPressure
+          expr: max by (pod) (lmcache_mp_l1_usage_ratio{namespace="{{ .Values.namespace }}"}) > 0.95
+          for: 1h
+          labels:
+            severity: info
+          annotations:
+            summary: "LMCache L1 eviction falling behind on {{`{{ $labels.pod }}`}}"
+            description: >-
+              L1 host-RAM tier above 95% for 1h (trigger watermark is 0.8).
+              Eviction is not reclaiming fast enough for the write rate.
+        # Cache-bypass detector: traffic flows but zero lookups reach the
+        # engines. The classic cause is stale vLLM->engine sessions after an
+        # engine pod roll (vLLM pods must be recycled -- see README). This
+        # is the alert form of the "gauge panels fine, counter panels empty"
+        # dashboard signature. Blind spot: an engine pod that has NEVER
+        # served a lookup has no series at all, so the alert cannot fire --
+        # it only detects the loss mid-life.
+        - alert: LMCacheNoLookups
+          expr: sum(increase(lmcache_mp_lookups_requests_total{namespace="{{ .Values.namespace }}"}[4h])) == 0
+          for: 30m
+          labels:
+            severity: info
+          annotations:
+            summary: "LMCache engines serving zero lookups for 4h"
+            description: >-
+              Requests may still be flowing but no cache lookups have
+              happened in 4h. Most likely the vLLM pods hold sessions to
+              dead engine pods after a roll: recycle the vLLM pods one at a
+              time (README 'Operations runbook'). Also expected overnight on
+              an idle cluster -- severity is info for a reason.
+{{- end }}

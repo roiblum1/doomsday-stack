@@ -1,0 +1,90 @@
+{{- if .Values.modelCache.enabled }}
+{{- $name := include "md.llmisvcName" . -}}
+{{- $dir := include "md.cacheDir" . -}}
+# The weights, downloaded once. Argo CD applies wave -1 first and waits for
+# the Job to finish before it applies the model (wave 0).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}-model
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "md.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    # Kept when the deployment is deleted with Argo CD's cascade: the
+    # weights take long to download again. Delete it by hand.
+    argocd.argoproj.io/sync-options: Delete=false
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [{{ .Values.modelCache.accessMode }}]
+  {{- with .Values.modelCache.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.modelCache.size }}
+---
+# A Job's spec cannot change: its name carries a hash of what it runs (uri
+# and image), and its pod's labels are fixed (no chart version), so a chart
+# upgrade does not make Argo CD fail on it.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-download-{{ printf "%s|%s" .Values.model.uri (.Values.modelCache.image | default .Values.images.storageInitializer) | sha256sum | trunc 10 }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "md.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "md.llmisvcName" . }}-download
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: download
+          image: {{ (.Values.modelCache.image | default .Values.images.storageInitializer) }}
+          # KServe's initializer: <source uri> <target directory>. Downloading
+          # into a directory that already has the files checks them and
+          # fetches only what is missing.
+          args:
+            - {{ .Values.model.uri | quote }}
+            - /mnt/models/{{ $dir }}
+          env:
+            - name: HOME
+              value: {{ .Values.modelCache.home | default "/tmp" }}
+            - name: HF_HOME
+              value: {{ .Values.modelCache.home | default "/tmp" }}/hf
+          {{- with .Values.s3.secretName }}
+          envFrom:
+            - secretRef:
+                name: {{ . }}
+          {{- end }}
+          {{- with .Values.modelCache.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: model
+              mountPath: /mnt/models
+            - name: tmp
+              mountPath: {{ .Values.modelCache.home | default "/tmp" }}
+      volumes:
+        - name: model
+          persistentVolumeClaim:
+            claimName: {{ $name }}-model
+        - name: tmp
+          emptyDir: {}
+{{- end }}

@@ -1,0 +1,37 @@
+# cluster-llm-prep: GLM-5.3 on 2 x B200 nodes, one pod per node, 8
+# data-parallel ranks with expert parallel inside the node (DP8 x EP8). The
+# recipe is operators/glm53/values.yaml; another cluster runs the same model
+# in its own shape (B300 DP8, H200 TP8, 2 x H200 over RoCE, ...).
+nodes:
+  gpuProduct: NVIDIA-B200
+  hostnames:
+    - gpu-node-x
+    - gpu-node-x
+llmisvc:
+  replicas: 2
+  runtimeClassName: performance-gpu-hpc-performanceprofile-extras-b200
+  # Multi-port external LB: one API server per rank on 8000-8007, each an
+  # endpoint of the scheduler's pool; the supervisor on 8208 answers the
+  # probes for all ranks.
+  dataParallelExternalLB:
+    ranks: 8
+    supervisorPort: 8208
+  extraArgs:
+    - --enable-expert-parallel
+    - --all2all-backend=allgather_reducescatter
+  resources:
+    requests:
+      cpu: "96"
+      memory: 512Gi
+      nvidia.com/gpu: "8"
+      hugepages-1Gi: 16Gi
+    limits:
+      cpu: "192"
+      memory: 2000Gi
+      nvidia.com/gpu: "8"
+      hugepages-1Gi: 16Gi
+  volumes:
+    # /dev/shm: NCCL psm windows plus headroom for the LMCacheMPConnector's
+    # local buffers.
+    dshmSize: 600Gi
+    hugepagesSize: 16Gi

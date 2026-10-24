@@ -1,6 +1,8 @@
 name: qwen36-judge
 projectNamespace: llm-judge
-repourl: 'https://git.example.internal/popai/helm-charts/qwen36-judge-chart.git'
+repourl: 'https://git.example.internal/popai/helm-charts/model-deployer-chart.git'
+# One chart for every model (charts/model-deployer); the model's recipe is
+# operators/qwen36-judge/values.yaml.
 targetRevision: main
 preserveResourcesOnDeletion: true
 syncPolicy:
@@ -11,6 +13,7 @@ syncPolicy:
     # the app's apply can hit "metadata.resourceVersion: Invalid value: 0"
     # forever on those objects (same lesson as glm53.yaml).
     - ServerSideApply=true
+    - RespectIgnoreDifferences=true
   # The three popai charts depend on CRDs each other installs
   # (EnvoyProxy/InferencePool from envoy-gateway, cert-manager.io from
   # cert-manager), so a first sync attempt can legitimately fail; retry
@@ -46,3 +49,9 @@ ignoreDifferences:
       - .spec.rules[].backendRefs[].priority
       - .spec.rules[].backendRefs[].weight
       - .spec.rules[].modelsOwnedBy
+  # A Job's pod template cannot change; its labels carry the chart's version
+  # (the per-node pull jobs), which an upgrade of the chart changes.
+  - group: batch
+    kind: Job
+    jsonPointers:
+      - /spec/template/metadata/labels

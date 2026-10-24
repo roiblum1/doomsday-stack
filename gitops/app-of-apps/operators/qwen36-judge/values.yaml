@@ -1,0 +1,202 @@
+# qwen36-judge: the model's recipe for charts/model-deployer, layered first by the
+# Argo CD platform (operators/qwen36-judge/values.yaml). A cluster's own
+# sites/<site>/<env>/mces/<mce>/<cluster>/qwen36-judge/values.yaml goes on top; aigw-ui's
+# Deployments page writes that one. From charts/generic-model's example,
+# which rendered the qwen36-judge chart byte for byte, without its client-listener
+# route and direct backend (the fleet's entry route replaced them).
+# Qwen3.6-35B-A3B-FP8 judge on the L4 GPU node -- deployment values for
+# generic-model.
+#
+# Reproduces the qwen36-judge-chart deployment in namespace llm-judge,
+# object names byte-identical (migration parity). Mission: an independent,
+# always-warm judge model for the Claude Code PreToolUse hook (verdicts:
+# allow / ask / deny). Different model family from GLM-5.3 so the judge is
+# never the agent grading itself. Full rationale: qwen36-judge-chart
+# docs/RECIPE.md (out-of-band; see README).
+
+namespace: llm-judge
+nameOverride: qwen36-judge
+
+# --- target node -------------------------------------------------------------
+nodes:
+  # The L4 server carries the standard GPU-operator label.
+  gpuProduct: NVIDIA-L4
+
+# --- model + S3 source ---------------------------------------------------------
+model:
+  # vLLM served-model-name (the kserve base preset also serves
+  # publishers/llm-judge/models/judge alongside it). The judge hook sends
+  # this as the OpenAI "model" field.
+  name: judge
+  # No subPath: the L4 node has NO LVMS (a single NVMe -- LVMS needs two),
+  # so there is no PVC to pre-warm. The KServe storage-initializer
+  # downloads the model straight from S3 into the pod's emptyDir at
+  # /mnt/models on every pod start (35 GB at ~3 GB/s FlashGrid rates =
+  # well under a minute; startup budget is 30 min anyway).
+  #
+  # The original ask was s3://mce-site-b-bucket/Qwen3.6-35B-A3B-FP8, but those
+  # credentials are rejected (InvalidAccessKeyId) on every endpoint
+  # reachable from this cluster; the IDENTICAL model dir already lives in
+  # the shared llms bucket with working credentials.
+  uri: s3://llms/Qwen/Qwen3.6-35B-A3B-FP8
+
+# S3 credentials: pre-existing out-of-band secret, kserve shape:
+#   kubectl -n llm-judge create secret generic judge-s3 \
+#     --from-literal=AWS_ACCESS_KEY_ID=<key> \
+#     --from-literal=AWS_SECRET_ACCESS_KEY=<secret>
+#   kubectl -n llm-judge annotate secret judge-s3 \
+#     serving.kserve.io/s3-endpoint=http://host.example.internal
+s3:
+  create: false
+  shape: kserve
+  secretName: judge-s3
+  endpoint: http://host.example.internal
+  region: us-east-1
+  accessKeyId: ""
+  secretAccessKey: ""
+
+# --- service account / SCC --------------------------------------------------------
+serviceAccount:
+  name: s3sa
+
+scc:
+  name: qwen36-judge-model-serving
+  create: true
+  description:
+    - Allows vLLM judge-serving pods to run as root and add IPC_LOCK
+    - while mounting the model PVC and S3 secrets.
+
+# --- images ------------------------------------------------------------------------
+images:
+  # Plain vLLM (no LMCache -- nothing shares a KV cache with the judge, and
+  # vLLM's own prefix cache covers the repeated system prompt + policy).
+  # v0.30.0 bundles flashinfer cubins (air-gap requirement).
+  vllm: registry-internal/vllm/vllm-openai:v0.30.0
+  # KServe storage-initializer mirror, pinned to the installed
+  # llmisvc-controller version. Without this initContainer image override
+  # the pod dies in ImagePullBackOff (docker.io is not in the IDMS).
+  storageInitializer: registry-internal/kserve/kserve/storage-initializer:v0.21.0-rc1
+
+# --- gateways ---------------------------------------------------------------------
+gateway:
+  aiGateway:
+    name: envoy-ai-gateway
+    namespace: envoy-ai-gateway-system
+    peerListener: peers
+    # KEEP AT peers: on the client listener KServe's own route skips the
+    # entry route.
+    kserveRouteListener: peers
+
+# --- the LLMInferenceService -------------------------------------------------------
+llmisvc:
+  # Root with IPC_LOCK (the chart's SCC, scc.create).
+  ipcLock: true
+  name: qwen36-judge
+
+  # runtimeClassName / priorityClassName deliberately NOT set and MUST stay
+  # unset: the kserve preset merge only stays out of the way when omitted.
+  runtimeClassName: ""
+
+  # No rolloutStrategy on this deployment (single replica, autoscaled).
+  rolloutStrategy: null
+
+  schedulerName: default-scheduler
+  terminationGracePeriodSeconds: 300
+
+  # Fixed 1 replica: WVA/KEDA prerequisites (KEDA + WVA controller +
+  # inferenceservice-config prometheus.url) are NOT installed on this
+  # cluster yet -- flip llmisvc.scaling.enabled once they are. minReplicas
+  # MUST stay 1: a cold judge pod takes minutes to load weights, and
+  # during that window every hook call would time out. maxReplicas 3 = 6
+  # of 8 L4s, leaving 2 for the RAG embedder/reranker.
+  replicas: 1
+  scaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    wva:
+      keda:
+        pollingInterval: 5
+        cooldownPeriod: 30
+
+  # Parallelism via the CRD field: the base preset renders
+  # --tensor-parallel-size from spec.parallelism.tensor. Do NOT also pass
+  # --tensor-parallel-size in args (duplicate flag). TP2: the FP8 weights
+  # are ~35 GB and do not fit one 24 GB L4; L4s have no NVLink -- wider
+  # than 2 only adds PCIe hops.
+  parallelism:
+    tensor: 2
+
+  # Extra vLLM args (single tokens; JSON blobs pre-wrapped in single quotes
+  # because the preset launcher evals `vllm serve ... "$@"` -- bash brace
+  # expansion).
+  args:
+    - --max-model-len=16384
+    # Qwen3.6 hybrid linear-attention (GDN/Mamba) layers need ONE state
+    # block per decode sequence: 128 keeps the KV cache at ~130k tokens.
+    - --max-num-seqs=128
+    - --reasoning-parser=qwen3
+    # Judge calls always send the same system prompt + policy first.
+    - --enable-prefix-caching
+    # What the gateway needs to charge cached prompt tokens less and to
+    # count streamed answers (aigw-ui prices).
+    - --enable-prompt-tokens-details
+    - --enable-force-include-usage
+    # Thinking OFF: the judge must answer in a fixed schema.
+    - "--default-chat-template-kwargs='{\"enable_thinking\": false}'"
+    # Text-only judge: refuse any multimodal input paths.
+    - "--limit-mm-per-prompt='{\"image\":0,\"video\":0}'"
+    - --trust-remote-code
+
+  env:
+    HF_HUB_OFFLINE: "1"
+    TRANSFORMERS_OFFLINE: "1"
+    VLLM_ENGINE_READY_TIMEOUT_S: "1800"
+    # TP2 crosses GPUs inside ONE node over PCIe only: NCCL must not try
+    # RoCE/IB.
+    NCCL_IB_DISABLE: "1"
+
+  resources:
+    requests:
+      cpu: "16"
+      memory: 64Gi
+      nvidia.com/gpu: "2"
+    limits:
+      cpu: "32"
+      memory: 128Gi
+      nvidia.com/gpu: "2"
+
+  probes:
+    # Startup = S3 download (35 GB, under a minute) + weight load across
+    # 2x L4 + CUDA graph capture + torch.compile JIT: budget 30 min, then
+    # tight liveness/readiness.
+    port: 8000
+    startup:
+      path: /health
+      periodSeconds: 5
+      failureThreshold: 360
+      timeoutSeconds: 5
+    readiness:
+      path: /health
+      periodSeconds: 10
+      failureThreshold: 60
+      timeoutSeconds: 5
+    liveness:
+      path: /health
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 10
+
+  # storage-initializer override (image from images.storageInitializer;
+  # docker.io is not mirrored -- see images).
+  storageInitializer:
+    enabled: true
+    resources:
+      requests: {cpu: "2", memory: 2Gi}
+      limits: {cpu: "8", memory: 8Gi}
+
+# --- the model on the peer listener (names of the qwen36-judge chart) -------------------
+peer:
+  name: qwen36-judge-peer
+  healthName: qwen36-judge-peer-health
+  requestTimeout: 600s

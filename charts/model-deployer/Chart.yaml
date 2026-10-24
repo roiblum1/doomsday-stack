@@ -1,0 +1,16 @@
+apiVersion: v2
+name: model-deployer
+description: >-
+  One model on a serving site of an aigw-ui fleet, the whole stack: node
+  storage prep, static local PVs and per-node S3 pull jobs (or a PVC filled
+  once from S3 or Hugging Face), the LMCache engine, the LLMInferenceService
+  (any parallel shape) behind the llm-d scheduler with flow control, and the
+  fleet side on the gateway's peer listener (peer route, health route,
+  request classes). A model is a values file in the Argo CD platform's
+  layout; aigw-ui's Deployments page writes them.
+type: application
+version: 0.1.0
+appVersion: "kserve-0.21 / ai-gateway-1.2.0"
+kubeVersion: ">=1.29.0-0"
+maintainers:
+  - name: popai platform team

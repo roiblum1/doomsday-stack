@@ -1,0 +1,18 @@
+# A cluster's own values (sites/.../<cluster>/<model>/values.yaml): whole
+# B300 nodes, one pod per node, 8 data-parallel ranks with expert parallel
+# inside the node. Each rank is a scheduler endpoint (ports 8000-8007).
+nodes:
+  gpuProduct: NVIDIA-B300
+  hostnames: [b300-node-a, b300-node-b]
+llmisvc:
+  replicas: 2
+  runtimeClassName: performance-gpu-hpc-performanceprofile-extras-b300
+  dataParallelExternalLB:
+    ranks: 8
+  extraArgs:
+    - --enable-expert-parallel
+  resources:
+    requests: {cpu: "96", memory: 512Gi, nvidia.com/gpu: "8"}
+    limits: {cpu: "192", memory: 2000Gi, nvidia.com/gpu: "8"}
+  volumes:
+    dshmSize: 256Gi

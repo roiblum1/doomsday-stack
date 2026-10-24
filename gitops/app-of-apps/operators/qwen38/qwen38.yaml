@@ -1,6 +1,8 @@
 name: qwen38
 projectNamespace: llm-qwen38
-repourl: 'https://git.example.internal/popai/helm-charts/qwen38-chart.git'
+repourl: 'https://git.example.internal/popai/helm-charts/model-deployer-chart.git'
+# One chart for every model (charts/model-deployer); the model's recipe is
+# operators/qwen38/values.yaml.
 targetRevision: main
 preserveResourcesOnDeletion: true
 syncPolicy:

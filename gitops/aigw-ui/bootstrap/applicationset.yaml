@@ -1,0 +1,87 @@
+# The lab's stand-in for argocd-day2-platform's ApplicationSet chain, which
+# is not in this export: one Application per model and cluster, made the
+# same way.
+#
+#   operators/<model>/<model>.yaml        app config: chart repo, revision,
+#                                         projectNamespace, sync options
+#   sites/<site>/<env>/mces/<mce>/<cluster>/<model>/   the directory is the
+#                                         registration; its values.yaml is
+#                                         the cluster's own layer
+#
+# Values layer as the platform's deploy chart layers them (last wins), a
+# missing file skipped. It reads only sites/site-lab: the other sites are the
+# platform's. aigw-ui's Deployments page writes the cluster's
+# <model>/values.yaml (and a new model's operators/<model>/ files).
+#
+# A new directory becomes an Application within requeueAfterSeconds; a
+# changed file reaches its Application at Argo CD's next refresh (3 min, at
+# once with a webhook). Removing a directory deletes the Application and,
+# through the finalizer, what it deployed.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: popai-lab
+  namespace: openshift-gitops
+spec:
+  goTemplate: true
+  generators:
+    - matrix:
+        generators:
+          - git:
+              repoURL: https://github.com/roiblum1/doomsday-stack.git
+              revision: main
+              requeueAfterSeconds: 30
+              files:
+                - path: gitops/app-of-apps/operators/*/*.yaml
+                - path: gitops/app-of-apps/operators/*/values*.yaml
+                  exclude: true
+          - git:
+              repoURL: https://github.com/roiblum1/doomsday-stack.git
+              revision: main
+              requeueAfterSeconds: 30
+              pathParamPrefix: dir
+              directories:
+                - path: 'gitops/app-of-apps/sites/site-lab/*/mces/*/*/{{ .name }}'
+  template:
+    metadata:
+      # Named as the platform names them: aigw-ui finds a deployment's
+      # Application by this name.
+      name: 'popai-{{ index .dir.path.segments 7 }}-{{ .name }}-deploy'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: aigw-ui-models
+      sources:
+        - repoURL: '{{ .repourl }}'
+          targetRevision: '{{ .targetRevision }}'
+          path: '{{ .chartPath | default "." }}'
+          helm:
+            releaseName: '{{ .name }}'
+            ignoreMissingValueFiles: true
+            valueFiles:
+              - '$values/gitops/app-of-apps/operators/{{ .name }}/values.yaml'
+              - '$values/gitops/app-of-apps/sites/{{ index .dir.path.segments 3 }}/values.yaml'
+              - '$values/gitops/app-of-apps/sites/{{ index .dir.path.segments 3 }}/{{ index .dir.path.segments 4 }}/values.yaml'
+              - '$values/gitops/app-of-apps/defaults/hosted-clusters/{{ .name }}/values.yaml'
+              - '$values/gitops/app-of-apps/defaults/hosted-clusters/{{ .name }}/values-{{ index .dir.path.segments 4 }}.yaml'
+              - '$values/gitops/app-of-apps/defaults/hosted-clusters/{{ .name }}/values-{{ index .dir.path.segments 7 }}.yaml'
+              - '$values/gitops/app-of-apps/sites/{{ index .dir.path.segments 3 }}/{{ index .dir.path.segments 4 }}/mces/{{ index .dir.path.segments 6 }}/values.yaml'
+              - '$values/gitops/app-of-apps/sites/{{ index .dir.path.segments 3 }}/{{ index .dir.path.segments 4 }}/mces/{{ index .dir.path.segments 6 }}/{{ index .dir.path.segments 7 }}/values.yaml'
+              - '$values/{{ .dir.path.path }}/values.yaml'
+        - repoURL: https://github.com/roiblum1/doomsday-stack.git
+          targetRevision: main
+          ref: values
+      destination:
+        name: '{{ index .dir.path.segments 7 }}'
+        namespace: '{{ .projectNamespace }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+  # The app config's own sync options and ignored differences.
+  templatePatch: |
+    spec:
+      syncPolicy:
+        syncOptions: {{ .syncPolicy.syncOptions | toJson }}
+        retry: {{ .syncPolicy.retry | toJson }}
+      ignoreDifferences: {{ .ignoreDifferences | toJson }}

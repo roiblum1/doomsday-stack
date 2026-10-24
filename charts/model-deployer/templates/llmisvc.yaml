@@ -1,0 +1,135 @@
+{{- include "md.requiredChecks" . }}
+{{- $name := include "md.llmisvcName" . }}
+{{- $fc := .Values.llmisvc.flowControl | default dict }}
+{{- if not (has ($fc.fairnessPolicy | default "") (list "" "round-robin-fairness-policy")) }}
+{{- fail "llmisvc.flowControl.fairnessPolicy must be empty or round-robin-fairness-policy" }}
+{{- end }}
+# The serving workload: ONE LLMInferenceService behind the llm-d router
+# (EPP + InferencePool). Per-model shape comes from values:
+#   - replicas (fixed) or llmisvc.scaling.enabled (WVA/KEDA block)
+#   - spec.parallelism.tensor (renders --tensor-parallel-size) for
+#     non-DP models; DP/EP models pass the flags in llmisvc.args
+#   - model.uri: pvc://<claim>/<subPath> (pre-pulled, node-prep + pull
+#     jobs), pvc://<name>-model/<dir> (modelCache Job) or model.uri
+#     verbatim (s3:// or hf:// -> storage-initializer)
+#
+# Merged on the base preset kserve-config-llm-template which already runs
+# `vllm serve /mnt/models --served-model-name ... --port 8000 ... "$@"`
+# (bash eval) -> args must be single tokens (dotted keys, no JSON).
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "md.labels" . | nindent 4 }}
+  annotations:
+    # What aigw-ui reads to weigh, label and price this site of the model.
+    aigw-ui.io/capacity-per-instance: {{ .Values.model.capacityPerInstance | toString | quote }}
+    {{- with .Values.model.revision }}
+    aigw-ui.io/model-revision: {{ . | toString | quote }}
+    {{- end }}
+    {{- with .Values.model.maxModelLen }}
+    aigw-ui.io/max-model-len: {{ . | toString | quote }}
+    {{- end }}
+    {{- with .Values.model.marketId }}
+    aigw-ui.io/market-id: {{ . | quote }}
+    {{- end }}
+spec:
+  {{- if .Values.llmisvc.scaling.enabled }}
+  # WVA-driven autoscaling (llm-d Workload Variant Autoscaler -> KEDA ->
+  # HPA). Prerequisites (KEDA + WVA + inferenceservice-config) must be
+  # installed first -- see values.yaml.
+  scaling:
+    minReplicas: {{ .Values.llmisvc.scaling.minReplicas }}
+    maxReplicas: {{ .Values.llmisvc.scaling.maxReplicas }}
+    wva:
+      keda:
+        pollingInterval: {{ .Values.llmisvc.scaling.wva.keda.pollingInterval }}
+        cooldownPeriod: {{ .Values.llmisvc.scaling.wva.keda.cooldownPeriod }}
+  {{- else }}
+  replicas: {{ .Values.llmisvc.replicas }}
+  {{- end }}
+  model:
+    name: {{ .Values.model.name | quote }}
+    uri: {{ include "md.modelUri" . }}
+  {{- with .Values.llmisvc.rolloutStrategy }}
+  rolloutStrategy:
+    maxSurge: {{ .maxSurge }}
+    maxUnavailable: {{ .maxUnavailable }}
+  {{- end }}
+  {{- if and .Values.llmisvc.kvCacheOffloading (not .Values.lmcache.enabled) }}
+  # Rendered by the controller into the vLLM launcher's KV_TRANSFER_ARGS
+  # (OffloadingConnector, CPU tier in /dev/shm -- see values.yaml for the
+  # sizing contract with volumes.dshmSize). Mutually exclusive with
+  # lmcache.enabled: LMCache replaces vLLM's built-in offloading connector
+  # (and only one --kv-transfer-config may exist).
+  {{- with .Values.llmisvc.kvCacheOffloading }}
+  kvCacheOffloading:
+    cpu: {{ .cpu }}
+    {{- with .evictionPolicy }}
+    evictionPolicy: {{ . }}
+    {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- $par := dict }}
+  {{- range $k, $v := (.Values.llmisvc.parallelism | default dict) }}
+  {{- if $v }}{{ $_ := set $par $k $v }}{{ end }}
+  {{- end }}
+  {{- with $par }}
+  # KServe renders the vLLM flags from these: --tensor-parallel-size,
+  # and with a worker (multi-node) --data-parallel-size, -size-local,
+  # --enable-expert-parallel and the leader's address and ranks. Do NOT
+  # also pass those flags in args.
+  parallelism:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.llmisvc.podAnnotations }}
+  # On the workload pods: e.g. the RoCE network attachment
+  # (k8s.v1.cni.cncf.io/networks).
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.llmisvc.prefill }}
+  # Prefill/decode: the prefill workload, verbatim.
+  prefill:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  router:
+    # KServe's own HTTPRoute (/<namespace>/<name>/... and /publishers/...)
+    # attaches to the shared gateway's PEER listener only. On the client
+    # listener it is a way to the model past aigw-ui's entry route, where
+    # nothing is counted against a quota. KServe reports the service ready
+    # only when a route of its own is accepted, so the route stays.
+    gateway:
+      refs:
+        - name: {{ .Values.gateway.aiGateway.name }}
+          namespace: {{ .Values.gateway.aiGateway.namespace }}
+          {{- with .Values.gateway.aiGateway.kserveRouteListener }}
+          # Without sectionName the route is on both listeners.
+          sectionName: {{ . }}
+          {{- end }}
+    route: {}
+    {{- $sched := include "md.scheduler" . | fromYaml }}
+    scheduler:
+      {{- with .Values.serviceAccount.name }}
+      # Pin the EPP to the chart's ServiceAccount instead of letting kserve
+      # mint its own <name>-epp-sa. Unpinned, the controller deep-copies the
+      # WORKLOAD SA into the epp-sa -- dragging along OpenShift's rotating
+      # dockercfg secret (s3sa-dockercfg-*), which OCM then re-adopts onto
+      # the copy, fighting the original SA's owner for it every few seconds.
+      template:
+        serviceAccountName: {{ . }}
+      {{- end }}
+      {{- with $sched }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+  template:
+    {{- include "md.podSpec" (dict "ctx" . "worker" false) | nindent 4 }}
+  {{- if .Values.llmisvc.multiNode }}
+  # Multi-node: KServe runs a LeaderWorkerSet of a leader and workers (data /
+  # dataLocal pods per replica), its worker preset passing the leader's
+  # address and each pod's start rank. The workers run the same container.
+  worker:
+    {{- include "md.podSpec" (dict "ctx" . "worker" true) | nindent 4 }}
+  {{- end }}
