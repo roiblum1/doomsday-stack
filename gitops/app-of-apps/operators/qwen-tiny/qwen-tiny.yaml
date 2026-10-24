@@ -1,0 +1,38 @@
+name: qwen-tiny
+projectNamespace: vllm-lab
+# The lab's copy of charts/model-deployer, in this repository. In the
+# disconnected network the chart has a repository of its own
+# (popai/helm-charts/model-deployer-chart.git, the chart at its root) and
+# chartPath is not needed. chartPath is read by the lab's ApplicationSet
+# (gitops/aigw-ui/bootstrap), not by argocd-day2-platform.
+repourl: 'https://github.com/roiblum1/doomsday-stack.git'
+chartPath: charts/model-deployer
+targetRevision: main
+preserveResourcesOnDeletion: true
+syncPolicy:
+  syncOptions:
+    - CreateNamespace=true
+    - SkipDryRunOnMissingResource=true
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+  retry:
+    limit: 10
+    backoff:
+      duration: 30s
+      factor: 2
+      maxDuration: 5m
+ignoreDifferences:
+  # The ai-gateway controller defaults priority/weight on every backendRef
+  # and stamps modelsOwnedBy on every rule after apply.
+  - group: aigateway.envoyproxy.io
+    kind: AIGatewayRoute
+    jqPathExpressions:
+      - .spec.rules[].backendRefs[].priority
+      - .spec.rules[].backendRefs[].weight
+      - .spec.rules[].modelsOwnedBy
+  # A Job's pod template cannot change; its labels carry the chart's version
+  # (the per-node pull jobs), which an upgrade of the chart changes.
+  - group: batch
+    kind: Job
+    jsonPointers:
+      - /spec/template/metadata/labels

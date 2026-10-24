@@ -1,39 +1,34 @@
-# aigw-ui deployments
+# aigw-ui and the Argo CD platform
 
-The models aigw-ui deploys with Argo CD. Unlike the rest of this export,
-this directory is live: Argo CD on the hub cluster reads it.
+aigw-ui's Deployments page reads and writes `gitops/app-of-apps` in the
+platform's layout (see that README). It writes three kinds of files, one
+commit per save:
 
-| Path | Who writes it | What |
-|---|---|---|
-| `deployments/<cluster>/<name>.yaml` | aigw-ui (Deployments page), or a person | One model on one cluster: the values of `charts/model-deployer`, plus `deployment.cluster` and `deployment.namespace` |
-| `presets/<preset>.yaml` | People | Starting points the Deployments page offers. `preset.title` and `preset.description` are left out of a deployment |
-| `bootstrap/` | People, once per Argo CD | The AppProject, the ApplicationSet, an example cluster Secret, and the read-only Role for aigw-ui's status column |
+| File | Page action |
+|---|---|
+| `sites/<site>/<env>/mces/<mce>/<cluster>/<model>/values.yaml` | Deploy (the directory registers the model on the cluster), Edit (what differs on this cluster), Remove (the directory goes) |
+| `operators/<model>/values.yaml` | Edit recipe (every cluster's first layer) |
+| `operators/<model>/<model>.yaml` + `values.yaml` | New model (app config copied from an existing model) |
 
-aigw-ui reads the files back, so a change made by hand shows on its page.
-It rewrites a file only when someone saves that deployment there, and then
-writes it without comments, keys in alphabetical order.
+A model is an operator whose values have `model.name`; the others (gpu,
+envoy-ai, ...) are left alone. aigw-ui reads every file back: a change made
+by hand shows on its page.
 
-## Setting it up
+## bootstrap/ (the lab only)
 
-1. On each serving cluster, an account for Argo CD; on the hub, its cluster
+argocd-day2-platform is not in this export. On the lab's hub, an
+ApplicationSet stands in for it for `sites/site-lab` only:
+
+1. On the serving cluster, an account for Argo CD; on the hub, its cluster
    Secret with `project: aigw-ui-models` and the cluster's name in aigw-ui
-   (`bootstrap/cluster-secret.example.yaml`).
-2. `oc apply -f bootstrap/appproject.yaml -f bootstrap/applicationset.yaml`
-3. Optional: `oc apply -f bootstrap/hub-status-role.yaml` and the hub's
-   `gitops.argocdNamespace`.
-4. The hub's `gitops.*` values: this repository, the branch, the directory
-   `gitops/aigw-ui`, and a key or token that may push.
+   (`cluster-secret.example.yaml`).
+2. `oc apply -f appproject.yaml -f applicationset.yaml`
+3. Optional: `oc apply -f hub-status-role.yaml` and the hub's
+   `gitops.argocdNamespace`: the page then shows each Application's sync and
+   health.
+4. The hub's `gitops.*` values: this repository, branch `main`, directory
+   `gitops/app-of-apps`, and a Secret with a key that may push.
 
-## What happens on a change
-
-1. aigw-ui commits the file (one commit per change, by the admin's action).
-2. Within 30 s the ApplicationSet creates the Application of a new file;
-   an existing Application picks up a change at its next refresh (3 min,
-   at once with a webhook from the git server to Argo CD).
-3. Argo CD renders the chart with the file and applies it: PVC and download
-   Job first (wave −1), then the model.
-4. aigw-ui's discovery finds the model on the cluster (its peer route) and
-   lists it under Models.
-
-Removing a file deletes the Application and what it deployed, except the
-weights PVC (`Delete=false`).
+It names Applications as the platform does (`popai-<cluster>-<model>-deploy`),
+layers the values the same way, and reads `chartPath` from the app config
+(the lab's chart is in this repository; the platform's are not).

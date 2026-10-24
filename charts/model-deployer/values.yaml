@@ -1,203 +1,444 @@
-# One model on one cluster. aigw-ui's Deployments page writes a file of these
-# values to git (gitops/aigw-ui/deployments/<cluster>/<name>.yaml) and Argo
-# CD's ApplicationSet aigw-ui-models deploys it with this chart. The presets
-# in gitops/aigw-ui/presets are complete examples: a CPU model, Qwen3.8-27B
-# on 4 L4 GPUs (tensor parallel) and GLM-5.3 on 8 B200 GPUs (data parallel).
+# model-deployer -- chart defaults.
 #
-# The chart serves the model on the gateway's peer listener only. Clients
-# reach it through aigw-ui's entry route (fleet-<model>), which checks the
-# key, counts the quota and picks a site. Nothing here is on the client
-# listener, so there is no way to the model that skips those checks.
+# One model on one serving site of an aigw-ui fleet: the whole stack the
+# per-model charts deployed (node storage prep, static local PVs, per-node
+# S3 pull jobs, the LMCache engine, the LLMInferenceService and its
+# scheduler) plus the fleet side (the peer-listener route, the health
+# route, the request classes, aigw-ui's annotations).
+#
+# A model is values, layered by the Argo CD platform (last wins):
+#   operators/<model>/values.yaml      the model's recipe: images,
+#                                      parallelism, vLLM and LMCache flags,
+#                                      the S3 path of its weights
+#   sites/.../<cluster>/<model>/values.yaml   what differs on one cluster
+#                                      (aigw-ui's Deployments page writes it)
+# Required: namespace, model.name, and model.subPath or model.uri.
 
-# Read by the ApplicationSet, not by the templates: where Argo CD deploys
-# this file. aigw-ui sets both. One deployment per namespace: the request
-# classes (InferenceObjective standard, ...) are one per namespace, and
-# aigw-ui adds its best-effort class to the same namespace.
-deployment:
-  # The cluster's name in aigw-ui, which must also be its name in Argo CD.
-  cluster: ""
-  namespace: ""
+# The Argo CD app's projectNamespace. REQUIRED.
+namespace: ""
+# Render the Namespace (with the label the peer listener asks for). Turn
+# off for a namespace that holds other things: the app would own it, and
+# deleting the app would delete the namespace.
+namespaceCreate: true
+# Prefix of the chart's own object names (node prep, PVs, pull jobs,
+# StorageClass). Empty: the LLMInferenceService's name.
+nameOverride: ""
 
+# --- target nodes ---------------------------------------------------------
+nodes:
+  # Label the node-prep DaemonSet and the vLLM pods select on.
+  gpuProduct: ""
+  # The static local PVs' nodeAffinity lists ALL of these hostnames; every
+  # node must have the model at the SAME host path (node-prep + pull jobs
+  # guarantee that). Only needed with storage (PVC-based models).
+  hostnames: []
+
+# --- node storage (manual LVs, no MCO/MachineConfig available) -----------
+nodePrep:
+  enabled: false
+  # MUST bundle the flashinfer_cubin dist package when the serving image
+  # does not (air-gap): besides LVM work, node-prep seeds flashinfer's
+  # trtllm-gen cubins FROM THIS IMAGE into the cache LV (idempotent).
+  image: ""
+  imagePullPolicy: IfNotPresent
+  # Blank data disks the chart turns into the volume group when the VG does
+  # not exist yet (fresh node). Leave EMPTY when the VG already exists
+  # (e.g. day-1 /dev/md/lvmdata RAID): pvcreate REFUSES devices with
+  # filesystem/partition signatures, so this can never clobber an in-use
+  # disk. ensure_vg() only renders when this list is non-empty.
+  devices: []
+  # LVM volume group.
+  vg: vg1
+  # LVs are mounted here (same path on every node in nodes.hostnames).
+  hostPathBase: /var/mnt/llm
+  loopIntervalSeconds: 60
+  # Cubin seeding sidecar parameters (donor rootfs + pgrep marker).
+  # pgrepPattern pins the pattern to the sidecar's argv0.
+  cubinSrc:
+    pgrepPattern: "^lmcache-cubin-src"
+    # Path of the flashinfer_cubin package inside the donor image.
+    distPackagesPath: /usr/local/lib/python3.12/dist-packages/flashinfer_cubin/cubins
+  resources:
+    requests: {cpu: "1", memory: 512Mi}
+    limits: {cpu: "2", memory: 1Gi}
+
+# --- static local PVs + pre-created PVCs ------------------------------------
+storage:
+  # Cluster-scoped like the SCC: every chart uses its OWN StorageClass name
+  # (never share an ArgoCD-managed object with another chart's app).
+  # Defaults to <fullname>-local-static; set explicitly to reuse an
+  # existing cluster-side class.
+  className: ""
+  # The pre-created claim names. model.uri (PVC shape) and the pull jobs
+  # derive from these -- change here, not in the templates.
+  models:
+    pvcName: ""
+    lvName: llm-models
+    lvSize: 100G
+    pvSize: 100Gi
+    subdir: models
+  cache:
+    pvcName: ""
+    lvName: llm-cache
+    lvSize: 100G
+    pvSize: 100Gi
+    subdir: cache
+  # Stable L2 disk tier for the LMCache engine: local-static PVC the engine
+  # CR mounts; node-prep creates and keeps mounted the backing LV.
+  l2:
+    pvcName: ""
+    lvName: llm-l2
+    lvSize: 100G
+    pvSize: 100Gi
+    subdir: lmcache-l2
+
+# --- model + S3 source -----------------------------------------------------
 model:
-  # What tenants send as "model", what vLLM serves, and what aigw-ui lists.
-  # Required. Dots are allowed (glm-5.3); object names use the slug.
+  # vLLM served-model-name (what clients send as "model"). REQUIRED.
   name: ""
-  # Where the weights are:
-  #   hf://<org>/<model>     Hugging Face (needs internet or a mirror)
-  #   s3://<bucket>/<path>   S3; storage.s3.secretName holds the keys
-  #   pvc://<claim>/<path>   already on a PVC (a site's storage chart)
-  # Required.
+  # Subdirectory inside the models PVC / S3 bucket. When set, model.uri
+  # derives as pvc://<storage.models.pvcName>/<subPath> (pre-pulled models).
+  # When unset, model.uri (below) is used verbatim (e.g. an s3:// URI the
+  # kserve storage-initializer downloads into the pod).
+  subPath: ""
   uri: ""
-  # The names of the objects: the LLMInferenceService, the routes
-  # (<name>-peer, <name>-health) and KServe's children (<name>-kserve,
-  # <name>-inference-pool). Empty is the slug of model.name (glm-5.3 ->
-  # glm-5-3). Changing it on a running deployment replaces every object.
-  objectName: ""
+  s3:
+    # s3://<this>/* -- where the pull jobs fetch the model from.
+    path: ""
   # What aigw-ui reads from the LLMInferenceService:
   #   revision             the checkpoint; sites with different revisions of
   #                        one model do not share traffic. Empty leaves it out.
   #   capacityPerInstance  what one ready replica serves, relative to the
-  #                        other sites' recipes of this model. aigw-ui's
+  #                        other sites' recipes of this model; aigw-ui's
   #                        capacity measurement replaces it.
-  #   maxModelLen          the longest prompt and answer together. Renders
-  #                        vLLM's --max-model-len and the annotation, so the
-  #                        two cannot differ. Empty lets vLLM choose and
-  #                        aigw-ui reads what it chose from the server.
+  #   maxModelLen          renders vLLM's --max-model-len and the annotation,
+  #                        so the two cannot differ. Empty: vLLM chooses and
+  #                        aigw-ui reads it from the server (then do not put
+  #                        --max-model-len in llmisvc.args either way twice).
   #   marketId             the OpenRouter id aigw-ui takes the price from.
   revision: ""
   capacityPerInstance: "1"
   maxModelLen: ""
   marketId: ""
 
-# How the pods get the weights of an hf:// or s3:// model.
-#   download  KServe's storage initializer downloads them into the pod at
-#             every start. Nothing to set up; costs node disk and a download
-#             per restart.
-#   cache     a PVC (<name>-model) is filled once by a Job, and the pods
-#             mount it. Argo CD runs the Job before the model (sync wave -1).
-#             A new uri downloads into a new directory of the same PVC.
-storage:
-  mode: download
-  cache:
-    size: 20Gi
-    # Empty is the cluster's default class.
-    storageClass: ""
-    # ReadWriteMany (CephFS, NFS) when replicas run on several nodes.
-    accessMode: ReadWriteOnce
-  # The image of the download Job: KServe's storage initializer, the one the
-  # cluster's KServe uses (configmap inferenceservice-config, kserve).
-  initializerImage: docker.io/kserve/storage-initializer:v0.21.0-rc1
-  downloadResources:
+# --- weights on a PVC from the cluster's storage class ------------------------
+# For a cluster without the node-prep local disks (shared storage such as
+# Ceph): a PVC (<llmisvc name>-model) filled once by a Job with KServe's
+# storage initializer from model.uri (hf:// or s3://, credentials from
+# s3.secretName), before the model starts (Argo CD sync wave -1). The pods
+# mount it instead of downloading into the node's disk at every start. A
+# new uri downloads into a new directory of the same PVC.
+modelCache:
+  enabled: false
+  size: 20Gi
+  # Empty: the cluster's default class.
+  storageClass: ""
+  # ReadWriteMany (CephFS, NFS) when replicas run on several nodes.
+  accessMode: ReadWriteOnce
+  # Empty: images.storageInitializer.
+  image: ""
+  home: /tmp
+  resources:
     requests: {cpu: 100m, memory: 512Mi}
     limits: {cpu: "2", memory: 4Gi}
-  # The download step writes its cache under $HOME, which is / and not
-  # writable under OpenShift's random user ID.
-  downloadHome: /tmp
-  s3:
-    # A Secret with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and, for a
-    # private endpoint, AWS_ENDPOINT_URL and AWS_DEFAULT_REGION. Used by the
-    # download Job (cache) and by KServe's initializer (download, through
-    # the ServiceAccount below). Never put the keys in this file: it is in
-    # git.
-    secretName: ""
-    serviceAccountName: ""
 
-serving:
-  # The vLLM image. Empty keeps the image of KServe's template (llm-d CUDA).
-  # The lab runs vLLM's CPU image.
-  image: ""
+# S3 credentials. NEVER put real keys in values files -- default is to
+# reference a pre-existing secret (created out-of-band). Set create: true
+# only for testing, with keys passed via --set-file / external secrets.
+# shape selects the created secret's shape:
+#   pull-job: data keys named by s3.keys.* (what s5cmd pull jobs read)
+#   kserve:   AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY data keys +
+#             serving.kserve.io/s3-endpoint/-region annotations (what the
+#             kserve controller's storage-initializer reads)
+s3:
+  create: false
+  shape: pull-job
+  secretName: ""
+  # Only used by shape: pull-job (key NAMES in the referenced secret).
+  keys:
+    accessKeyId: AWS_ACCESS_KEY_ID
+    secretAccessKey: AWS_SECRET_ACCESS_KEY
+    endpoint: AWS_ENDPOINT_URL
+    region: AWS_DEFAULT_REGION
+  # Only used when create: true:
+  endpoint: ""
+  region: us-east-1
+  accessKeyId: ""
+  secretAccessKey: ""
+
+# --- service accounts / SCC ------------------------------------------------
+serviceAccount:
+  name: s3sa
+
+# Root with IPC_LOCK for the vLLM pods (llmisvc.ipcLock): GPU recipes with
+# hugepages or LMCache need it. A CPU model runs under the restricted SCC
+# without it.
+scc:
+  # Cluster-scoped SecurityContextConstraints object name. REQUIRED with
+  # create.
+  name: ""
+  create: false
+  # Text of the SCC's kubernetes.io/description annotation, as the lines
+  # of its folded block (one list item = one rendered line).
+  description:
+    - Allows vLLM model-serving pods to run as root and add IPC_LOCK while
+    - mounting local PVs, hugepage emptyDirs and secrets.
+
+# --- images -----------------------------------------------------------------
+images:
+  # The vLLM serving image. With LMCache enabled, keep tag-for-tag with
+  # lmcache.image: both sides of the ZMQ/CUDA-IPC protocol must run the
+  # same LMCache build.
+  vllm: ""
+  s5cmd: registry-internal/tools/s5cmd:v2.3.0
+  # KServe storage-initializer mirror (S3-uri models only): overrides the
+  # controller-injected initContainer image (docker.io is not mirrored).
+  storageInitializer: registry-internal/kserve/kserve/storage-initializer:v0.21.0-rc1
+
+# --- per-node model pull jobs ------------------------------------------------
+pullJobs:
+  enabled: false
+  concurrency: 128
+  partSize: 256
+  resources:
+    requests: {cpu: "16", memory: 32Gi}
+    limits: {cpu: "48", memory: 100Gi}
+
+# --- gateway -------------------------------------------------------------------
+# ONE Gateway: the shared Envoy AI Gateway, with two listeners. The client
+# listener belongs to aigw-ui's entry routes; this chart puts nothing on
+# it. The peer listener (mTLS, reached only by an entry route) takes the
+# model's peer route, its health route and KServe's own route. The names
+# are fleet-wide: they are in aigw-ui's quota counter keys.
+gateway:
+  aiGateway:
+    name: envoy-ai-gateway
+    namespace: envoy-ai-gateway-system
+    peerListener: peers
+    # Where KServe's own path routes attach. KEEP AT peers: on the client
+    # listener they are a way to the model past the entry route.
+    kserveRouteListener: peers
+
+# --- the LLMInferenceService ---------------------------------------------------
+llmisvc:
+  # REQUIRED.
+  name: ""
+  # Fixed replica count. Ignored when scaling.enabled is true (the scaling
+  # block renders instead of replicas).
   replicas: 1
-  # Appended to `vllm serve`. One token each, options in dot notation
-  # (--speculative-config.method=mtp): KServe's launcher runs them through
-  # bash eval, so spaces, quotes, braces and shell characters are refused.
-  # The first two are what the gateway needs to charge cached prompt tokens
-  # less and to count streamed answers. Do not add --max-model-len (use
-  # model.maxModelLen), --tensor-parallel-size (serving.tensorParallel) or
-  # the data-parallel flags (serving.dataParallel).
-  args:
-    - --enable-prompt-tokens-details
-    - --enable-force-include-usage
-  # Name: value. VLLM_ADDITIONAL_ARGS is refused (it goes through eval).
-  env: {}
-  resources: {}
-  # GPUs per pod: renders nvidia.com/gpu requests and limits, and a rollout
-  # without a surge pod (there are no free GPUs for one).
-  gpus: 0
-  # nodeSelector nvidia.com/gpu.product, e.g. NVIDIA-L4, NVIDIA-B200.
-  gpuProduct: ""
-  # spec.parallelism.tensor: KServe adds --tensor-parallel-size. 0 = none.
-  tensorParallel: 0
-  # Data parallel with one port per rank (GLM-5.3 on B200): ranks > 1 adds
-  # the vLLM flags, gives the InferencePool one port per rank (8000, 8001,
-  # ...) so the scheduler picks a rank, and points the probes at the
-  # supervisor, which reports for all ranks. aigw-ui measures every port.
-  dataParallel:
-    ranks: 0
-    supervisorPort: 8208
+  # runtimeClassName / priorityClassName are deliberately OPTIONAL: on the
+  # proven L4 deployments the kserve preset merge only stays out of the way
+  # when they are omitted. Leave unset unless the performance profile's
+  # runtime class is needed (B200 deployments set it).
   runtimeClassName: ""
-  nodeSelector: {}
-  tolerations: []
-  # Empty: maxSurge 0 / maxUnavailable 1 with GPUs, KServe's default without.
-  rollout: {}
-  terminationGracePeriodSeconds: 0
-  # vLLM closes a connection after this many idle seconds. The health check
-  # comes every 3 seconds; with vLLM's default of 5 it met connections being
-  # closed and took the only site out (the 503 storm). Changing it restarts
-  # the pods.
-  keepAliveSeconds: 75
-  # Size of /dev/shm. Tensor parallel needs several GiB.
-  shmSize: ""
-  # KServe's kvCacheOffloading ({cpu: 64Gi, evictionPolicy: lru}): KV blocks
-  # that leave the GPU wait in host memory (/dev/shm: size shmSize above it).
-  kvCacheOffloading: {}
-  # More volumes and mounts for the vLLM container, e.g. a compile cache PVC.
-  volumes: []
-  volumeMounts: []
-  # How long the first start may take: model load, compile, graph capture.
-  # startupSeconds / 10 checks.
-  startupSeconds: 600
-
-# The llm-d scheduler (InferencePool + endpoint picker) in front of the
-# replicas. It picks the replica that holds the prompt's prefix and, with
-# flow control, serves the class best-effort last and the tenants in turn.
-scheduler:
-  # The scheduler config, verbatim (an EndpointPickerConfig). Set it for
-  # the plugin set of a newer endpoint picker (GLM-5.3's preset). Empty
-  # builds one from weights and flowControl below.
-  config: {}
-  # false keeps KServe's default config while flowControl is off.
-  custom: false
-  #   prefix   the replica already holds the start of this prompt
-  #   queue    few requests wait on the replica
-  #   kvCache  the replica's KV cache is little used
-  #   noHitLru for a prompt no replica holds, the one that least recently
-  #            got such a prompt
-  weights:
-    prefix: 3
-    queue: 2
-    kvCache: 2
-    noHitLru: 2
-  # Requests wait in the scheduler when the replicas are busy and leave in
-  # order of priority: best-effort (-1) waits behind everyone and gets 429
-  # after requestTTL. Needs a gateway with agent-router#2595.
+  schedulerName: default-scheduler
+  terminationGracePeriodSeconds: 300
+  rolloutStrategy:
+    maxSurge: 0                # no free GPUs for a surge pod -> deadlock
+    maxUnavailable: 1
+  # WVA-driven autoscaling (llm-d Workload Variant Autoscaler -> KEDA ->
+  # HPA, scaling on vLLM queue depth + KV-cache usage). DEFAULT OFF: a
+  # spec.scaling block is NOT inert without WVA/KEDA installed (the
+  # llmisvc-controller error-loops ReconcileScalingError). When enabled,
+  # the template renders the scaling block instead of replicas
+  # (replicas -> scaling.minReplicas).
+  scaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    wva:
+      keda:
+        pollingInterval: 5
+        cooldownPeriod: 30
+  # Parallelism via the CRD field: the base preset renders
+  # --tensor-parallel-size from spec.parallelism.tensor. Do NOT also pass
+  # --tensor-parallel-size in args (duplicate flag). Omitted when unset.
+  parallelism:
+    tensor: 0
+  # KServe storage-initializer override (s3:// or hf:// model URIs): renders
+  # the initContainers block overriding the controller-injected
+  # storage-initializer's image, resources and HOME (the controller merges:
+  # these win, args/command stay the controller's).
+  storageInitializer:
+    enabled: false
+    image: ""                  # defaults to images.storageInitializer
+    # HOME and HF_HOME for the download; / is not writable under
+    # OpenShift's random user ID (hf:// models).
+    home: ""
+    resources: {}
+  # --- EPP (router scheduler) config -------------------------------------------
+  # Rendered verbatim by the kserve controller into the EPP deployment's
+  # --config-text (EndpointPickerConfig). Optional: without it the EPP
+  # template only pins the serviceAccountName. When set, the block is
+  # copied verbatim into spec.router.scheduler (pool spec + config).
+  scheduler: {}
+  # Flow control, added to the scheduler config above (which must have
+  # config.inline): requests wait in the scheduler when the replicas are
+  # busy and leave in order of priority, so best-effort (-1) waits behind
+  # everyone and gets 429 after requestTTL, and the tenants are served in
+  # turn. Needs a gateway with agent-router#2595.
   flowControl:
     enabled: false
     # Requests in flight per endpoint (each InferencePool port, so one per
     # data-parallel rank) before the scheduler holds any back. Never above
-    # each rank's --max-num-seqs. Required with enabled. Size it from
-    # aigw-ui's capacity measurement.
+    # each rank's --max-num-seqs. Required with enabled.
     maxConcurrency: null
-    # Keep below peer.requestTimeout. 300s was tested on the lab.
     requestTTL: 300s
     # round-robin-fairness-policy: each tenant (x-llm-d-inference-fairness-id,
     # set by aigw-ui from the token) waits in its own queue and the tenants
-    # are served in turn. Empty: oldest first whatever the tenant, and
-    # aigw-ui warns.
+    # are served in turn. Empty: oldest first whatever the tenant.
     fairnessPolicy: round-robin-fairness-policy
-    # Most requests below priority 0 that may wait; above it they get 429 at
-    # once. 0 keeps the scheduler's default (5000).
+    # Most requests below priority 0 that may wait; above it 429 at once.
+    # 0 keeps the scheduler's default.
     negativeBandMaxRequests: 0
-    # DO NOT turn on without a lab test: cancels running best-effort answers.
+    # DO NOT turn on without a test: cancels running best-effort answers.
     enableEviction: false
+  # Free-form vLLM args list, copied verbatim (single tokens only: the
+  # kserve preset launcher evals `vllm serve ... "$@"`). Spaces, quotes,
+  # braces and shell characters fail the render.
+  args: []
+  env: {}
+  # vLLM closes a connection after this many idle seconds. With vLLM's 5
+  # the 3-second health checks met closing connections and took the only
+  # site out (the 503 storm). Changing it restarts the pods.
+  keepAliveSeconds: 75
+  resources: {}
+  # Root with IPC_LOCK (needs scc.create and scc.name).
+  ipcLock: false
+  tolerations: []
+  # Optional volumes (emptyDir Memory dshm, HugePages). dshmSize renders
+  # the dshm volume; hugepagesSize additionally renders the hugepages
+  # volume + its mount (B200 recipes).
+  volumes:
+    dshmSize: ""
+    hugepagesSize: ""
+  # Empty ({}) keeps KServe's own probes (/health on 8000).
+  probes:
+    # Probe target: DP multi-port external LB recipes point at the
+    # supervisor's aggregated health endpoints on
+    # --data-parallel-supervisor-port; internal-LB / TP recipes point at
+    # the API server on the preset's base port 8000 (/readyz does not
+    # exist there -- verified live; use /health).
+    port: 8000
+    startup:
+      path: /health
+      periodSeconds: 10
+      failureThreshold: 180     # cold boot: model load + JIT + graph capture
+      timeoutSeconds: 5
+    readiness:
+      path: /health
+      periodSeconds: 10
+      failureThreshold: 5
+      timeoutSeconds: 5
+    liveness:
+      path: /health
+      periodSeconds: 30
+      failureThreshold: 5
+      timeoutSeconds: 5
+  # Legacy vLLM OffloadingConnector KV-cache offloading (CPU tier in
+  # /dev/shm). Mutually exclusive with lmcache.enabled (only one connector
+  # may own the KV cache). Default unset.
+  kvCacheOffloading: {}
 
-# The site's gateway. The names are fleet-wide: they are in aigw-ui's quota
-# counter keys.
-gateway:
-  name: envoy-ai-gateway
-  namespace: envoy-ai-gateway-system
-  # The listener only other sites reach (mutual TLS). The namespace needs
-  # the label aigw-ui.io/serving=true; the ApplicationSet sets it.
-  peerListener: peers
+# --- LMCache (node-local KV cache: RAM L1 + disk L2) --------------------------
+lmcache:
+  enabled: false
+  # All remaining keys mirror the upstream lmcache-engine chart (shipped in
+  # the operator package) 1:1, so its docs and guards apply here too.
+  name: ""                      # = CR + Service name + <name>-connection CM
+  image:
+    # Keep tag-for-tag with images.vllm (both sides of the protocol must
+    # run the same LMCache build).
+    repository: ""
+    tag: ""
+    pullPolicy: IfNotPresent
+  serviceAccountName: ""
+  isolatedIPC: true
+  privileged: false
+  gpuVendor: nvidia
+  hostIPC: false
+  hostNetwork: false
+  logLevel: INFO
+  nodeSelector: {}
+  priorityClassName: openshift-user-critical
+  server:
+    port: 5555                 # ZMQ, what vLLM connects to
+    httpPort: 8080             # health/HTTP frontend
+    # MUST be a multiple of lmcache.chunkSizeModulus (template fails the
+    # render otherwise; the modulus is model/arch-specific -- see the
+    # per-model examples). Only whole chunks are cached.
+    chunkSize: 256
+    # Rendered explicitly (CRD default 256 may violate the modulus guard).
+    chunkSizeModulus: 0         # 0 disables the guard
+    # ZMQ worker threads. Keep >= the DP ranks per node.
+    maxWorkers: 8
+    hashAlgorithm: blake3
+  l1:
+    sizeGB: 100
+  # Top-level (it governs the L1 tier).
+  eviction:
+    policy: LRU
+    triggerWatermark: 0.8
+    evictionRatio: 0.2
+  # Disk tier: stable local-static PVC (storage.l2.pvcName) backed by a
+  # node-prep-managed LV. maxCapacityGB must stay below storage.l2.pvSize
+  # (the template refuses values >= pvSize) for filesystem overhead.
+  l2:
+    enabled: false
+    mountPath: /mnt/lmcache-l2
+    maxCapacityGB: 80
+    directIO: false
+    # Spread files over hashed subdirectories. Choose once: flipping later
+    # orphans existing files.
+    shardDirs: true
+    persist: true
+    eviction:
+      policy: LRU
+      triggerWatermark: 0.9
+      evictionRatio: 0.1
+    storePolicy: default
+    prefetchPolicy: default
+    prefetchMaxInFlight: 8
+  # Model-recipe flags appended last (can override operator-generated
+  # flags), e.g. ["--separate-object-groups"].
+  extraArgs: []
+  env: []
+  prometheus:
+    enabled: true
+    # v0.5.5's engine serves /metrics on the http frontend (httpPort) --
+    # the operator passes --prometheus-port through but the engine ignores
+    # it. Point the operator-generated metrics Service (and thus the
+    # ServiceMonitor) at the real listener, or Prometheus scrapes nothing.
+    port: 8080
+    serviceMonitor:
+      # Scraped by the platform Prometheus (openshift-monitoring k8s) via
+      # the openshift.io/cluster-monitoring namespace label.
+      enabled: true
+      interval: 30s
+    rules:
+      # PrometheusRule (engine down / no targets / L2 headroom / eviction
+      # pressure / cache-bypass). Alerting group name is
+      # <fullname>-lmcache.rules.
+      enabled: true
 
+# --- the model on the peer listener ------------------------------------------------
+# A request arrives on the gateway's client listener, where aigw-ui's entry
+# route (fleet-<model>) checks the key, counts the quota and picks a site,
+# and comes here over mTLS: peer route -> scheduler (EPP) -> vLLM.
 peer:
-  # Requests the site takes at once, per proxy pod of the gateway. Above it
-  # the site answers 503 at once and the entry tries the next site.
-  # replicas x requests one replica holds / proxy pods. 0 = no limit.
-  maxParallelRequests: 0
+  enabled: true
+  # Default <llmisvc name>-peer and -health.
+  name: ""
+  healthName: ""
   # DO NOT lower: the gateway's default of 60s cuts long answers.
   requestTimeout: 3600s
-  # A health check that meets a connection vLLM is closing is tried again.
+  # How often a health check is tried again when it meets a connection that
+  # vLLM is closing.
   healthRetries: 2
+  # Requests the site takes at once, per proxy pod of the gateway. Above it
+  # the site answers 503 at once and the entry tries the next site.
+  # replicas x requests one replica holds / proxy pods. 0 renders no limit.
+  maxParallelRequests: 0
 
 # Request classes of the scheduler, by priority. best-effort is not here:
 # aigw-ui creates it (-1) for every model set to serve a spent budget.
@@ -206,7 +447,26 @@ objectives:
   standard: 0
   batch: -10
 
-# Alerts on the scheduler's queue (needs flowControl.enabled).
+# Alerts on the scheduler's queue (needs llmisvc.flowControl.enabled).
 alerts:
   enabled: false
   standardQueuedFor: 5m
+
+# --- optional AIPerf benchmark Job ---------------------------------------------
+aiperf:
+  enabled: false
+  name: ""
+  version: 0.7.0
+  pypiIndex: https://registry-internal/pypi/simple/
+  pypiHost: registry-internal
+  # Target the in-cluster Envoy AI Gateway service (full path incl. EPP).
+  url: http://envoy-ai-gateway.envoy-gateway-system.svc:80
+  streaming: true
+  concurrency: 64
+  numPrompts: 512
+  inputTokensMean: 1024
+  inputTokensStddev: 256
+  outputTokensMean: 256
+  resources:
+    requests: {cpu: "8", memory: 16Gi}
+    limits: {cpu: "16", memory: 32Gi}

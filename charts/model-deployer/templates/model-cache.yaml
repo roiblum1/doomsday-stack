@@ -1,5 +1,5 @@
-{{- if include "md.cached" . }}
-{{- $name := include "md.name" . -}}
+{{- if .Values.modelCache.enabled }}
+{{- $name := include "md.llmisvcName" . -}}
 {{- $dir := include "md.cacheDir" . -}}
 # The weights, downloaded once. Argo CD applies wave -1 first and waits for
 # the Job to finish before it applies the model (wave 0).
@@ -7,7 +7,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ $name }}-model
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ .Values.namespace }}
   labels:
     {{- include "md.labels" . | nindent 4 }}
   annotations:
@@ -17,21 +17,22 @@ metadata:
     argocd.argoproj.io/sync-options: Delete=false
     helm.sh/resource-policy: keep
 spec:
-  accessModes: [{{ .Values.storage.cache.accessMode }}]
-  {{- with .Values.storage.cache.storageClass }}
+  accessModes: [{{ .Values.modelCache.accessMode }}]
+  {{- with .Values.modelCache.storageClass }}
   storageClassName: {{ . }}
   {{- end }}
   resources:
     requests:
-      storage: {{ .Values.storage.cache.size }}
+      storage: {{ .Values.modelCache.size }}
 ---
-# A Job's spec cannot change, so its name carries the directory, which is
-# named after the uri: a new uri is a new Job and a new directory.
+# A Job's spec cannot change: its name carries a hash of what it runs (uri
+# and image), and its pod's labels are fixed (no chart version), so a chart
+# upgrade does not make Argo CD fail on it.
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ $name }}-download-{{ $dir }}
-  namespace: {{ .Release.Namespace }}
+  name: {{ $name }}-download-{{ printf "%s|%s" .Values.model.uri (.Values.modelCache.image | default .Values.images.storageInitializer) | sha256sum | trunc 10 }}
+  namespace: {{ .Values.namespace }}
   labels:
     {{- include "md.labels" . | nindent 4 }}
   annotations:
@@ -41,7 +42,7 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "md.labels" . | nindent 8 }}
+        app.kubernetes.io/name: {{ include "md.llmisvcName" . }}-download
     spec:
       restartPolicy: OnFailure
       securityContext:
@@ -50,7 +51,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: download
-          image: {{ .Values.storage.initializerImage }}
+          image: {{ (.Values.modelCache.image | default .Values.images.storageInitializer) }}
           # KServe's initializer: <source uri> <target directory>. Downloading
           # into a directory that already has the files checks them and
           # fetches only what is missing.
@@ -59,15 +60,15 @@ spec:
             - /mnt/models/{{ $dir }}
           env:
             - name: HOME
-              value: {{ .Values.storage.downloadHome | default "/tmp" }}
+              value: {{ .Values.modelCache.home | default "/tmp" }}
             - name: HF_HOME
-              value: {{ .Values.storage.downloadHome | default "/tmp" }}/hf
-          {{- with .Values.storage.s3.secretName }}
+              value: {{ .Values.modelCache.home | default "/tmp" }}/hf
+          {{- with .Values.s3.secretName }}
           envFrom:
             - secretRef:
                 name: {{ . }}
           {{- end }}
-          {{- with .Values.storage.downloadResources }}
+          {{- with .Values.modelCache.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -79,7 +80,7 @@ spec:
             - name: model
               mountPath: /mnt/models
             - name: tmp
-              mountPath: {{ .Values.storage.downloadHome | default "/tmp" }}
+              mountPath: {{ .Values.modelCache.home | default "/tmp" }}
       volumes:
         - name: model
           persistentVolumeClaim:

@@ -1,11 +1,11 @@
-{{- if and .Values.alerts.enabled .Values.scheduler.flowControl.enabled }}
-{{- $name := include "md.name" . -}}
+{{- if and .Values.alerts.enabled (.Values.llmisvc.flowControl | default dict).enabled }}
+{{- $name := include "md.llmisvcName" . -}}
 {{- $pool := include "md.pool" . -}}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: {{ $name }}-flow-control
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ .Values.namespace }}
   labels:
     {{- include "md.labels" . | nindent 4 }}
 spec:

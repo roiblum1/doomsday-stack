@@ -1,0 +1,22 @@
+{{- if .Values.namespaceCreate }}
+# Namespace for everything the chart deploys. Applied first so plain
+# `oc apply -f` (non-Helm) installs also work in one shot.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  labels:
+    {{- include "md.labels" . | nindent 4 }}
+    # The gateway's peer listener takes routes only from namespaces with
+    # this label: without it the model's peer route is not attached and no
+    # entry route reaches the model.
+    aigw-ui.io/serving: "true"
+    {{- if and .Values.lmcache.enabled .Values.lmcache.prometheus.enabled .Values.lmcache.prometheus.serviceMonitor.enabled }}
+    # Lets the platform Prometheus (openshift-monitoring k8s instance, which
+    # selects ServiceMonitors only from namespaces carrying this label --
+    # hpc-observability does the same) scrape the LMCache engine's
+    # ServiceMonitor. thanos-querier fronts it, which is what the POPAI
+    # Grafana's prometheus datasource queries.
+    openshift.io/cluster-monitoring: "true"
+    {{- end }}
+{{- end }}

@@ -1,0 +1,362 @@
+# glm53: the model's recipe for charts/model-deployer, layered first by the
+# Argo CD platform (operators/glm53/values.yaml). A cluster's own
+# sites/<site>/<env>/mces/<mce>/<cluster>/glm53/values.yaml goes on top; aigw-ui's
+# Deployments page writes that one. From charts/generic-model's example,
+# which rendered the glm53 chart byte for byte, without its client-listener
+# route and direct backend (the fleet's entry route replaced them).
+# GLM-5.3 on 2x B200 -- full deployment bundle values for generic-model.
+#
+# Reproduces the glm53-chart deployment in namespace llm-glm53 on the
+# site-a A cluster, object names byte-identical (migration parity).
+
+namespace: llm-glm53
+nameOverride: glm53
+
+# --- target nodes ---------------------------------------------------------
+nodes:
+  gpuProduct: NVIDIA-B200
+  hostnames:
+    - gpu-node-x
+    - gpu-node-x
+
+# --- node storage ----------------------------------------------------------
+nodePrep:
+  enabled: true
+  # MUST stay v0.30.0 (or any image bundling the flashinfer_cubin dist
+  # package): besides LVM work, node-prep seeds flashinfer's trtllm-gen
+  # cubins FROM THIS IMAGE into the cache LV (6.3G, idempotent). The lmcache
+  # vllm-openai:v0.5.5 image ships plain flashinfer 0.6.18 without cubins and
+  # would fetch them from edge.urm.nvidia.com at runtime -- unreachable
+  # air-gapped. v0.30.0's flashinfer 0.6.18.post1 bundles the same cubins.
+  image: registry-internal/vllm/vllm-openai:v0.30.0
+  imagePullPolicy: IfNotPresent
+  # vg1 comes from the day-1 /dev/md/lvmdata RAID: no devices list, no
+  # ensure_vg().
+  vg: vg1
+  hostPathBase: /var/mnt/llm
+  loopIntervalSeconds: 60
+  resources:
+    requests: {cpu: "1", memory: 512Mi}
+    limits: {cpu: "2", memory: 1Gi}
+
+# --- static local PVs + pre-created PVCs ------------------------------------
+storage:
+  # The cluster-side StorageClass local-static already exists (created by
+  # the glm53 app) -- reuse it verbatim.
+  className: local-static
+  models:
+    pvcName: glm53-models
+    lvName: llm-models
+    lvSize: 1200G          # LV created by node-prep (LVM suffix)
+    pvSize: 1200Gi          # PV/PVC capacity
+    subdir: models          # under nodePrep.hostPathBase
+  cache:
+    pvcName: glm53-cache
+    lvName: llm-cache
+    lvSize: 300G
+    pvSize: 300Gi
+    subdir: cache
+  # Stable L2 disk tier for the LMCache engine (data survives engine pod
+  # recreation -- spec changes, node drains).
+  l2:
+    pvcName: glm53-cache-l2
+    lvName: llm-l2
+    lvSize: 2500G
+    pvSize: 2500Gi
+    subdir: lmcache-l2
+
+# --- model + S3 source -----------------------------------------------------
+model:
+  name: glm-5.3
+  # Subdirectory inside the models PVC / S3 bucket.
+  subPath: GLM-5.3
+  s3:
+    path: llms/zai-org/GLM-5.3   # s3://<this>/*
+
+# S3 credentials: pre-existing secret (created out-of-band), pull-job shape.
+s3:
+  create: false
+  shape: pull-job
+  secretName: glm53-s3
+  keys:
+    accessKeyId: AWS_ACCESS_KEY_ID
+    secretAccessKey: AWS_SECRET_ACCESS_KEY
+    endpoint: AWS_ENDPOINT_URL
+    region: AWS_DEFAULT_REGION
+  endpoint: ""
+  region: us-east-1
+  accessKeyId: ""
+  secretAccessKey: ""
+
+# --- service accounts / SCC ------------------------------------------------
+serviceAccount:
+  name: s3sa
+
+scc:
+  name: glm53-model-serving
+  create: true
+
+# --- images -----------------------------------------------------------------
+images:
+  # LMCache-enabled vLLM build (lmcache 0.5.5 + vllm 0.29.0, NGC CUDA 13
+  # base). Must stay in lockstep with lmcache.image below (ZMQ/CUDA-IPC
+  # protocol on both sides).
+  vllm: registry-internal/lmcache/lmcache/vllm-openai:v0.5.5
+  s5cmd: registry-internal/tools/s5cmd:v2.3.0
+
+# --- per-node model pull jobs ------------------------------------------------
+pullJobs:
+  enabled: true
+  concurrency: 128
+  partSize: 256
+  resources:
+    requests: {cpu: "16", memory: 32Gi}
+    limits: {cpu: "48", memory: 100Gi}
+
+# --- gateways -----------------------------------------------------------------
+gateway:
+  aiGateway:
+    name: envoy-ai-gateway
+    namespace: envoy-ai-gateway-system
+    peerListener: peers
+    # KEEP AT peers: on the client listener KServe's own route skips the
+    # entry route.
+    kserveRouteListener: peers
+
+# --- the LLMInferenceService ---------------------------------------------------
+llmisvc:
+  # Root with IPC_LOCK (the chart's SCC, scc.create).
+  ipcLock: true
+  name: glm53-b200
+  replicas: 2                  # one pod per node (one full node each)
+  runtimeClassName: performance-gpu-hpc-performanceprofile-extras-b200
+  schedulerName: default-scheduler
+  terminationGracePeriodSeconds: 300
+  rolloutStrategy:
+    maxSurge: 0                # no free GPUs for a surge pod -> deadlock
+    maxUnavailable: 1
+  # --- EPP (router scheduler) config -------------------------------------------
+  # EPP-INTERNAL counting (inflight-load-producer) instead of the default
+  # /metrics-based scorers: with DP8 every metric family is exposed 8x
+  # (engine="0".."7") and the EPP takes ONE sample per family. See the
+  # glm53-chart git history for the full rationale.
+  scheduler:
+    pool:
+      spec:
+        appProtocol: http
+        endpointPickerRef:
+          failureMode: FailOpen
+          group: ""
+          kind: Service
+          name: glm53-b200-epp-service
+          port:
+            number: 9002
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: glm53-b200
+            app.kubernetes.io/part-of: llminferenceservice
+            kserve.io/component: workload
+        targetPorts:
+          - number: 8000
+          - number: 8001
+          - number: 8002
+          - number: 8003
+          - number: 8004
+          - number: 8005
+          - number: 8006
+          - number: 8007
+    config:
+      inline:
+        apiVersion: llm-d.ai/v1alpha1
+        kind: EndpointPickerConfig
+        plugins:
+          - type: single-profile-handler
+          - type: approx-prefix-cache-producer
+          - type: inflight-load-producer
+          - type: prefix-cache-scorer
+          - type: active-request-scorer
+          - type: token-load-scorer
+          - type: max-score-picker
+        schedulingProfiles:
+          - name: default
+            plugins:
+              - pluginRef: active-request-scorer
+                weight: 3
+              - pluginRef: token-load-scorer
+                weight: 1
+              - pluginRef: prefix-cache-scorer
+                weight: 1
+              - pluginRef: max-score-picker
+  # --- parallelism: DP8 x EP8 inside the node ---
+  # Multi-port external LB: one API server per DP rank on ports 8000-8007,
+  # supervisor serves aggregated /health + /readyz on 8208 (probes below
+  # point there). Each rank is its own InferencePool endpoint.
+  args:
+    - --data-parallel-size=8
+    - --data-parallel-size-local=8
+    - --data-parallel-multi-port-external-lb
+    - --data-parallel-supervisor-port=8208
+    - --enable-expert-parallel
+    - --all2all-backend=allgather_reducescatter
+    - --kv-cache-dtype=fp8_e4m3
+    - --gpu-memory-utilization=0.90
+    - --max-model-len=262144
+    - --max-num-seqs=64            # per DP rank -> 512 per node
+    - --max-num-batched-tokens=16384
+    - --enable-prefix-caching
+    # What the gateway needs to charge cached prompt tokens less and to
+    # count streamed answers (aigw-ui prices).
+    - --enable-prompt-tokens-details
+    - --enable-force-include-usage
+    - --per-request-spec-decode-metrics=summary
+    - --kv-cache-metrics
+    - --speculative-config.method=mtp
+    - --speculative-config.num_speculative_tokens=5
+    - --reasoning-parser=glm47
+    - --tool-call-parser=glm47
+    - --enable-auto-tool-choice
+    - --trust-remote-code
+  env:
+    HF_HUB_OFFLINE: "1"
+    TRANSFORMERS_OFFLINE: "1"
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    NCCL_IB_DISABLE: "1"
+    NCCL_P2P_LEVEL: NVL
+    NVSHMEM_REMOTE_TRANSPORT: none
+    NVSHMEM_IB_ENABLE_IBGDA: "0"
+    VLLM_USE_DEEP_GEMM: "1"
+    OMP_NUM_THREADS: "16"
+    VLLM_CACHE_ROOT: /cache/vllm
+    DG_JIT_CACHE_DIR: /cache/deep_gemm
+    TRITON_CACHE_DIR: /cache/triton
+    FLASHINFER_WORKSPACE_BASE: /cache/flashinfer
+    TORCHINDUCTOR_CACHE_DIR: /cache/inductor
+    TORCHINDUCTOR_FX_GRAPH_CACHE: "1"
+    HF_HOME: /cache/hf
+  resources:
+    requests:
+      cpu: "96"
+      memory: 512Gi
+      nvidia.com/gpu: "8"
+      hugepages-1Gi: 16Gi
+    limits:
+      cpu: "192"
+      memory: 2000Gi
+      nvidia.com/gpu: "8"
+      hugepages-1Gi: 16Gi
+  volumes:
+    # /dev/shm: NCCL psm windows plus headroom for the LMCacheMPConnector's
+    # local buffers. Memory-backed emptyDir: tmpfs, only consumes what is
+    # written.
+    dshmSize: 600Gi
+    hugepagesSize: 16Gi
+  probes:
+    # DP supervisor (multi-port external LB mode): aggregated child health,
+    # /readyz reflecting all per-rank API servers.
+    port: 8208
+    startup:
+      path: /health
+      periodSeconds: 10
+      failureThreshold: 180     # cold boot: load + DeepGEMM JIT + graph capture
+      timeoutSeconds: 5
+    readiness:
+      path: /readyz
+      periodSeconds: 10
+      failureThreshold: 5
+      timeoutSeconds: 5
+    liveness:
+      path: /health
+      periodSeconds: 30
+      failureThreshold: 5
+      timeoutSeconds: 5
+
+# --- LMCache (node-local KV cache: RAM L1 + LVMS disk L2) ----------------------
+# Operator/CRDs come from the day2 `lmcache` app (lmcache-chart.git); the
+# engine CR deploys HERE because the image must match images.vllm.
+lmcache:
+  enabled: true
+  name: glm53-cache            # = CR + Service name + <name>-connection CM
+  image:
+    repository: registry-internal/lmcache/lmcache/vllm-openai
+    tag: v0.5.5
+    pullPolicy: IfNotPresent
+  serviceAccountName: glm53-cache
+  isolatedIPC: true
+  privileged: false
+  gpuVendor: nvidia
+  hostIPC: false
+  hostNetwork: false
+  logLevel: INFO
+  nodeSelector:
+    nvidia.com/gpu.product: NVIDIA-B200
+  priorityClassName: openshift-user-critical
+  server:
+    port: 5555                 # ZMQ, what vLLM connects to
+    httpPort: 8080             # health/HTTP frontend
+    # GLM-5.3 reports tokens_per_block=64: chunkSize must be a multiple of
+    # 64 (chunkSizeModulus enforces it). 256 caches more of each prompt
+    # than 1024.
+    chunkSize: 256
+    chunkSizeModulus: 64
+    maxWorkers: 8
+    hashAlgorithm: blake3
+  # Pinned host RAM per node (request = sizeGB+5 Gi, limit = 1.5x).
+  l1:
+    sizeGB: 1000
+  eviction:
+    policy: LRU
+    triggerWatermark: 0.8
+    evictionRatio: 0.2
+  l2:
+    enabled: true
+    mountPath: /mnt/lmcache-l2
+    maxCapacityGB: 2200
+    directIO: false
+    shardDirs: true
+    persist: true
+    eviction:
+      policy: LRU
+      triggerWatermark: 0.9
+      evictionRatio: 0.1
+    storePolicy: default
+    prefetchPolicy: default
+    prefetchMaxInFlight: 8
+  # GLM-5.3 recipe flag (hybrid attention has separate object groups).
+  extraArgs:
+    - --separate-object-groups
+  env:
+    - name: HOME
+      value: /tmp
+    - name: NUMBA_CACHE_DIR
+      value: /tmp/numba
+  prometheus:
+    enabled: true
+    port: 8080
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+    rules:
+      enabled: true
+
+aiperf:
+  enabled: false
+  name: glm53-aiperf
+  version: 0.7.0
+  pypiIndex: https://registry-internal/pypi/simple/
+  pypiHost: registry-internal
+  url: http://envoy-ai-gateway.envoy-gateway-system.svc:80
+  streaming: true
+  concurrency: 64
+  numPrompts: 512
+  inputTokensMean: 1024
+  inputTokensStddev: 256
+  outputTokensMean: 256
+  resources:
+    requests: {cpu: "8", memory: 16Gi}
+    limits: {cpu: "16", memory: 32Gi}
+
+# --- the model on the peer listener (names of the glm53 chart) -------------------
+peer:
+  name: glm53-peer
+  healthName: glm53-peer-health
+  requestTimeout: 3600s

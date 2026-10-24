@@ -1,60 +1,105 @@
 # model-deployer
 
-One model on one serving site of an aigw-ui fleet. A deployment is a values
-file. aigw-ui's Deployments page writes those files to
-`gitops/aigw-ui/deployments/<cluster>/<name>.yaml`, and Argo CD's
-ApplicationSet `aigw-ui-models` deploys each one with this chart
-(`gitops/aigw-ui/bootstrap/`).
+One chart for every model on a serving site of an aigw-ui fleet. A model is
+values, layered by the Argo CD platform (argocd-day2-platform):
 
-It takes from the charts before it:
+| Layer | Who writes it | Holds |
+|---|---|---|
+| `gitops/app-of-apps/operators/<model>/values.yaml` | people, or aigw-ui's Deployments page ("Edit recipe", "New model") | the recipe: images, parallelism, vLLM and LMCache flags, the S3 path of the weights |
+| the site's layers (`sites/<site>/…/values.yaml`, `defaults/hosted-clusters/<model>/…`) | people | what a site or environment shares |
+| `sites/<site>/<env>/mces/<mce>/<cluster>/<model>/values.yaml` | aigw-ui's Deployments page ("Deploy", "Edit"), or people | what differs on that cluster; the directory is the registration |
 
-| From | What |
-|---|---|
-| `glm53-bundled`, `qwen38-bundled`, `generic-model` | The GPU shapes: tensor parallel (`serving.tensorParallel`), data parallel with one port per rank (`serving.dataParallel.ranks`: the InferencePool's ports, the supervisor probes), GPUs and GPU product, runtime class, no surge pod on GPUs, `/dev/shm`, KV-cache offloading, a scheduler config of a newer endpoint picker (`scheduler.config`), vLLM's keep-alive of 75 s |
-| `llm-model` 0.2.0 | The fleet side: the model only on the peer listener (`<name>-peer`, Exact match), `/healthz/<model>` straight to vLLM with a retry, the shed limit, the classes `interactive`/`standard`/`batch`, flow control with `maxConcurrency` per endpoint and tenants served in turn, aigw-ui's annotations, the alerts |
-| new | `storage.mode: cache`: a PVC filled once by a Job (KServe's storage initializer) before the model starts, instead of a download into the node's disk at every start; a values schema; arguments checked to be single tokens |
+`operators/<model>/<model>.yaml` points the model's Argo CD app at this chart
+(`repourl` `…/model-deployer-chart.git`). aigw-ui writes only what differs
+from the layers below, so a recipe change still reaches every cluster.
 
-Not in it: node preparation, local PVs and per-node pull Jobs, the LMCache
-engine, the AIPerf Job and the S3 Secret. Those stay in the site charts.
-A deployment can use their PVC (`model.uri: pvc://<claim>/<path>`).
+## What it deploys
 
-## Objects
+From `generic-model` (each piece gated on values), which rendered the
+per-model charts byte for byte:
 
-| Object | Name |
-|---|---|
-| `LLMInferenceService` | `<name>` (`model.objectName`, else the slug of `model.name`) |
-| `AIGatewayRoute` on the peer listener | `<name>-peer` |
-| `HTTPRoute` `/healthz/<model.name>` | `<name>-health` |
-| `BackendTrafficPolicy` (shed limit, timeout; health retry) | `<name>-peer`, `<name>-health` |
-| `InferenceObjective` | `interactive` 10, `standard` 0, `batch` −10 |
-| `PersistentVolumeClaim`, `Job` (cache mode) | `<name>-model`, `<name>-download-<hash of uri>` |
-| `PrometheusRule` (`alerts.enabled`) | `<name>-flow-control` |
+- `Namespace` with `aigw-ui.io/serving: "true"` (the peer listener's selector) and,
+  with the LMCache ServiceMonitor, `openshift.io/cluster-monitoring`;
+  `namespaceCreate: false` for a namespace that holds other things;
+- node preparation DaemonSet (LVM LVs, VG from blank disks, flashinfer
+  cubins), static local PVs and PVCs, per-node S3 pull Jobs (`model.subPath`,
+  `model.s3.path`, `pullJobs`, `nodePrep`, `storage`);
+- the LMCache engine (RAM L1 + disk L2), its ServiceAccount, SCC binding,
+  monitoring RBAC and PrometheusRule (`lmcache`);
+- the SCC for root with IPC_LOCK (`scc`, `llmisvc.ipcLock`), the S3 Secret
+  (`s3.create`, testing only), the AIPerf Job (`aiperf`);
+- the `LLMInferenceService`: any parallel shape (tensor parallel through
+  `llmisvc.parallelism.tensor` or the flags, data parallel with one port per
+  rank through `llmisvc.scheduler.pool`), WVA/KEDA scaling, KV offloading.
 
-One deployment per namespace: the classes are one per namespace, and
-aigw-ui adds `best-effort` next to them.
+From the fleet charts (`glm53-bundled`, `llm-model`), on the gateway's peer
+listener only:
 
-## Rules kept from the site charts
+- `AIGatewayRoute <name>-peer` (Exact match on the model name) to the
+  InferencePool, `HTTPRoute <name>-health` (`/healthz/<model>` straight to
+  vLLM) with a retry, the shed limit (`peer.maxParallelRequests`);
+- the classes `interactive` 10, `standard` 0, `batch` −10;
+- flow control merged into the model's own scheduler config
+  (`llmisvc.flowControl`: `maxConcurrency` per endpoint, tenants in turn);
+- `VLLM_HTTP_TIMEOUT_KEEP_ALIVE` 75 (`llmisvc.keepAliveSeconds`), KServe's own
+  route on the peer listener (`gateway.aiGateway.kserveRouteListener`);
+- aigw-ui's annotations: `capacity-per-instance`, `model-revision`,
+  `max-model-len`, `market-id` (`model.*`).
 
-- Nothing on the client listener. A client reaches the model only through
-  aigw-ui's entry route, which checks the key and counts the quota.
-- The peer route's match stays `Exact`: aigw-ui finds the model by it.
-- `keepAliveSeconds` 75 (vLLM's 5 s met the 3 s health checks: the 503 storm).
-- Arguments are single tokens in dot notation; KServe runs them through
-  `bash eval`. The chart refuses spaces, quotes, braces and shell characters,
-  and sets `--max-model-len`, `--tensor-parallel-size` and the data-parallel
-  flags itself.
-- `maxSurge: 0` with GPUs.
+New: `modelCache` for a cluster without node disks: a PVC from the
+cluster's storage class, filled once by a Job (KServe's storage initializer,
+`hf://` or `s3://`) before the model starts (Argo CD sync wave −1).
+
+Not rendered any more: the client-listener `AIGatewayRoute` and the direct
+backends of `generic-model` (`aigatewayRoute`, `directBackend`). Every
+request takes aigw-ui's entry route.
+
+## Rules
+
+- Nothing on the client listener; the peer route's match stays `Exact`.
+- `llmisvc.args` are single tokens in dot notation, or `--option='value'`
+  with no single quote inside (KServe runs them through `bash eval`); the
+  render fails otherwise. `--kv-transfer-config` is the chart's (LMCache).
+- The vLLM image and the LMCache image are the same build; `lmcache.server.chunkSize`
+  is tied to the model and its TP shape (`chunkSizeModulus` guards it).
+- `maxSurge: 0` on GPU recipes (the default); a CPU recipe sets
+  `llmisvc.rolloutStrategy: null`.
+- A Job's pod template cannot change: the download Job's pod labels are fixed
+  and its name carries a hash of uri and image; the per-node pull Jobs carry
+  the chart's version, so model apps ignore `/spec/template/metadata/labels`
+  of Jobs (`ignoreDifferences` in `operators/<model>/<model>.yaml`).
+
+## Migration from glm53-bundled, qwen38-bundled, qwen36-judge
+
+`operators/{glm53,qwen38,qwen36-judge}/values.yaml` are `generic-model`'s
+examples without the client-listener parts, with the peer names of each old
+chart and `llmisvc.ipcLock: true`. Rendered against the old charts
+(`helm template`, 2026-10-24), the only differences are:
+
+- the classes `interactive`/`standard`/`batch` (the old charts had none) and
+  the annotation `aigw-ui.io/capacity-per-instance: "1"`;
+- `helm.sh/chart` labels, and the node-prep script's comment wording
+  (`generic-model`'s merged text; the DaemonSet rolls once);
+- glm53: the recipe is the `bundled` branch the app deploys (LMCache
+  v0.5.5 engine and image), not the export's `glm53-bundled` copy of `main`
+  (KV offloading).
+
+The examples lacked `--enable-prompt-tokens-details` and
+`--enable-force-include-usage`; the recipes have them (aigw-ui charges cached
+tokens and streamed answers from them).
 
 ## Render
 
-    helm lint charts/model-deployer -f gitops/aigw-ui/presets/cpu-small.yaml
-    helm template x charts/model-deployer -n llm-x -f gitops/aigw-ui/presets/qwen3.8-27b-l4.yaml
+    helm lint charts/model-deployer -f gitops/app-of-apps/operators/qwen38/values.yaml
+    helm template x charts/model-deployer --kube-version 1.32.0 \
+      -f gitops/app-of-apps/operators/glm53/values.yaml
 
 ## Tested
 
 On the lab (OpenShift 4.22, KServe 0.21, Envoy Gateway 1.9.2, AI Gateway
-1.2.0 patched), 2026-10-24: the render of `deployments/lab/qwen-tiny.yaml`
-passed a server-side dry run against the lab's CRDs; the cache Job filled
-the PVC from `hf://` in 7 s; qwen-tiny's LLMInferenceService was moved to
-the render's spec and served from the PVC. The GPU presets were rendered
-and linted only.
+1.2.0 patched), 2026-10-24: qwen-tiny's recipe
+(`operators/qwen-tiny/values.yaml`) renders the 10 objects it runs, and a
+server-side dry run against the lab's CRDs accepted them; the download Job
+filled the PVC from `hf://` in 7 s; qwen-tiny served from the PVC
+(`max_model_len` 8192, cached-token details in `usage`). The GPU recipes
+were rendered, linted and compared with the old charts only.

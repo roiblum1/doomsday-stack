@@ -1,9 +1,13 @@
-{{ .Values.model.name }} on the peer listener of {{ .Values.gateway.namespace }}/{{ .Values.gateway.name }}, namespace {{ .Release.Namespace }}.
-{{- if include "md.cached" . }}
-Weights: PVC {{ include "md.name" . }}-model, directory {{ include "md.cacheDir" . }}, filled by Job {{ include "md.name" . }}-download-{{ include "md.cacheDir" . }}.
+{{ .Chart.Name }}-{{ .Chart.Version }}: model "{{ .Values.model.name }}" in namespace "{{ .Values.namespace }}" (LLMInferenceService {{ include "md.llmisvcName" . }}), served on the peer listener of {{ .Values.gateway.aiGateway.namespace }}/{{ .Values.gateway.aiGateway.name }}.
+{{- if .Values.model.subPath }}
+Weights: PVC {{ .Values.storage.models.pvcName }} (local PVs filled by the per-node pull jobs from s3://{{ .Values.model.s3.path }}).
+{{- else if .Values.modelCache.enabled }}
+Weights: PVC {{ include "md.llmisvcName" . }}-model, filled once by Job {{ include "md.llmisvcName" . }}-download-{{ include "md.cacheDir" . }} from {{ .Values.model.uri }}.
+{{- else }}
+Weights: downloaded into each pod at every start from {{ .Values.model.uri }}.
 {{- end }}
 
-  oc -n {{ .Release.Namespace }} get llminferenceservice {{ include "md.name" . }}
-  oc -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name={{ include "md.name" . }}
+  oc -n {{ .Values.namespace }} get llminferenceservice {{ include "md.llmisvcName" . }}
+  oc -n {{ .Values.namespace }} get pods -l app.kubernetes.io/name={{ include "md.llmisvcName" . }}
 
 Clients reach it through aigw-ui's entry route once the model's entry route is on in aigw-ui (Models).

@@ -1,3 +1,330 @@
-# Values for the qwen38 chart. The chart's own values.yaml carries the
-# full deployment defaults (single L4 node); site-level overrides would
-# land here.
+# qwen38: the model's recipe for charts/model-deployer, layered first by the
+# Argo CD platform (operators/qwen38/values.yaml). A cluster's own
+# sites/<site>/<env>/mces/<mce>/<cluster>/qwen38/values.yaml goes on top; aigw-ui's
+# Deployments page writes that one. From charts/generic-model's example,
+# which rendered the qwen38 chart byte for byte, without its client-listener
+# route and direct backend (the fleet's entry route replaced them).
+# Qwen3.8-27B-FP8 on the L4 node -- full deployment bundle values for
+# generic-model.
+#
+# Reproduces the qwen38-chart deployment in namespace llm-qwen38 on the
+# site-a A cluster (single L4 node: 8x NVIDIA L4, 2 taken by the
+# qwen36-judge workload -> 6 free GPUs here), object names
+# byte-identical (migration parity).
+
+namespace: llm-qwen38
+nameOverride: qwen38
+
+# --- target nodes ---------------------------------------------------------
+nodes:
+  gpuProduct: NVIDIA-L4
+  hostnames:
+    - ocp-util-node-1
+
+# --- node storage ----------------------------------------------------------
+nodePrep:
+  enabled: true
+  # MUST stay v0.30.0 (or any image bundling the flashinfer_cubin dist
+  # package): besides LVM work, node-prep seeds flashinfer's trtllm-gen
+  # cubins FROM THIS IMAGE into the cache LV (idempotent). The lmcache
+  # vllm-openai:v0.5.5 image ships plain flashinfer 0.6.18 without cubins
+  # and would fetch them from edge.urm.nvidia.com at runtime -- unreachable
+  # air-gapped. v0.30.0's flashinfer 0.6.18.post1 bundles the same cubins.
+  image: registry-internal/vllm/vllm-openai:v0.30.0
+  imagePullPolicy: IfNotPresent
+  # Blank data disk the chart turns into the volume group when the VG does
+  # not exist yet (fresh L4 R760xa: /dev/sda blank, boot is sdb). pvcreate
+  # REFUSES devices with filesystem/partition signatures.
+  devices:
+    - /dev/sda
+  vg: vg1
+  hostPathBase: /var/mnt/llm
+  loopIntervalSeconds: 60
+  resources:
+    requests: {cpu: "1", memory: 512Mi}
+    limits: {cpu: "2", memory: 1Gi}
+
+# --- static local PVs + pre-created PVCs ------------------------------------
+storage:
+  # Own class (cluster-scoped, like the SCC): never share an
+  # ArgoCD-managed object with another chart's app.
+  className: qwen38-local-static
+  models:
+    pvcName: qwen38-models
+    lvName: llm-models
+    lvSize: 200G           # LV created by node-prep; model is 28.8G
+    pvSize: 200Gi
+    subdir: models
+  cache:
+    pvcName: qwen38-cache
+    lvName: llm-cache
+    lvSize: 150G
+    pvSize: 150Gi
+    subdir: cache
+  l2:
+    pvcName: qwen38-cache-l2
+    lvName: llm-l2
+    lvSize: 1000G
+    pvSize: 1000Gi
+    subdir: lmcache-l2
+
+# --- model + S3 source -----------------------------------------------------
+model:
+  name: Qwen3.8-27B-FP8
+  subPath: Qwen3.8-27B-FP8
+  s3:
+    path: llms/Qwen/Qwen3.8-27B-FP8   # s3://<this>/*
+
+# S3 credentials: pre-existing secret (created out-of-band), pull-job shape.
+s3:
+  create: false
+  shape: pull-job
+  secretName: qwen38-s3
+  keys:
+    accessKeyId: AWS_ACCESS_KEY_ID
+    secretAccessKey: AWS_SECRET_ACCESS_KEY
+    endpoint: AWS_ENDPOINT_URL
+    region: AWS_DEFAULT_REGION
+  endpoint: ""
+  region: us-east-1
+  accessKeyId: ""
+  secretAccessKey: ""
+
+# --- service accounts / SCC ------------------------------------------------
+serviceAccount:
+  name: s3sa
+
+scc:
+  name: qwen38-model-serving
+  create: true
+  description:
+    - Allows vLLM model-serving pods to run as root and add IPC_LOCK while
+    - mounting local PVs, emptyDirs and secrets.
+
+# --- images -----------------------------------------------------------------
+images:
+  # LMCache-enabled vLLM build (lmcache 0.5.5 + vllm 0.29.0). Must stay in
+  # lockstep with lmcache.image below. vLLM 0.29.0 supports the model arch
+  # Qwen3_5ForConditionalGeneration.
+  vllm: registry-internal/lmcache/lmcache/vllm-openai:v0.5.5
+  s5cmd: registry-internal/tools/s5cmd:v2.3.0
+
+# --- per-node model pull jobs ------------------------------------------------
+pullJobs:
+  enabled: true
+  concurrency: 64
+  partSize: 128
+  resources:
+    requests: {cpu: "8", memory: 16Gi}
+    limits: {cpu: "24", memory: 32Gi}
+
+# --- gateways -----------------------------------------------------------------
+gateway:
+  aiGateway:
+    name: envoy-ai-gateway
+    namespace: envoy-ai-gateway-system
+    peerListener: peers
+    # KEEP AT peers: on the client listener KServe's own route skips the
+    # entry route.
+    kserveRouteListener: peers
+
+# --- the LLMInferenceService ---------------------------------------------------
+llmisvc:
+  # Root with IPC_LOCK (the chart's SCC, scc.create).
+  ipcLock: true
+  name: qwen38-l4
+  replicas: 1                  # one pod on the single L4 node
+  runtimeClassName: performance-gpu-hpc-performanceprofile-extras-l4
+  schedulerName: default-scheduler
+  terminationGracePeriodSeconds: 300
+  rolloutStrategy:
+    maxSurge: 0                # no free GPUs for a surge pod -> deadlock
+    maxUnavailable: 1
+  # --- EPP (router scheduler) config -------------------------------------------
+  # Same plugin profile as glm53 (EPP-INTERNAL counting). Internal DP LB
+  # exposes ONE endpoint (pod:8000 -- vLLM's single API server
+  # load-balances the DP ranks itself); external multi-port LB is
+  # MoE-gated in vLLM 0.29 (unusable for this arch).
+  scheduler:
+    pool:
+      spec:
+        appProtocol: http
+        endpointPickerRef:
+          failureMode: FailOpen
+          group: ""
+          kind: Service
+          name: qwen38-l4-epp-service
+          port:
+            number: 9002
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: qwen38-l4
+            app.kubernetes.io/part-of: llminferenceservice
+            kserve.io/component: workload
+        targetPorts:
+          - number: 8000
+    config:
+      inline:
+        apiVersion: llm-d.ai/v1alpha1
+        kind: EndpointPickerConfig
+        plugins:
+          - type: single-profile-handler
+          - type: approx-prefix-cache-producer
+          - type: inflight-load-producer
+          - type: prefix-cache-scorer
+          - type: active-request-scorer
+          - type: token-load-scorer
+          - type: max-score-picker
+        schedulingProfiles:
+          - name: default
+            plugins:
+              - pluginRef: active-request-scorer
+                weight: 3
+              - pluginRef: token-load-scorer
+                weight: 1
+              - pluginRef: prefix-cache-scorer
+                weight: 1
+              - pluginRef: max-score-picker
+  # --- parallelism: TP4/DP1 (single-stream decode; see qwen38-chart git
+  # history for the TP-shape validity analysis) ---
+  args:
+    - --tensor-parallel-size=4
+    - --data-parallel-size=1
+    - --max-model-len=65536
+    - --kv-cache-dtype=fp8_e4m3
+    - --gpu-memory-utilization=0.90
+    - --max-num-seqs=32            # single DP rank -> 32 per pod
+    - --max-num-batched-tokens=8192
+    - --kv-cache-metrics
+    - --enable-prefix-caching
+    # What the gateway needs to charge cached prompt tokens less and to
+    # count streamed answers (aigw-ui prices).
+    - --enable-prompt-tokens-details
+    - --enable-force-include-usage
+    - --enable-chunked-prefill
+    - --speculative-config.method=mtp
+    - --speculative-config.num_speculative_tokens=2
+    - --per-request-spec-decode-metrics=summary
+    - --reasoning-parser=qwen3
+    - --tool-call-parser=qwen3_xml
+    - --enable-auto-tool-choice
+    - --trust-remote-code
+  env:
+    HF_HUB_OFFLINE: "1"
+    TRANSFORMERS_OFFLINE: "1"
+    VLLM_ENGINE_READY_TIMEOUT_S: "3600"
+    NCCL_IB_DISABLE: "1"
+    OMP_NUM_THREADS: "16"
+    VLLM_CACHE_ROOT: /cache/vllm
+    TRITON_CACHE_DIR: /cache/triton
+    FLASHINFER_WORKSPACE_BASE: /cache/flashinfer
+    TORCHINDUCTOR_CACHE_DIR: /cache/inductor
+    TORCHINDUCTOR_FX_GRAPH_CACHE: "1"
+    HF_HOME: /cache/hf
+  resources:
+    requests:
+      cpu: "48"
+      memory: 64Gi
+      nvidia.com/gpu: "4"
+    limits:
+      cpu: "96"
+      memory: 128Gi
+      nvidia.com/gpu: "4"
+  volumes:
+    # /dev/shm: NCCL psm windows plus the LMCacheMPConnector's local
+    # buffers. Memory-backed emptyDir: tmpfs, only consumes what is written.
+    dshmSize: 8Gi
+  probes:
+    # Internal DP LB: one API server process on the preset's base port 8000
+    # serving all DP ranks (/readyz does not exist in vLLM 0.29).
+    port: 8000
+    startup:
+      path: /health
+      periodSeconds: 10
+      failureThreshold: 180     # cold boot: 28.8G model load + JIT + graph capture
+      timeoutSeconds: 5
+    readiness:
+      path: /health
+      periodSeconds: 10
+      failureThreshold: 5
+      timeoutSeconds: 5
+    liveness:
+      path: /health
+      periodSeconds: 30
+      failureThreshold: 5
+      timeoutSeconds: 5
+
+# --- LMCache (node-local KV cache: RAM L1 + disk L2) --------------------------
+# Replaces the reference deployment's MooncakeStoreConnector. Operator/CRDs
+# come from the day2 `lmcache` app; the engine CR deploys HERE because the
+# image must match images.vllm.
+lmcache:
+  enabled: true
+  name: qwen38-cache            # = CR + Service name + <name>-metrics job
+  image:
+    repository: registry-internal/lmcache/lmcache/vllm-openai
+    tag: v0.5.5
+    pullPolicy: IfNotPresent
+  serviceAccountName: qwen38-cache
+  isolatedIPC: true
+  privileged: false
+  gpuVendor: nvidia
+  hostIPC: false
+  hostNetwork: false
+  logLevel: INFO
+  nodeSelector:
+    nvidia.com/gpu.product: NVIDIA-L4
+  priorityClassName: openshift-user-critical
+  server:
+    port: 5555                 # ZMQ, what vLLM connects to
+    httpPort: 8080             # health/HTTP frontend
+    # Qwen3_5 hybrid linear/full-attention: block alignment depends on the
+    # engine parallel shape. TP4+MTP spec decode = 1600 (measured at
+    # connector init). Changing this invalidates existing L2 chunk keys
+    # (harmless: dead entries repopulate).
+    chunkSize: 1600
+    chunkSizeModulus: 1600
+    # maxWorkers left unset: the upstream CRD default applies (parity
+    # with the qwen38-chart template, which did not render it).
+    maxWorkers: null
+    hashAlgorithm: blake3
+  # Pinned host RAM per node (request = sizeGB+5 Gi, limit = 1.5x).
+  l1:
+    sizeGB: 200
+  eviction:
+    policy: LRU
+    triggerWatermark: 0.8
+    evictionRatio: 0.2
+  l2:
+    enabled: true
+    mountPath: /mnt/lmcache-l2
+    maxCapacityGB: 900
+    directIO: false
+    shardDirs: true
+    persist: true
+    eviction:
+      policy: LRU
+      triggerWatermark: 0.9
+      evictionRatio: 0.1
+    storePolicy: default
+    prefetchPolicy: default
+    prefetchMaxInFlight: 8
+  env:
+    - name: HOME
+      value: /tmp
+    - name: NUMBA_CACHE_DIR
+      value: /tmp/numba
+  prometheus:
+    enabled: true
+    port: 8080
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+    rules:
+      enabled: true
+
+# --- the model on the peer listener (names of the qwen38 chart) -------------------
+peer:
+  name: qwen38-peer
+  healthName: qwen38-peer-health
+  requestTimeout: 900s
