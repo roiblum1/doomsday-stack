@@ -1,5 +1,0 @@
-# Written by aigw-ui (Deployments): this cluster's own values for the
-# model, on top of operators/e2e-r035-small/values.yaml and the site's layers. aigw-ui
-# reads it back: a change by hand shows on its page.
-llmisvc:
-  replicas: 2
