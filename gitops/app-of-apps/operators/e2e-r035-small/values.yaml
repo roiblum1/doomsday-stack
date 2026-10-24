@@ -1,0 +1,62 @@
+# The recipe of e2e-r035-small for charts/model-deployer, the first layer on every
+# cluster. Written by aigw-ui (Deployments); a change by hand shows there.
+images:
+  vllm: public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.29.0
+llmisvc:
+  args:
+  - --enable-prompt-tokens-details
+  - --enable-force-include-usage
+  - --dtype=bfloat16
+  env:
+    VLLM_CPU_KVCACHE_SPACE: "4"
+  flowControl:
+    enabled: true
+    maxConcurrency: 2
+    negativeBandMaxRequests: 4
+  replicas: 1
+  resources:
+    limits:
+      cpu: "6"
+      memory: 10Gi
+    requests:
+      cpu: "2"
+      memory: 6Gi
+  scheduler:
+    config:
+      inline:
+        apiVersion: llm-d.ai/v1alpha1
+        kind: EndpointPickerConfig
+        plugins:
+        - type: single-profile-handler
+        - type: queue-scorer
+        - type: kv-cache-utilization-scorer
+        - type: prefix-cache-scorer
+        - type: no-hit-lru-scorer
+        - type: max-score-picker
+        schedulingProfiles:
+        - name: default
+          plugins:
+          - pluginRef: queue-scorer
+            weight: 2
+          - pluginRef: kv-cache-utilization-scorer
+            weight: 2
+          - pluginRef: prefix-cache-scorer
+            weight: 3
+          - pluginRef: no-hit-lru-scorer
+            weight: 2
+          - pluginRef: max-score-picker
+model:
+  maxModelLen: 8192
+  name: e2e-r035-small
+  revision: qwen2.5-0.5b-e2e
+  uri: hf://Qwen/Qwen2.5-0.5B-Instruct
+modelCache:
+  enabled: true
+  image: docker.io/kserve/storage-initializer:v0.21.0-rc1
+  size: 5Gi
+namespace: e2e-r035-small
+namespaceCreate: true
+peer:
+  maxParallelRequests: 8
+serviceAccount:
+  name: ""
