@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A **sanitized, point-in-time export** (2026-10-12) of an LLM serving stack on a HyperShift-hosted OpenShift 4.22 cluster (`cluster-llm-prep`): GLM-5.3 on two B200 nodes, Qwen3.8 and a Qwen3.6 "judge" on one L4 node, served by KServe `LLMInferenceService` + llm-d EPP, fronted by Envoy Gateway + Envoy AI Gateway, with LMCache, per-client token quotas and a cross-site "fleet" path.
 
-It is a snapshot kept in git, not the source of truth. The real sources are per-chart git repos, the `popai` values repo, and `argocd-day2-platform`. Editing files here deploys nothing.
+It is a snapshot kept in git, not the source of truth. The real sources are per-chart git repos, the `popai` values repo, and `argocd-day2-platform`. Editing files here deploys nothing, **except on the lab**: since 2026-10-24 the lab's Argo CD (on the aigw-ui hub cluster) reads `main` through `gitops/aigw-ui/bootstrap` — `charts/model-deployer`, `gitops/app-of-apps/operators/<model>/` and `gitops/app-of-apps/sites/site-lab/**` are live there, and the aigw-ui hub commits to `gitops/app-of-apps` (author `aigw-ui`, messages `aigw-ui: …`). Do not rewrite those commits or hand-edit a file the hub is changing; a hand edit is fine (the hub reads files back).
 
 ## Hard rules
 
@@ -59,6 +59,8 @@ Client → OpenShift Route or LoadBalancer → Gateway `envoy-ai-gateway` (names
 
 ## aigw-ui (companion repo `git@github.com:roiblum1/aigw-ui.git`)
 
+- From aigw-ui 0.35.0 its Deployments page reads and writes `gitops/app-of-apps` in the platform's layout: a model is an operator whose values have `model.name`; it writes a cluster's `<op>/values.yaml` as what differs from the layers below (patched, comments kept), recipes, and new operators (copied app config, object names renamed). Keep that layout and the layer order of `gitops/aigw-ui/bootstrap/applicationset.yaml` (= the platform's), and keep model charts' values under `model.name`, `namespace` (= projectNamespace), `llmisvc.args`/`extraArgs` (plain tokens or `--opt='value'`).
+
 A Go hub service (React UI, Postgres) that writes gateway objects directly to clusters with stored kubeconfigs, outside Helm and Argo CD.
 
 - It owns everything labelled `app.kubernetes.io/managed-by: aigw-ui`: `fleet-<slug>` (AIGatewayRoute, AIServiceBackend, Backend, BackendTrafficPolicy), `fleet-<slug>-retry` (EnvoyPatchPolicy), `fleetbe-<slug>`, QuotaPolicies, InferenceObjective `best-effort`, Secret `aigw-ui-api-keys`, SecurityPolicy `aigw-ui-api-key-auth`.
@@ -92,7 +94,7 @@ helm template x charts/platform/<c> -f gitops/app-of-apps/operators/<c>/values.y
 - `charts/envoy-gateway` and `charts/envoy-ai-gateway` **do not render as checked in**: their dependencies were extracted to `charts/upstream-subcharts/` instead of each wrapper's `charts/`. To render, copy the wrapper to a scratch directory and place the vendored chart at `<copy>/charts/gateway-helm` or `<copy>/charts/ai-gateway-helm`.
 - Monitoring subcharts render standalone only with `--set global.clusterName=x --set global.baseDomain=y`.
 - Model and platform charts have no tests or CI; platform charts have no `fail` guards, so bad values render silently or die with nil-pointer errors.
-- Deployed model charts are `glm53-bundled`, `qwen38-bundled`, `qwen36-judge`. `generic-model` claims to supersede them but nothing deploys it; `llm-model` is the gateway/fleet companion chart.
+- **`model-deployer`** is the one chart for every model (generic-model's stack + the fleet side, nothing on the client listener). `operators/{glm53,qwen38,qwen36-judge,qwen-tiny}/<op>.yaml` point at it; a model's recipe is `operators/<op>/values.yaml`, a cluster's shape its `sites/…/<cluster>/<op>/values.yaml` (glm53's B200 shape is cluster-llm-prep's). `glm53-bundled`, `qwen38-bundled`, `qwen36-judge`, `generic-model`, `llm-model` are kept for reference. Render: `helm template x charts/model-deployer --kube-version 1.32.0 -f gitops/app-of-apps/operators/<op>/values.yaml -f <cluster layer>`; parity with the old charts is in its README.
 - Templates are copy-pasted between sibling model charts (`pull-jobs`, `scc`, `lmcache-engine`, `node-prep`, `local-storage`) and between platform charts (`subscription`, `operatorgroup`, `namespace`). Mirror a fix across them.
 - Platform charts follow Namespace (wave 1) → OperatorGroup (2) → Subscription (3) → CR (4+), ordered only by Argo sync-waves. `charts/platform/lvms/CLAUDE.md` exists; its override path and catalog source name predate this layout.
 
