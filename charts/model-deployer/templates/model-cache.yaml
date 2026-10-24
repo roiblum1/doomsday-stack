@@ -45,6 +45,19 @@ spec:
         app.kubernetes.io/name: {{ include "md.llmisvcName" . }}-download
     spec:
       restartPolicy: OnFailure
+      # A ReadWriteOnce PVC can be used on one node only: once the model runs,
+      # a new download (a new uri) has to run on the model's node, or it waits
+      # for the volume. Preferred, so the first download can run anywhere.
+      affinity:
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: {{ $name }}
+                    kserve.io/component: workload
       securityContext:
         runAsNonRoot: true
         seccompProfile:
