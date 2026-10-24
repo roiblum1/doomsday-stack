@@ -1,0 +1,9 @@
+{{ .Values.model.name }} on the peer listener of {{ .Values.gateway.namespace }}/{{ .Values.gateway.name }}, namespace {{ .Release.Namespace }}.
+{{- if include "md.cached" . }}
+Weights: PVC {{ include "md.name" . }}-model, directory {{ include "md.cacheDir" . }}, filled by Job {{ include "md.name" . }}-download-{{ include "md.cacheDir" . }}.
+{{- end }}
+
+  oc -n {{ .Release.Namespace }} get llminferenceservice {{ include "md.name" . }}
+  oc -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name={{ include "md.name" . }}
+
+Clients reach it through aigw-ui's entry route once the model's entry route is on in aigw-ui (Models).

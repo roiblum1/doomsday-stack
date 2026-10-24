@@ -1,0 +1,89 @@
+{{- if include "md.cached" . }}
+{{- $name := include "md.name" . -}}
+{{- $dir := include "md.cacheDir" . -}}
+# The weights, downloaded once. Argo CD applies wave -1 first and waits for
+# the Job to finish before it applies the model (wave 0).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}-model
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "md.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    # Kept when the deployment is deleted with Argo CD's cascade: the
+    # weights take long to download again. Delete it by hand.
+    argocd.argoproj.io/sync-options: Delete=false
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [{{ .Values.storage.cache.accessMode }}]
+  {{- with .Values.storage.cache.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.cache.size }}
+---
+# A Job's spec cannot change, so its name carries the directory, which is
+# named after the uri: a new uri is a new Job and a new directory.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-download-{{ $dir }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "md.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "md.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: download
+          image: {{ .Values.storage.initializerImage }}
+          # KServe's initializer: <source uri> <target directory>. Downloading
+          # into a directory that already has the files checks them and
+          # fetches only what is missing.
+          args:
+            - {{ .Values.model.uri | quote }}
+            - /mnt/models/{{ $dir }}
+          env:
+            - name: HOME
+              value: {{ .Values.storage.downloadHome | default "/tmp" }}
+            - name: HF_HOME
+              value: {{ .Values.storage.downloadHome | default "/tmp" }}/hf
+          {{- with .Values.storage.s3.secretName }}
+          envFrom:
+            - secretRef:
+                name: {{ . }}
+          {{- end }}
+          {{- with .Values.storage.downloadResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: model
+              mountPath: /mnt/models
+            - name: tmp
+              mountPath: {{ .Values.storage.downloadHome | default "/tmp" }}
+      volumes:
+        - name: model
+          persistentVolumeClaim:
+            claimName: {{ $name }}-model
+        - name: tmp
+          emptyDir: {}
+{{- end }}

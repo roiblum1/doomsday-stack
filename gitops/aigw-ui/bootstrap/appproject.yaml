@@ -1,0 +1,38 @@
+# What an Application of aigw-ui's models may do. Apply once to the Argo CD
+# instance (namespace openshift-gitops on OpenShift GitOps).
+#
+# - Only this repository.
+# - Only clusters registered for this project (a cluster Secret with
+#   project: aigw-ui-models, see cluster-secret.example.yaml).
+# - Only the kinds charts/model-deployer renders, plus the Namespace that
+#   CreateNamespace makes. No cluster-wide kind but Namespace.
+# - Never the gateway's namespaces, where aigw-ui's own objects live.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: aigw-ui-models
+  namespace: openshift-gitops
+spec:
+  description: Models aigw-ui deploys (gitops/aigw-ui/deployments with charts/model-deployer)
+  sourceRepos:
+    - https://github.com/roiblum1/doomsday-stack.git
+  permitOnlyProjectScopedClusters: true
+  destinations:
+    - {name: "*", namespace: "!envoy-ai-gateway-system"}
+    - {name: "*", namespace: "!envoy-gateway-system"}
+    - {name: "*", namespace: "!kserve"}
+    - {name: "*", namespace: "!openshift*"}
+    - {name: "*", namespace: "!kube-*"}
+    - {name: "*", namespace: "!default"}
+    - {name: "*", namespace: "*"}
+  clusterResourceWhitelist:
+    - {group: "", kind: Namespace}
+  namespaceResourceWhitelist:
+    - {group: serving.kserve.io, kind: LLMInferenceService}
+    - {group: llm-d.ai, kind: InferenceObjective}
+    - {group: aigateway.envoyproxy.io, kind: AIGatewayRoute}
+    - {group: gateway.networking.k8s.io, kind: HTTPRoute}
+    - {group: gateway.envoyproxy.io, kind: BackendTrafficPolicy}
+    - {group: "", kind: PersistentVolumeClaim}
+    - {group: batch, kind: Job}
+    - {group: monitoring.coreos.com, kind: PrometheusRule}
