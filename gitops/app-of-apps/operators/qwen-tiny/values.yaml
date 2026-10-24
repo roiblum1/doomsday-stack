@@ -19,7 +19,7 @@ modelCache:
 serviceAccount:
   name: ""
 images:
-  vllm: public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:v0.29.0
+  vllm: docker.io/vllm/vllm-openai-cpu:v0.32.0
 llmisvc:
   replicas: 1
   # CPU: a surge pod is fine, and keeps the model answering while the new
